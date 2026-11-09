@@ -6,6 +6,10 @@ Explore red-team agent harnesses, penetration testing, exploit validation, vulne
 
 [Browse the catalog](https://paperswithcode-cyber.com/catalog) · [Connect via MCP](https://paperswithcode-cyber.com/mcp) · [Run the Cyber catalog locally](local-dev/README.md)
 
+[![Watch the Cyber catalog in action: trending research, filters, organizations, developers, and MCP](docs/media/catalog-preview.gif)](https://paperswithcode-cyber.com)
+
+[Watch the full 55-second demo](https://paperswithcode-cyber.com/catalog-demo.mp4) · The preview loops automatically unless your GitHub motion settings disable animation.
+
 This is a fork of [Hugging Face's Papers with Code](https://github.com/huggingface/paperswithcode). The repository includes the upstream application and its optional features. The Cyber deployment runs the discovery profile with keyword search and read-only tools.
 
 ## Features
