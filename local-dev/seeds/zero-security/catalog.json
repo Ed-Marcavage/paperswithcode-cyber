@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "names": {
+    "topic": {
+      "vulnerability-analysis": "Vulnerability detection and triage",
+      "penetration-testing": "Penetration testing",
+      "binary-analysis": "Binary analysis",
+      "repair": "Vulnerability repair"
+    },
+    "target": {
+      "source-code": "Source code",
+      "binaries": "Native binaries"
+    },
+    "contribution": {
+      "system": "System or technique"
+    },
+    "kind": {
+      "repository": "Repository"
+    },
+    "year": {}
+  },
+  "rows": [
+    {
+      "id": "gh-repo-1339271188",
+      "title": "0sec-labs/0",
+      "abstract": "0 is a security-agent harness with a browser interface, headless CLI and MCP integration. It provides reusable workflows for source review, penetration testing, vulnerability investigation, verification and fixes, plus Ghidra-based binary analysis. Users supply a model provider; runs retain results and source-linked notes. The maintainers describe it as a research preview.",
+      "url": "https://github.com/0sec-labs/0",
+      "artifact_url": "https://github.com/0sec-labs/0",
+      "kind": "repository",
+      "facets": {
+        "topic": [
+          "vulnerability-analysis",
+          "penetration-testing",
+          "binary-analysis",
+          "repair"
+        ],
+        "target": [
+          "source-code",
+          "binaries"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "kind": [
+          "repository"
+        ],
+        "year": []
+      }
+    }
+  ]
+}

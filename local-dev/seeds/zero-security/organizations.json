@@ -1,0 +1,17 @@
+[
+  {
+    "slug": "0sec-labs",
+    "name": "0security",
+    "website_url": "https://0.security",
+    "github_url": "https://github.com/0sec-labs",
+    "description": "Maintainers of the 0 security-agent harness and publishers of applied vulnerability research.",
+    "github_account_id": 274613126,
+    "works": [
+      {
+        "id": "gh-repo-1339271188",
+        "role": "repository owner",
+        "evidence": "https://github.com/0sec-labs/0"
+      }
+    ]
+  }
+]

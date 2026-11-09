@@ -1,0 +1,19 @@
+{
+  "repositories": [
+    {
+      "full_name": "0sec-labs/0",
+      "url": "https://github.com/0sec-labs/0",
+      "stars": 707,
+      "archived": false,
+      "observed_at": "2026-11-09T05:17:37.714803+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/0sec-labs/0",
+          "is_official": true,
+          "evidence_url": "https://github.com/0sec-labs/0/blob/5169ae22d7fc339730b93a963441955086a57a56/README.md",
+          "evidence_note": "The catalog entry represents this repository itself. Its README documents the security workflow runner, CLI, MCP and binary analysis integration."
+        }
+      ]
+    }
+  ]
+}
