@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This repository is the Cyber catalog fork of Hugging Face's Papers with Code. For work on this fork use the [local discovery setup](local-dev/README.md), the `Ed-Marcavage/paperswithcode` repository and <https://paperswithcode-cyber.com>. Its code releases and data imports are separate operations.
+This repository is the Cyber catalog fork of Hugging Face's Papers with Code. For work on this fork use the [local discovery setup](local-dev/README.md), the `Ed-Marcavage/paperswithcode-cyber` repository and <https://paperswithcode-cyber.com>. Its code releases and data imports are separate operations.
 
 The production and staging hosts, services, deploy commands, GitHub review automation and automatic merge/deploy instructions below describe the upstream Hugging Face project. They apply only to work authorized for upstream. For this fork, use the target environment and publication scope requested by its maintainer.
 

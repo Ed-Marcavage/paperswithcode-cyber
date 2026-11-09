@@ -1,14 +1,16 @@
-# Cyberintel research catalog
+# Papers With Code Cyber
 
-This site serves reviewed cybersecurity papers, their source artifacts, and
-read-only access for MCP clients. Resolve paths against the origin that
-served this document.
+This site serves reviewed cybersecurity papers, engineering posts, and security
+agent repositories, with read-only access for MCP clients. Topics include red-team
+harnesses, penetration testing, vulnerability research, and security benchmarks.
+Resolve paths against the origin that served this document.
 
 - Browse the catalog: /catalog
 - MCP setup and Streamable HTTP endpoint: /mcp
 - MCP health: /mcp/health
 - MCP tool schema: /mcp/schema
-- CLI and MCP source: https://github.com/Ed-Marcavage/pwc-cli
+- CLI and MCP source: https://github.com/Ed-Marcavage/pwc-cli-cyber
+- Website source: https://github.com/Ed-Marcavage/paperswithcode-cyber
 - REST catalog filters: /api/v1/catalog/filters
 - REST catalog papers: /api/v1/catalog/papers
 

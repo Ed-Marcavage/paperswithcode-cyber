@@ -596,7 +596,7 @@ def test_installer_includes_mcp_unit_and_separate_repository():
     tools = Path("deploy/install_deploy_tools.py").read_text()
     assert '"paperswithcode-mcp@.service"' in host_layout
     assert '"paperswithcode-mcp@.service"' in tools
-    assert "https://github.com/Ed-Marcavage/pwc-cli.git" in host_layout
+    assert "https://github.com/Ed-Marcavage/pwc-cli-cyber.git" in host_layout
     assert '"pwc-mcp"' in host_layout
 
 

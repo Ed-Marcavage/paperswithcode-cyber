@@ -14,8 +14,8 @@ Choose a paper you haven’t sent me before. Favor relevance over recency. Start
 Link to the catalog entry, the original paper, and the authors’ code when available.
 
 If you have a feature request or bug fix, please submit an issue, both the MCP and website are OSS below:
-- https://github.com/Ed-Marcavage/pwc-cli
-- https://github.com/Ed-Marcavage/paperswithcode`;
+- https://github.com/Ed-Marcavage/pwc-cli-cyber
+- https://github.com/Ed-Marcavage/paperswithcode-cyber`;
 
 export default function PersonalAgentsView() {
   useDocumentTitle(formatPageTitle("Personal agents"));

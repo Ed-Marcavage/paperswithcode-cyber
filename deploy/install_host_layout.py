@@ -404,7 +404,7 @@ def main() -> int:
                 "git",
                 "clone",
                 "--mirror",
-                "https://github.com/Ed-Marcavage/pwc-cli.git",
+                "https://github.com/Ed-Marcavage/pwc-cli-cyber.git",
                 str(mcp_repository),
             ],
             check=True,

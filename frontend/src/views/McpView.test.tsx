@@ -35,7 +35,7 @@ describe("McpView", () => {
     renderView();
 
     const banner = screen.getByRole("link", { name: /Ed-Marcavage\/pwc-cli/ });
-    expect(banner).toHaveAttribute("href", "https://github.com/Ed-Marcavage/pwc-cli");
+    expect(banner).toHaveAttribute("href", "https://github.com/Ed-Marcavage/pwc-cli-cyber");
   });
 
   it("reports healthy version and protocol without blocking the page", async () => {
@@ -129,7 +129,7 @@ describe("McpView", () => {
     expect(screen.getByText(/Trace the predecessor and successor papers/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /CLI repository/ })).toHaveAttribute(
       "href",
-      "https://github.com/Ed-Marcavage/pwc-cli",
+      "https://github.com/Ed-Marcavage/pwc-cli-cyber",
     );
     expect(screen.getByRole("link", { name: /llms.txt/ })).toHaveAttribute(
       "href",

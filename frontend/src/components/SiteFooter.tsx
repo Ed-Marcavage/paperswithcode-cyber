@@ -14,6 +14,10 @@ const SiteFooter = () => {
         <Link to="/docs/api">API</Link>
         <Link to="/mcp">MCP</Link>
         <Link to="/privacy">Privacy</Link>
+        {isDiscoveryCatalog() && <>
+          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber" target="_blank" rel="noreferrer">GitHub</a>
+          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber/issues" target="_blank" rel="noreferrer">Feedback</a>
+        </>}
         {!isDiscoveryCatalog() && <>
         <a
           href="https://github.com/huggingface/paperswithcode-feedback/issues"

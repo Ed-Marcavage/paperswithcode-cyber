@@ -6,7 +6,7 @@ description: "Papers With Code CLI (`pwc`) for searching and reading AI/ML paper
 Install:
 
 ```bash
-uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
+uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli-cyber.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
 export PWC_API_URL=http://localhost:8095/api/v1
 pwc search EVMbench --mode keyword
 ```

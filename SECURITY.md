@@ -5,7 +5,7 @@
 Please report security issues privately. Do not open a public GitHub issue,
 pull request, or discussion for a suspected vulnerability.
 
-For Papers With Code Cyber, use **Report a vulnerability** on the [fork's Security tab](https://github.com/Ed-Marcavage/paperswithcode/security) when available. If it is unavailable, contact [the fork's maintainer](https://github.com/Ed-Marcavage) to arrange a private reporting channel before sharing technical details.
+For Papers With Code Cyber, use **Report a vulnerability** on the [fork's Security tab](https://github.com/Ed-Marcavage/paperswithcode-cyber/security) when available. If it is unavailable, contact [the fork's maintainer](https://github.com/Ed-Marcavage) to arrange a private reporting channel before sharing technical details.
 
 For a vulnerability affecting the original Papers with Code service, follow the [upstream security policy](https://github.com/huggingface/paperswithcode/security/policy).
 

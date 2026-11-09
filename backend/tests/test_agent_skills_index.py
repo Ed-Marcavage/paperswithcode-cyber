@@ -21,7 +21,7 @@ def test_agent_skills_index_matches_published_skill():
     assert skill["name"] == "pwc-cli"
     assert skill["type"] == "skill-md"
     assert re.fullmatch(
-        r"https://raw\.githubusercontent\.com/Ed-Marcavage/pwc-cli/"
+        r"https://raw\.githubusercontent\.com/Ed-Marcavage/pwc-cli-cyber/"
         r"[a-f0-9]{40}/standalone_cli/SKILL\.md", skill["url"]
     )
     assert skill["description"] in SKILL_PATH.read_text(encoding="utf-8")

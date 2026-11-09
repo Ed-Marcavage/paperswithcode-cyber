@@ -114,7 +114,7 @@ reader returns a source link. The project artifact may be a subdirectory;
 Trending credits stars to the enclosing GitHub repository. MCP adds no
 server-side chat agent; a client can use its own assistant.
 
-The MCP image builds a pinned revision of [the CLI fork](https://github.com/Ed-Marcavage/pwc-cli) with
+The MCP image builds a pinned revision of [the CLI fork](https://github.com/Ed-Marcavage/pwc-cli-cyber) with
 the catalog changes in `mcp.patch`. A standalone CLI also needs
 `PWC_API_URL=http://localhost:8095/api/v1` to search this local catalog.
 API responses, schema discovery and

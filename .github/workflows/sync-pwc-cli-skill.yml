@@ -21,7 +21,7 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-24.04
     env:
-      UPSTREAM_REPOSITORY: Ed-Marcavage/pwc-cli
+      UPSTREAM_REPOSITORY: Ed-Marcavage/pwc-cli-cyber
       UPSTREAM_PATH: standalone_cli/SKILL.md
       DESTINATION: backend/chat_sandbox_worker/PWC_CLI_SKILL.md
       SKILL_INDEX: frontend/public/.well-known/agent-skills/index.json

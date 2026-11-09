@@ -2,6 +2,8 @@
 
 Papers With Code Cyber is a curated catalog of cybersecurity papers, engineering posts, and repositories for people building and evaluating security agents. Browse by topic, target, or contribution, find organizations and developers, or connect a personal agent to the read-only MCP.
 
+Explore red-team agent harnesses, penetration testing, exploit validation, vulnerability analysis, binary analysis, and security benchmarks with links to the authors' code.
+
 [Browse the catalog](https://paperswithcode-cyber.com/catalog) · [Connect via MCP](https://paperswithcode-cyber.com/mcp) · [Run the Cyber catalog locally](local-dev/README.md)
 
 This is a fork of [Hugging Face's Papers with Code](https://github.com/huggingface/paperswithcode). The repository includes the upstream application and its optional features. The Cyber deployment runs the discovery profile with keyword search and read-only tools.
@@ -59,8 +61,8 @@ This is a fork of [Hugging Face's Papers with Code](https://github.com/huggingfa
 ### 1. Install dependencies
 
 ```bash
-git clone https://github.com/Ed-Marcavage/paperswithcode.git
-cd paperswithcode
+git clone https://github.com/Ed-Marcavage/paperswithcode-cyber.git
+cd paperswithcode-cyber
 uv sync
 cd frontend && npm install && cd ..
 ```
@@ -135,10 +137,10 @@ uv run --env-file backend/keys.env pwc cron health               # scheduled-job
 ```
 
 For read-only access to the public catalog from any machine, install the
-standalone [`pwc-cli`](https://github.com/Ed-Marcavage/pwc-cli):
+standalone [`pwc-cli`](https://github.com/Ed-Marcavage/pwc-cli-cyber):
 
 ```bash
-uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
+uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli-cyber.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
 PWC_API_URL=http://localhost:8095/api/v1 pwc search EVMbench --mode keyword
 ```
 
