@@ -33,4 +33,7 @@
   overflow-wrap: anywhere;
 }
 
-.agent-prompt-body p { margin: 1em 0 0; }
+.agent-prompt-body p {
+  margin: 1em 0 0;
+  white-space: pre-wrap;
+}

@@ -5,13 +5,17 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { formatPageTitle } from "@/lib/latexPlainText";
 import "./PersonalAgentsView.css";
 
-const prompt = `Pick one cybersecurity paper for me every morning based on what you know about what I’m building, researching, or learning. Give me the first pick now.
+const prompt = `Pick one cybersecurity paper, blog or repo for me every morning based on what you know about what I’m building, researching, or learning. Give me the first pick now.
 
-Use the Papers With Code Cyber catalog. Connect to its public, read-only MCP at https://paperswithcode-cyber.com/mcp. If you can’t use MCP, browse https://paperswithcode-cyber.com/api/v1/catalog/papers?kind=paper. Neither requires an API key.
+Use the Papers With Code Cyber catalog. Connect to its public MCP at https://paperswithcode-cyber.com/mcp. If you can’t use MCP, browse https://paperswithcode-cyber.com/api/v1/catalog/papers?kind=paper. Neither requires an API key.
 
 Choose a paper you haven’t sent me before. Favor relevance over recency. Start with one sentence explaining why you picked it for me. Then tell me what the authors tried, what they found, one limitation, and one idea I could test in my own work. Read the original when available, and say if you only had the abstract.
 
-Link to the catalog entry, the original paper, and the authors’ code when available.`;
+Link to the catalog entry, the original paper, and the authors’ code when available.
+
+If you have a feature request or bug fix, please submit an issue, both the MCP and website are OSS below:
+- https://github.com/Ed-Marcavage/pwc-cli
+- https://github.com/Ed-Marcavage/paperswithcode`;
 
 export default function PersonalAgentsView() {
   useDocumentTitle(formatPageTitle("Personal agents"));
