@@ -186,10 +186,15 @@ const OrganizationsIndexView: React.FC = () => {
               const showStars = discovery && sort === "stars";
               const workCounts = [
                 [count, "paper", "papers"],
-                [organization.post_count, "post", "posts"],
-                [organization.repository_count, "repository", "repositories"],
+                [organization.post_count ?? 0, "post", "posts"],
+                [organization.repository_count ?? 0, "repository", "repositories"],
               ] as const;
-              const kinds = workCounts.filter(([n]) => n && n > 0)
+              const [primaryCount, singular, plural] = discovery && count === 0
+                ? workCounts.reduce((largest, work) => work[0] > largest[0] ? work : largest)
+                : workCounts[0];
+              const kinds = workCounts
+                .filter(([n, kind]) => (n > 0 || kind === "paper") &&
+                  (showStars || singular === "paper" || kind !== singular))
                 .map(([n, singular, plural]) => `${n} ${n === 1 ? singular : plural}`).join(" · ");
               const githubLogin = organization.github_url?.split("/").filter(Boolean).pop();
               const years =
@@ -213,8 +218,8 @@ const OrganizationsIndexView: React.FC = () => {
                     </div>
                   </div>
                   <div className="organization-card-metrics">
-                    <strong>{showStars ? (organization.catalog_stars?.toLocaleString() ?? "—") : count.toLocaleString()}</strong>
-                    <span>{showStars ? "stars" : count === 1 ? "paper" : "papers"}</span>
+                    <strong>{showStars ? (organization.catalog_stars?.toLocaleString() ?? "—") : primaryCount.toLocaleString()}</strong>
+                    <span>{showStars ? "stars" : primaryCount === 1 ? singular : plural}</span>
                     {discovery && <span className="organization-kind-summary">{kinds}
                       {!showStars && organization.catalog_stars != null && ` · ★ ${organization.catalog_stars.toLocaleString()}`}
                     </span>}
