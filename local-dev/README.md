@@ -178,6 +178,17 @@ the browser's CSP to permit connections to the selected ingest host if the
 site has a restrictive `connect-src`. Browser or network blocking can reduce
 these counts. Analytics outages and rate spikes do not block MCP requests.
 
+README referral measurement uses an allowlist, not automatic URL or referrer capture.
+Links with `utm_source=github`, `utm_medium=readme`, and
+`utm_campaign=awesome-security-agent-harnesses` add fixed `referral_source` and
+`referral_campaign` properties to the landing `$pageview`. `utm_content=catalog`
+or `utm_content=mcp` adds `referral_link`; all other campaign values are dropped.
+The label is not persisted to later visits. In PostHog, filter production
+`$pageview` events by `referral_campaign` and count unique visitors. Compare that
+with GitHub repository visitors for the same dates as an estimated referral rate;
+GitHub does not expose README impressions or outbound clicks, and browser privacy
+controls can reduce the measured visits.
+
 | Event | Meaning |
 | --- | --- |
 | `$pageview` | A pathname navigation in the catalog; only its page category is sent. Count distinct browser IDs for weekly visitors. A filter change is not a new pageview. |

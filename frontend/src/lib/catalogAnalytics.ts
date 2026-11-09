@@ -7,7 +7,8 @@ type Resource = "pdf" | "reader" | "cached_text" | "source" | "code" | "artifact
 type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked";
 const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version",
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
-  "topic", "target", "contribution", "kind", "year", "catalog_environment"]);
+  "topic", "target", "contribution", "kind", "year", "catalog_environment",
+  "referral_source", "referral_campaign", "referral_link"]);
 const events = new Set<Event>(["$pageview", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked"]);
 export const catalogOptions = {
   ...posthogPrivacyOptions,
@@ -33,7 +34,21 @@ function capture(event: Event, properties: Record<string, unknown>) {
   if (!isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || catalogPrivacySignal()) return;
   posthog.capture(event, { ...properties, catalog_environment: import.meta.env.VITE_CATALOG_ANALYTICS_ENV || "preview" });
 }
-export function catalogPageview(path: string) { capture("$pageview", {page: catalogPage(path)}); }
+/** Recognize our public README links without collecting arbitrary campaign or URL text. */
+export function catalogReferral(search: string) {
+  const params = new URLSearchParams(search);
+  if (params.get("utm_source") !== "github" || params.get("utm_medium") !== "readme" ||
+      params.get("utm_campaign") !== "awesome-security-agent-harnesses") return {};
+  const link = params.get("utm_content");
+  return {
+    referral_source: "github",
+    referral_campaign: "awesome-security-agent-harnesses",
+    ...(link === "catalog" || link === "mcp" ? {referral_link: link} : {}),
+  };
+}
+export function catalogPageview(path: string) {
+  capture("$pageview", {page: catalogPage(path), ...catalogReferral(window.location.search)});
+}
 export function catalogNavigation(to: string) {
   if (to === "/catalog" || to === "/mcp" || to === "/personal-agents") capture("catalog_navigation", {surface: "top_nav", destination: to.slice(1)});
 }
