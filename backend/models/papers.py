@@ -281,6 +281,8 @@ class Paper(BaseModel):
             "as character spans of `abstract` (paper detail only)."
         ),
     )
+    catalog_kind: Optional[str] = Field(None, description="Reviewed catalog source type")
+    catalog_contributions: Optional[List[str]] = Field(None, description="Reviewed discovery catalog contributions")
     tasks: Optional[List["TaskSummary"]] = Field(
         None, description="AI/ML tasks associated with this paper"
     )

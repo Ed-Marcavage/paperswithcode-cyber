@@ -23,7 +23,8 @@ vi.mock("@/lib/api/catalog", () => ({
     searchOrganizations: (...args: unknown[]) => searchOrganizations(...args),
   },
 }));
-vi.mock("@/lib/apiUrl", () => ({ isChatEnabled: () => true }));
+const flags = vi.hoisted(() => ({ discovery: false }));
+vi.mock("@/lib/apiUrl", () => ({ isChatEnabled: () => !flags.discovery, isDiscoveryCatalog: () => flags.discovery }));
 vi.mock("@/hooks/useDebounce", () => ({ useDebounce: (value: string) => value }));
 
 const Location = () => <div data-testid="location">{useLocation().pathname}{useLocation().search}</div>;
@@ -44,6 +45,7 @@ function renderOverlay(onClose = vi.fn()) {
 
 describe("SearchOverlay paper handoff", () => {
   beforeEach(() => {
+    flags.discovery = false;
     searchPapers.mockReset();
     searchPapers.mockResolvedValue({ results: [], next_page: 2, previous_page: null });
     searchAuthors.mockReset();
@@ -72,6 +74,15 @@ describe("SearchOverlay paper handoff", () => {
     } finally {
       window.removeEventListener("keydown", pageKeydown);
     }
+  });
+
+  it("opens keyword results on Enter in the discovery catalog", () => {
+    flags.discovery = true;
+    renderOverlay();
+    const input = screen.getByPlaceholderText(/Search papers/);
+    fireEvent.change(input, { target: { value: "EVMbench" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByTestId("location")).toHaveTextContent("/papers?search=EVMbench");
   });
 
   it("keeps Enter assigned to the assistant", async () => {

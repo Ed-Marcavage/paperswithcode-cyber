@@ -1,0 +1,136 @@
+{
+  "arxiv:2505.11565": {
+    "source": "https://arxiv.org/abs/2505.11565v2",
+    "paper_license": "http://creativecommons.org/licenses/by-nc-sa/4.0/",
+    "pdf": "https://arxiv.org/pdf/2505.11565v2"
+  },
+  "arxiv:2402.11814": {
+    "source": "https://arxiv.org/abs/2402.11814v1",
+    "paper_license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "pdf": "https://arxiv.org/pdf/2402.11814v1"
+  },
+  "arxiv:2508.03936": {
+    "source": "https://arxiv.org/abs/2508.03936v1",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2508.03936v1"
+  },
+  "arxiv:2510.18131": {
+    "source": "https://arxiv.org/abs/2510.18131v2",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2510.18131v2"
+  },
+  "arxiv:2602.05523": {
+    "source": "https://arxiv.org/abs/2602.05523v2",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2602.05523v2"
+  },
+  "arxiv:2610.07557": {
+    "source": "https://arxiv.org/abs/2610.07557v1",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2610.07557v1"
+  },
+  "arxiv:2404.13161": {
+    "source": "https://arxiv.org/abs/2404.13161v1",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2404.13161v1"
+  },
+  "arxiv:2610.02206": {
+    "source": "https://arxiv.org/abs/2610.02206v1",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2610.02206v1"
+  },
+  "arxiv:2308.12086": {
+    "source": "https://arxiv.org/abs/2308.12086v2",
+    "paper_license": "http://creativecommons.org/licenses/by-nc-nd/4.0/",
+    "pdf": "https://arxiv.org/pdf/2308.12086v2"
+  },
+  "arxiv:2510.11688": {
+    "source": "https://arxiv.org/abs/2510.11688v1",
+    "paper_license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "pdf": "https://arxiv.org/pdf/2510.11688v1"
+  },
+  "arxiv:2511.11019": {
+    "source": "https://arxiv.org/abs/2511.11019v1",
+    "paper_license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "pdf": "https://arxiv.org/pdf/2511.11019v1"
+  },
+  "arxiv:2603.02277": {
+    "source": "https://arxiv.org/abs/2603.02277v3",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2603.02277v3"
+  },
+  "arxiv:2507.19399": {
+    "source": "https://arxiv.org/abs/2507.19399v1",
+    "paper_license": "http://creativecommons.org/licenses/by/4.0/",
+    "pdf": "https://arxiv.org/pdf/2507.19399v1"
+  },
+  "arxiv:2607.26791": {
+    "source": "https://arxiv.org/abs/2607.26791v1",
+    "paper_license": "http://arxiv.org/licenses/nonexclusive-distrib/1.0/",
+    "pdf": "https://arxiv.org/pdf/2607.26791v1"
+  },
+  "post:cloudflare:build-your-own-vulnerability-harness": {
+    "source": "https://blog.cloudflare.com/build-your-own-vulnerability-harness/",
+    "publisher_artwork": "https://blog.cloudflare.com/_emdash/api/media/file/01KW9WMBPK5EVD04H7DQCYTF3Q.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:cloudflare:cyber-frontier-models": {
+    "source": "https://blog.cloudflare.com/cyber-frontier-models/",
+    "publisher_artwork": "https://blog.cloudflare.com/_emdash/api/media/file/01KW46MAMYB08GREHFV622DEC1.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:cloudflare:frontier-model-defense": {
+    "source": "https://blog.cloudflare.com/frontier-model-defense/",
+    "publisher_artwork": "https://blog.cloudflare.com/_emdash/api/media/file/01KW48R3X9M0KK0FWY5B0W6ZA1.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:google:chrome-stronger-with-every-update": {
+    "source": "https://blog.google/security/chrome-stronger-with-every-update/",
+    "publisher_artwork": "https://storage.googleapis.com/gweb-uniblog-publish-prod/images/Screenshot_2026-07-17_at_5.00.43PM.width-1300.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:shopify:river-vulnerability-remediation": {
+    "source": "https://shopify.engineering/river-vulnerability-remediation",
+    "publisher_artwork": "https://cdn.shopify.com/b/shopify-brochure2-assets/07e1fad36dab89645573962ca37bcae1.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:trail-of-bits:auditing-in-the-age-of-good-enough-ai": {
+    "source": "https://blog.trailofbits.com/2026/09/18/auditing-in-the-age-of-good-enough-ai/",
+    "publisher_artwork": "https://blog.trailofbits.com/2026/09/18/auditing-in-the-age-of-good-enough-ai/auditing-ai-social-banner.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:ramp:100-vulnerabilities-patched-with-0-humans": {
+    "source": "https://engineering.ramp.com/post/100-vulnerabilities-patched-with-0-humans",
+    "publisher_artwork": "https://assets.ramp.com/builders-blog/ramp_engineering.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:accomplish:beltdown-escaping-the-claude-code-sandbox": {
+    "source": "https://accomplish.ai/blog/beltdown-escaping-the-claude-code-sandbox/",
+    "publisher_artwork": "https://accomplish.ai/images/beltdown-claude-code-key.jpg",
+    "text": "original editorial description and publisher link"
+  },
+  "post:anthropic:multiagent-systems": {
+    "source": "https://www.anthropic.com/research/multiagent-systems",
+    "publisher_artwork": "https://www-cdn.anthropic.com/images/4zrzovbb/website/e63815d305c8470e3222e5471183dff4e5783b4b-1200x630.jpg",
+    "text": "original editorial description and publisher link"
+  },
+  "post:booz-allen:cyber-weapon-index": {
+    "source": "https://www.boozallen.com/insights/cyber/cyber-weapon-index.html",
+    "publisher_artwork": "https://www.boozallen.com/assets/home/images/article/thumbnail/cwi-thumb-social-withtitle.png.img.png",
+    "text": "original editorial description and publisher link"
+  },
+  "post:openai:defense-factory": {
+    "source": "https://openai.com/the-defense-factory/",
+    "date": "Exact publication day unverified"
+  },
+  "repo:cloudflare/security-audit-skill": {
+    "source": "https://github.com/cloudflare/security-audit-skill",
+    "date": "GitHub repository creation date",
+    "github_repository_id": 1273427276
+  },
+  "repo:chainreactors/cyber-harness": {
+    "source": "https://github.com/chainreactors/cyber-harness",
+    "date": "GitHub repository creation date",
+    "github_repository_id": 1232001105
+  }
+}

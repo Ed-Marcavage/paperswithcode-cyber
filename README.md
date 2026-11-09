@@ -1,12 +1,10 @@
-# Papers with Code
+# Papers With Code Cyber
 
-Papers with Code makes open AI research and its artifacts accessible: papers,
-code, models, datasets, tasks, methods, and benchmark leaderboards. It recreates
-the original paperswithcode.com, which Meta retired in 2025, and keeps it up to
-date with automated imports from Hugging Face, arXiv, GitHub, and public
-leaderboards.
+Papers With Code Cyber is a curated catalog of cybersecurity papers, engineering posts, and repositories for people building and evaluating security agents. Browse by topic, target, or contribution, find organizations and developers, or connect a personal agent to the read-only MCP.
 
-**Live site:** https://paperswithcode.co
+[Browse the catalog](https://paperswithcode-cyber.com/catalog) · [Connect via MCP](https://paperswithcode-cyber.com/mcp) · [Run the Cyber catalog locally](local-dev/README.md)
+
+This is a fork of [Hugging Face's Papers with Code](https://github.com/huggingface/paperswithcode). The repository includes the upstream application and its optional features. The Cyber deployment runs the discovery profile with keyword search and read-only tools.
 
 ## Features
 
@@ -61,7 +59,7 @@ leaderboards.
 ### 1. Install dependencies
 
 ```bash
-git clone https://github.com/huggingface/paperswithcode.git
+git clone https://github.com/Ed-Marcavage/paperswithcode.git
 cd paperswithcode
 uv sync
 cd frontend && npm install && cd ..
@@ -137,13 +135,14 @@ uv run --env-file backend/keys.env pwc cron health               # scheduled-job
 ```
 
 For read-only access to the public catalog from any machine, install the
-standalone [`pwc-cli`](https://github.com/huggingface/pwc-cli):
+standalone [`pwc-cli`](https://github.com/Ed-Marcavage/pwc-cli):
 
 ```bash
-uv tool install 'git+https://github.com/huggingface/pwc-cli.git#subdirectory=standalone_cli'
+uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
+PWC_API_URL=http://localhost:8095/api/v1 pwc search EVMbench --mode keyword
 ```
 
-## Hosted deployment
+## Upstream hosted deployment
 
 paperswithcode.co runs production and staging as immutable releases behind
 nginx; see [docs/deployment.md](docs/deployment.md) and
@@ -175,4 +174,4 @@ Please report vulnerabilities privately; see [SECURITY.md](SECURITY.md).
 
 ## License
 
-Papers with Code is licensed under the [Apache License 2.0](LICENSE).
+The application code is licensed under the [Apache License 2.0](LICENSE). The bundled paper texts and first-page previews retain each paper's license. Their [provenance manifest](local-dev/seeds/harness-catalog/provenance.json) identifies the source revisions and licenses, and the text files credit the authors and identify the conversion. Product marks retain their own terms. See the [agent artwork notices](frontend/src/assets/agents/README.md).

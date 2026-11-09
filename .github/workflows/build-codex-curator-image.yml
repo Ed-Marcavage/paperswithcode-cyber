@@ -18,6 +18,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.repository == 'huggingface/paperswithcode'
     environment: hf-publish
     permissions:
       contents: read

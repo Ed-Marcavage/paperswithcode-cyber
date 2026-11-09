@@ -1,3 +1,4 @@
+import { externalResource, resourceClicked } from "@/lib/catalogAnalytics";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import "./PaperDetailView.css";
@@ -6,11 +7,13 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "@/components/Icon";
 import { PaperPreview } from "@/components/PaperPreview";
 import { SotaBadges } from "@/components/SotaBadges";
+import { BenchmarkChip } from "@/components/Chips";
 import LatexTitle from "@/components/LatexTitle";
 import { evaluationsApi } from "@/lib/api/evaluations";
 import { papersApi } from "@/lib/api/papers";
 import {
   assetUrl,
+  isDiscoveryCatalog,
   isCodexEnrichPaperEnabled,
   isNativePdfReaderEnabled,
   isPaperReaderChatEnabled,
@@ -42,6 +45,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
+import { DiscoveryPaper } from "@/components/paper-detail/DiscoveryPaper";
 import { PaperAgentEdits } from "@/components/paper-detail/PaperAgentEdits";
 import { PaperDetailEditors } from "@/components/paper-detail/PaperDetailEditors";
 import { PaperResultsSection } from "@/components/paper-detail/PaperResultsSection";
@@ -57,7 +61,7 @@ import { AuthorAvatar } from "@/components/AuthorAvatar";
 function formatLongDate(iso: string | null | undefined): string {
   if (!iso) return "—";
   try {
-    return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+    return new Date(iso).toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric", timeZone: "UTC" });
   } catch {
     return "—";
   }
@@ -357,6 +361,7 @@ const PaperDetailView: React.FC = () => {
           <a
             className="breadcrumb-external"
             href={safeAbstractUrl}
+                  onClick={() => resourceClicked(paper.id, externalResource(safeAbstractUrl, "source"))}
             target="_blank"
             rel="noopener noreferrer"
             title="Open on arXiv"
@@ -379,7 +384,7 @@ const PaperDetailView: React.FC = () => {
             {/* Keep the pencil on the last org's line so it stays pinned to that logo. */}
             <span className="detail-title-tail">
               {organizations.slice(-1).map(renderTitleOrg)}
-              <button
+              {!isDiscoveryCatalog() && <button
                 type="button"
                 className="detail-title-edit"
                 onClick={() => openEdit("organizations")}
@@ -387,7 +392,7 @@ const PaperDetailView: React.FC = () => {
                 aria-label="Edit organizations"
               >
                 <Icon name="pencil" size={11} />
-              </button>
+              </button>}
             </span>
           </h1>
           <div className="detail-meta">
@@ -490,19 +495,19 @@ const PaperDetailView: React.FC = () => {
               <Link
                 className="action-btn"
                 to={readerRoute}
-                onClick={() => resetReaderSession(readerRoute)}
+                onClick={() => { resourceClicked(paper.id, "reader"); resetReaderSession(readerRoute); }}
               >
                 <Icon name="pdf" size={12} /> Read paper
                 <span className="nav-new-badge" aria-hidden="true">New</span>
               </Link>
             ) : safePdfUrl ? (
-              <a className="action-btn" href={safePdfUrl} target="_blank" rel="noopener noreferrer">
+              <a className="action-btn" href={safePdfUrl} onClick={() => resourceClicked(paper.id, "pdf")} target="_blank" rel="noopener noreferrer">
                 <Icon name="pdf" size={12} /> View PDF
               </a>
             ) : null}
             {safeAbstractUrl && paper.source === "external" && (
               <EditableActionButton
-                showEdit
+                showEdit={!isDiscoveryCatalog()}
                 onEdit={() => openEdit("source_url")}
                 editAriaLabel="Edit source URL"
               >
@@ -518,13 +523,14 @@ const PaperDetailView: React.FC = () => {
             )}
             {projectPages.length === 1 ? (
               <EditableActionButton
-                showEdit
+                showEdit={!isDiscoveryCatalog()}
                 onEdit={() => openEdit("project_pages")}
                 editAriaLabel="Edit project pages"
               >
                 <a
                   className="action-btn-segment action-btn-main"
                   href={projectPages[0].safeHref ?? undefined}
+                  onClick={() => resourceClicked(paper.id, externalResource(projectPages[0].url, "artifact"))}
                   target="_blank"
                   rel="noopener noreferrer"
                 >
@@ -534,7 +540,7 @@ const PaperDetailView: React.FC = () => {
             ) : null}
             {projectPages.length > 1 ? (
               <EditableActionButton
-                showEdit
+                showEdit={!isDiscoveryCatalog()}
                 onEdit={() => openEdit("project_pages")}
                 editAriaLabel="Edit project pages"
               >
@@ -551,7 +557,7 @@ const PaperDetailView: React.FC = () => {
                     {projectPages.map((page, index) => (
                       <DropdownMenuItem key={page.url} asChild>
                         {page.safeHref ? (
-                          <a href={page.safeHref} target="_blank" rel="noopener noreferrer">
+                          <a href={page.safeHref} onClick={() => resourceClicked(paper.id, externalResource(page.url, "artifact"))} target="_blank" rel="noopener noreferrer">
                             {formatResourceLinkLabel(page.url, `Project page ${index + 1}`)}
                           </a>
                         ) : (
@@ -578,6 +584,7 @@ const PaperDetailView: React.FC = () => {
                 <Icon name="external" size={12} /> Conference
               </a>
             )}
+            {!isDiscoveryCatalog() && <>
             <a
               className="action-btn"
               href={mlInternReproduceUrl(paper.title, paper.arxiv_id)}
@@ -588,6 +595,7 @@ const PaperDetailView: React.FC = () => {
               <span className="ml-intern-icon"><Icon name="robot" size={12} /></span> Reproduce with ML Intern
             </a>
             <PaperAgentEdits paperId={Number(paper.id)} />
+            </>}
             {isAdmin && isCodexEnrichPaperEnabled() && (
               <CodexPaperJobDialog
                 kind="enrich-paper"
@@ -597,9 +605,10 @@ const PaperDetailView: React.FC = () => {
                 onComplete={() => void refetch()}
               />
             )}
-            <SavePaperButton paperId={paper.id} />
+            {!isDiscoveryCatalog() && <SavePaperButton paperId={paper.id} />}
           </div>
 
+          {paper.catalog_contributions?.includes("benchmark") && <BenchmarkChip />}
           {paper.leaderboard_ranks && paper.leaderboard_ranks.length > 0 && (
             <SotaBadges
               wrap
@@ -609,14 +618,14 @@ const PaperDetailView: React.FC = () => {
           )}
             </div>
 
-            <div className="detail-hero-thumb detail-thumb-wrap">
+            {(!isDiscoveryCatalog() || paper.thumbnail_url) && <div className="detail-hero-thumb detail-thumb-wrap">
               <PaperPreview
                 paperId={paper.arxiv_id || paper.id}
                 title={paper.title}
                 thumbnailUrl={assetUrl(paper.thumbnail_url)}
                 priority
               />
-            </div>
+            </div>}
           </div>
 
           {hasIntroducedItems && (
@@ -712,8 +721,9 @@ const PaperDetailView: React.FC = () => {
             </div>
           )}
 
+          {isDiscoveryCatalog() && <DiscoveryPaper paperId={paper.id} />}
           <PaperMetadataSections
-            canEdit
+            canEdit={!isDiscoveryCatalog()}
             onEditMethods={() => openEdit("methods")}
             onEditTasks={() => openEdit("tasks")}
             paper={paper}
@@ -721,7 +731,7 @@ const PaperDetailView: React.FC = () => {
           />
           <PaperResultsSection
             canCopyBadge={copyableRanks.length > 0}
-            canEdit
+            canEdit={!isDiscoveryCatalog()}
             evaluationsByTask={evaluationsByTask}
             evaluationsLoading={evaluationsLoading}
             isAdmin={isAdmin}

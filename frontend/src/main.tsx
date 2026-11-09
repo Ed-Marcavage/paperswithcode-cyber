@@ -1,3 +1,6 @@
+import posthog from "posthog-js";
+import { catalogOptions, catalogPrivacySignal } from "./lib/catalogAnalytics";
+import { isDiscoveryCatalog } from "./lib/apiUrl";
 import React from "react";
 import { createRoot } from "react-dom/client";
 import { ThemeProvider } from "next-themes";
@@ -16,6 +19,9 @@ installChunkReloadRecovery();
 
 const posthogToken = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
 
+const catalog = isDiscoveryCatalog();
+if (catalog && posthogToken && !catalogPrivacySignal()) posthog.init(posthogToken, catalogOptions);
+
 const app = (
   <ThemeProvider
     attribute="class"
@@ -33,7 +39,7 @@ const app = (
 const root = createRoot(document.getElementById("root")!);
 root.render(
   <React.StrictMode>
-    {posthogToken ? (
+    {posthogToken && !catalog ? (
       <PostHogProvider apiKey={posthogToken} options={posthogPrivacyOptions}>
         {app}
       </PostHogProvider>

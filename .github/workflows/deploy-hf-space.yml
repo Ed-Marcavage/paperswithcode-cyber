@@ -30,6 +30,7 @@ permissions: {}
 
 jobs:
   deploy:
+    if: github.repository == 'huggingface/paperswithcode'
     environment: hf-publish
     permissions:
       contents: read

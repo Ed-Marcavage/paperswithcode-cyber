@@ -9,6 +9,7 @@ import {
   type Operation,
   type Schema,
 } from "@/lib/api/publicDocs";
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import "./ApiDocsView.css";
 
@@ -221,6 +222,16 @@ export default function ApiDocsView() {
     });
     return () => cancelAnimationFrame(frame);
   }, [data]);
+  if (isDiscoveryCatalog()) {
+    return <main className="page api-content">
+      <h1>Catalog API</h1>
+      <p>Browse catalog works, find developers by their repositories, or connect a client at <a href="/mcp">MCP setup</a>.</p>
+      <p>Base URL: <code>{window.location.origin}/api/v1</code> · <a href="/api/v1/openapi.json">OpenAPI specification</a></p>
+      {isPending ? <p>Loading endpoints…</p> : isError ? <p role="alert">Could not load the specification. <button onClick={() => void refetch()}>Retry</button></p>
+        : data && Object.entries(data.paths).filter(([path]) => path.includes("/catalog/") || path.includes("/developers/"))
+          .map(([path, {get}]) => <Endpoint key={path} path={path} operation={get} />)}
+    </main>;
+  }
   return (
     <div className="api-docs">
       <nav className="api-sidebar" aria-label="API documentation">
@@ -252,7 +263,7 @@ export default function ApiDocsView() {
             The public beta covers keyword search and core catalog lookups.
           </p>
           <p>
-            <a href="https://paperswithcode.co/api/v1/openapi.json">
+            <a href="/api/v1/openapi.json">
               Download the public OpenAPI specification
             </a>{" "}
             · <a href={FEEDBACK}>Report a bug or request a feature</a>

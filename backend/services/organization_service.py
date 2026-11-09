@@ -7,7 +7,7 @@ import time
 from datetime import date, timedelta
 from typing import Optional
 
-from sqlalchemy import Float, and_, case, cast, desc, func, or_, select
+from sqlalchemy import text, Float, and_, case, cast, desc, func, or_, select
 from sqlalchemy.orm import Session
 
 from backend.database.organizations_setup.organizations import BY_PWC_SLUG
@@ -35,6 +35,7 @@ from backend.services.trending_ranking_service import (
     active_paper_score_components,
     correlated_paper_score_expressions,
 )
+from backend.services.discovery_organizations import with_catalog_metrics
 from backend.config import get_settings
 from backend.utils.exceptions import DatabaseError, PaperNotFoundError
 from backend.utils.organization_logos import organization_logo_path
@@ -50,6 +51,14 @@ _organization_index_cache: dict[str, tuple[float, Organizations]] = {}
 _organization_index_refreshing: set[str] = set()
 _organization_index_lock = threading.Lock()
 _organization_index_warmed: dict[str, threading.Event] = {}
+
+
+def _eligible_organization_work():
+    if get_settings().discovery_catalog:
+        return and_(DBPaper.is_latest_version, text(
+            "EXISTS (SELECT 1 FROM discovery_works w WHERE w.paper_id=papers.id)"
+        ))
+    return eligible_paper_filter()
 
 
 def _refresh_organization_index(bind, key: str) -> None:
@@ -116,7 +125,7 @@ class OrganizationService:
                 .join(DBPaper, DBPaper.id == PaperOrganization.paper_id)
                 .filter(
                     PaperOrganization.organization_id == db_org.id,
-                    eligible_paper_filter(),
+                    _eligible_organization_work(),
                 )
                 .scalar()
                 or 0
@@ -209,14 +218,14 @@ class OrganizationService:
                         partition_by=PaperOrganization.organization_id,
                         order_by=(
                             desc(active_score),
-                            desc(DBPaper.date_published),
+                            desc(DBPaper.date_published).nulls_last(),
                             desc(DBPaper.id),
                         ),
                     )
                     .label("rank"),
                 )
                 .join(DBPaper, DBPaper.id == PaperOrganization.paper_id)
-                .where(eligible_paper_filter())
+                .where(_eligible_organization_work())
                 .subquery()
             )
             stats = (
@@ -272,7 +281,7 @@ class OrganizationService:
                     ),
                 )
             )
-            if curated_only:
+            if curated_only and not get_settings().discovery_catalog:
                 # The reviewed manifest plus every org established enough to be
                 # auto-featured, so backfilled institutions reach the directory.
                 rows = rows.filter(
@@ -318,6 +327,8 @@ class OrganizationService:
                     top_paper_id,
                 ) in enumerate(rows, start=1)
             ]
+            if get_settings().discovery_catalog:
+                results = with_catalog_metrics(self.db, results)
             return Organizations(count=len(results), results=results)
         except Exception as e:
             raise DatabaseError(f"Failed to retrieve organizations: {str(e)}")
@@ -342,7 +353,7 @@ class OrganizationService:
                 DBPaper,
                 and_(
                     DBPaper.id == PaperOrganization.paper_id,
-                    eligible_paper_filter(),
+                    _eligible_organization_work(),
                 ),
             )
             .filter(
@@ -365,6 +376,8 @@ class OrganizationService:
             self._organization_to_api(db_org, paper_count or 0)
             for db_org, paper_count in rows
         ]
+        if get_settings().discovery_catalog:
+            results = with_catalog_metrics(self.db, results)
         return Organizations(count=len(results), results=results)
 
     def _project_organization(self, organization: DBOrganization) -> Organization:
@@ -382,7 +395,7 @@ class OrganizationService:
             .join(PaperOrganization, PaperOrganization.paper_id == DBPaper.id)
             .filter(
                 PaperOrganization.organization_id == organization.id,
-                eligible_paper_filter(),
+                _eligible_organization_work(),
             )
             .one()
         )
@@ -399,11 +412,11 @@ class OrganizationService:
             .outerjoin(repo_stats, repo_stats.c.paper_id == DBPaper.id)
             .filter(
                 PaperOrganization.organization_id == organization.id,
-                eligible_paper_filter(),
+                _eligible_organization_work(),
             )
             .order_by(
                 desc(active_score),
-                desc(DBPaper.date_published),
+                desc(DBPaper.date_published).nulls_last(),
                 desc(DBPaper.id),
             )
             .first()
@@ -500,7 +513,7 @@ class OrganizationService:
                     DBPaper,
                     and_(
                         DBPaper.id == PaperOrganization.paper_id,
-                        eligible_paper_filter(),
+                        _eligible_organization_work(),
                     ),
                 )
                 .filter(DBOrganization.id.in_(tied_ids))
@@ -515,7 +528,8 @@ class OrganizationService:
 
     def get_organization(self, slug: str) -> Organization:
         try:
-            return self._project_organization(self._get_organization_by_slug(slug))
+            result = self._project_organization(self._get_organization_by_slug(slug))
+            return with_catalog_metrics(self.db, [result])[0] if get_settings().discovery_catalog else result
         except PaperNotFoundError:
             raise
         except Exception as e:
@@ -527,7 +541,7 @@ class OrganizationService:
             organization = self._get_organization_by_slug(slug)
             end_date = date.today()
             start_date = end_date - timedelta(days=364)
-            rows = (
+            query = (
                 self.db.query(
                     DBPaper.date_published,
                     func.count(func.distinct(DBPaper.id)).label("paper_count"),
@@ -539,9 +553,16 @@ class OrganizationService:
                 .filter(
                     PaperOrganization.organization_id == organization.id,
                     DBPaper.date_published.between(start_date, end_date),
-                    eligible_paper_filter(),
+                    _eligible_organization_work(),
                 )
-                .group_by(DBPaper.date_published)
+            )
+            if get_settings().discovery_catalog:
+                query = query.filter(text("""
+                    EXISTS (SELECT 1 FROM discovery_works w WHERE w.paper_id=papers.id
+                            AND (w.facets->'kind' ? 'paper' OR w.facets->'kind' ? 'post'))
+                """))
+            rows = (
+                query.group_by(DBPaper.date_published)
                 .order_by(DBPaper.date_published)
                 .all()
             )
@@ -589,7 +610,7 @@ class OrganizationService:
                     ),
                 )
                 .join(DBPaper, DBPaper.id == PaperTask.paper_id)
-                .filter(eligible_paper_filter())
+                .filter(_eligible_organization_work())
                 .group_by(DBTask.id)
                 .order_by(DBTask.name)
                 .all()

@@ -129,6 +129,10 @@ export interface Organization {
   paper_count?: number;
   is_featured: boolean;
   display_order?: number | null;
+  post_count?: number | null;
+  repository_count?: number | null;
+  owned_repository_count?: number | null;
+  catalog_stars?: number | null;
   organization_trending_score?: number | null;
   trending_rank?: number | null;
   top_trending_paper?: {

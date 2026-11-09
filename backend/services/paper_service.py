@@ -310,7 +310,7 @@ class PaperService:
             db_paper.source_url,
         )
         url_pdf = get_paper_pdf_url(
-            db_paper.source, db_paper.arxiv_id, db_paper.version
+            db_paper.source, db_paper.arxiv_id, db_paper.version, db_paper.conference_url_pdf
         )
 
         thumbnail_url = self._resolve_thumbnail_url(db_paper)
@@ -379,6 +379,8 @@ class PaperService:
             "project_pages": project_pages,
             "x_threads": x_threads,
             "tasks": tasks,
+            "catalog_kind": relations.catalog_kinds.get(db_paper.id),
+            "catalog_contributions": relations.catalog_contributions.get(db_paper.id),
             "methods": methods,
             "introduced_benchmarks": introduced_benchmarks,
             "introduced_frameworks": introduced_frameworks,
@@ -1182,7 +1184,7 @@ class PaperService:
         version: Optional[str],
     ) -> Optional[str]:
         """Preserve the repository-trending endpoint's thumbnail policy."""
-        if explicit_thumbnail_url is not None:
+        if explicit_thumbnail_url is not None or self.settings.discovery_catalog:
             return explicit_thumbnail_url
         if source == "arxiv" and arxiv_id:
             return build_thumbnail_url(

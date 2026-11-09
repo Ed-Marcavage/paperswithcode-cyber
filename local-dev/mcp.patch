@@ -1,0 +1,484 @@
+diff --git a/mcp_server/src/pwc_mcp/app.py b/mcp_server/src/pwc_mcp/app.py
+index d51f4d9..5469589 100644
+--- a/mcp_server/src/pwc_mcp/app.py
++++ b/mcp_server/src/pwc_mcp/app.py
+@@ -1,5 +1,8 @@
+ from __future__ import annotations
+ 
++from pwc_cli.transport import SITE_URL
++from pwc_mcp.mcp_analytics import capture_tool
++
+ import asyncio
+ import hashlib
+ import ipaddress
+@@ -35,7 +38,7 @@ PROTOCOL_VERSION = "2025-11-25"
+ EXPERIMENTAL_PROTOCOL_VERSION = "2026-07-28"
+ MAX_REQUEST_BODY_SIZE = 2 * 1024 * 1024
+ MAX_RESPONSE_BODY_SIZE = 2 * 1024 * 1024
+-KNOWN_TOOLS = frozenset(TOOL_COMMANDS)
++KNOWN_TOOLS = frozenset(TOOL_COMMANDS) | {"catalog_filters", "browse_catalog", "list_developers", "get_developer"}
+ KNOWN_PROTOCOLS = {
+     PROTOCOL_VERSION,
+     EXPERIMENTAL_PROTOCOL_VERSION,
+@@ -53,8 +56,8 @@ async def well_known_mcp(_request: Request) -> JSONResponse:
+             "transport": {"type": "streamable-http", "url": "/mcp"},
+             "protocol_version": PROTOCOL_VERSION,
+             "supported_protocol_versions": sorted(KNOWN_PROTOCOLS, reverse=True),
+-            "documentation_url": "https://paperswithcode.co/mcp/schema",
+-            "setup_url": "https://paperswithcode.co/mcp",
++            "documentation_url": f"{SITE_URL}/mcp/schema",
++            "setup_url": f"{SITE_URL}/mcp",
+         }
+     )
+ 
+@@ -310,7 +313,7 @@ async def _body_and_replay(
+     return b"".join(chunks), replay
+ 
+ 
+-def _tool_and_semantic(headers: Headers, body: bytes) -> tuple[str | None, bool]:
++def _tool_and_semantic(headers: Headers, body: bytes, state: dict | None = None) -> tuple[str | None, bool]:
+     header_tool = headers.get("mcp-name")
+     body_tool = None
+     mode = DEFAULT_SEARCH_MODE
+@@ -330,6 +333,9 @@ def _tool_and_semantic(headers: Headers, body: bytes) -> tuple[str | None, bool]
+         arguments = params.get("arguments") if isinstance(params, dict) else None
+         if isinstance(arguments, dict):
+             mode = arguments.get("mode", DEFAULT_SEARCH_MODE)
++    if (state is not None and isinstance(payload, dict) and payload.get("jsonrpc") == "2.0"
++            and payload.get("method") == "tools/call" and body_tool in KNOWN_TOOLS):
++        state["catalog_tool"] = body_tool
+     tool = body_tool or header_tool
+     tool = tool if tool in KNOWN_TOOLS else None
+     # Hybrid retrieval also runs the dense embedding search upstream.
+@@ -415,7 +421,7 @@ class RateLimitMiddleware:
+             response = JSONResponse({"error": "request_too_large"}, status_code=413)
+             await response(scope, receive, send)
+             return
+-        tool, semantic = _tool_and_semantic(headers, body)
++        tool, semantic = _tool_and_semantic(headers, body, scope.setdefault("state", {}))
+         scope.setdefault("state", {})["pwc_tool_name"] = tool
+         identity = self._identity(
+             _client_address(
+@@ -508,6 +514,8 @@ class OperationalTelemetryMiddleware:
+             tool = scope.get("state", {}).get("pwc_tool_name")
+             if tool not in KNOWN_TOOLS:
+                 tool = "unknown"
++            if called := scope.get("state", {}).get("catalog_tool"):
++                capture_tool(called, status)
+             LOGGER.info(
+                 "mcp_request tool=%s status=%s latency_ms=%s bytes=%s protocol=%s version=%s",
+                 tool or "unknown",
+diff --git a/mcp_server/src/pwc_mcp/catalog.py b/mcp_server/src/pwc_mcp/catalog.py
+index 7da20f0..e69a411 100644
+--- a/mcp_server/src/pwc_mcp/catalog.py
++++ b/mcp_server/src/pwc_mcp/catalog.py
+@@ -1,5 +1,7 @@
+ from __future__ import annotations
+ 
++from pwc_cli.transport import SITE_URL
++
+ import re
+ import threading
+ from difflib import SequenceMatcher
+@@ -228,6 +230,15 @@ class CatalogClient:
+             raise ResponseError("API returned an unexpected response shape")
+         return payload
+ 
++    def discovery(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
++        return self._json(f"catalog/{path}", params, ttl=60)
++
++    def developers(self, params: dict[str, Any]) -> dict[str, Any]:
++        return self._json("developers/", params, ttl=60)
++
++    def developer(self, github_id: int) -> dict[str, Any]:
++        return self._json(f"developers/{github_id}", ttl=60)
++
+     def check_readiness(self) -> bool:
+         response = self.transport.get("tasks/", {"page": 1, "page_size": 1})
+         payload = response.json()
+@@ -283,6 +294,7 @@ class CatalogClient:
+             in {
+                 "paperswithcode.co",
+                 "www.paperswithcode.co",
++                urlparse(SITE_URL).netloc.casefold(),
+             }
+             and len(parts) >= 2
+             and parts[0] == "paper"
+@@ -305,6 +317,7 @@ class CatalogClient:
+             if parsed.netloc.casefold() in {
+                 "paperswithcode.co",
+                 "www.paperswithcode.co",
++                urlparse(SITE_URL).netloc.casefold(),
+             }:
+                 slug_from_url = candidate.casefold()
+         elif urlparse(candidate).scheme in {"http", "https"}:
+diff --git a/mcp_server/src/pwc_mcp/models.py b/mcp_server/src/pwc_mcp/models.py
+index 4c8ea95..60be3c0 100644
+--- a/mcp_server/src/pwc_mcp/models.py
++++ b/mcp_server/src/pwc_mcp/models.py
+@@ -1,5 +1,7 @@
+ from __future__ import annotations
+ 
++from pwc_cli.transport import SITE_URL
++
+ import re
+ from typing import Any, Literal
+ 
+@@ -14,7 +16,7 @@ def _absolute_url(value: object) -> str | None:
+     if not value:
+         return None
+     url = str(value)
+-    return f"https://paperswithcode.co{url}" if url.startswith("/") else url
++    return f"{SITE_URL}{url}" if url.startswith("/") else url
+ 
+ 
+ class QueryResult(OutputModel):
+@@ -119,6 +121,7 @@ class PaperEvaluation(OutputModel):
+ 
+ 
+ class PaperInfoResult(QueryResult):
++    discovery: dict[str, Any] | None = None
+     paper: PaperDetail
+     evaluation_count: int | None = None
+     evaluations: list[PaperEvaluation] | None = None
+diff --git a/mcp_server/src/pwc_mcp/server.py b/mcp_server/src/pwc_mcp/server.py
+index fa0e182..475c7b3 100644
+--- a/mcp_server/src/pwc_mcp/server.py
++++ b/mcp_server/src/pwc_mcp/server.py
+@@ -9,6 +9,8 @@ checks against the CLI parser.
+ 
+ from __future__ import annotations
+ 
++from pwc_cli.transport import SITE_URL
++
+ import logging
+ import os
+ import time
+@@ -77,7 +79,7 @@ READ_ONLY = ToolAnnotations(
+ # Hosted ceiling on rows per response (SPEC.md); the CLI allows up to 100.
+ MAX_ROWS = 25
+ # Matches `pwc search --mode`; app.py counts omitted modes with this value.
+-DEFAULT_SEARCH_MODE = "hybrid"
++DEFAULT_SEARCH_MODE = "keyword"
+ # CLI lookup failures the caller can act on (an unknown or ambiguous name, an
+ # unconfirmed filter). Transport, HTTP, and response-shape failures stay generic.
+ CLIENT_FACING_ERRORS = (
+@@ -431,6 +433,12 @@ def _grouped_benchmarks(areas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+ 
+ 
+ class Catalog(Protocol):
++    def discovery(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]: ...
++
++    def developers(self, params: dict[str, Any]) -> dict[str, Any]: ...
++
++    def developer(self, github_id: int) -> dict[str, Any]: ...
++
+     def resolve_paper(self, paper: str) -> str: ...
+ 
+     def read_paper_chunk(
+@@ -466,7 +474,8 @@ def build_server(
+             "frameworks, and benchmarks; every pwc CLI research command and flag."
+         ),
+         instructions=(
+-            "Use search_papers for relevance and list tools for deterministic filters. "
++            "Use search_papers for keyword search, catalog_filters for vocabulary and browse_catalog for intersecting facets. "
++            "Use list_developers for GitHub accounts behind tracked repos and get_developer for ownership and contribution evidence. "
+             "Pass slugs or numeric IDs returned by list tools to exact lookup tools. "
+             "Dates use YYYY-MM-DD. Structured data is in structuredContent; text is a "
+             "short Markdown summary. Official implementation means catalog-designated "
+@@ -474,7 +483,7 @@ def build_server(
+             "cataloged implementation and may be null when unknown."
+         ),
+         version=__version__,
+-        website_url="https://paperswithcode.co",
++        website_url=os.environ["PWC_SITE_URL"],
+         cache_hints={
+             "server/discover": CacheHint(ttl_ms=3_600_000, scope="public"),
+             "tools/list": CacheHint(ttl_ms=3_600_000, scope="public"),
+@@ -525,6 +534,8 @@ def build_server(
+ 
+     def public_paper(reference: str, missing: ToolError) -> dict[str, Any]:
+         """Public metadata for a catalog miss, or the original error."""
++        if os.environ.get("PWC_CATALOG_ONLY") == "1":
++            raise ToolError("Paper not found in the curated catalog") from missing
+         record = catalog.public_paper(reference)
+         if isinstance(record, PublicPaperMiss):
+             message, _, closest = str(missing).partition(CLOSEST_CATALOG_PAPERS)
+@@ -580,17 +591,50 @@ def build_server(
+             raise missing
+         return None
+ 
++    @server.tool(annotations=READ_ONLY, structured_output=True)
++    def catalog_filters() -> dict[str, Any]:
++        """List topic, target, contribution, year and source type filter values."""
++        return catalog.discovery("filters")
++
++    @server.tool(annotations=READ_ONLY, structured_output=True)
++    def browse_catalog(topic: str = "", target: str = "", contribution: str = "",
++                       year: str = "", kind: str = "", limit: Limit = 10,
++                       offset: Annotated[int, Field(ge=0)] = 0, include_facet_counts: bool = False) -> dict[str, Any]:
++        """Find works matching all catalog filters. Request facet counts to see which choices still have results."""
++        params = dict(topic=topic, target=target, contribution=contribution, year=year,
++                      kind=kind, limit=limit, offset=offset, include_facet_counts=include_facet_counts)
++        return catalog.discovery("papers", params)
++
++    @server.tool(annotations=READ_ONLY, structured_output=True)
++    def list_developers(q: Annotated[str, Field(max_length=100)] = "", topic: str = "", target: str = "",
++                        contribution: str = "", repository: Annotated[str, Field(max_length=250)] = "",
++                        sort: Literal["repos", "stars"] = "repos", include_facet_counts: bool = False,
++                        limit: Limit = 10, offset: Annotated[int, Field(ge=0)] = 0) -> dict[str, Any]:
++        """Find GitHub users by username, exact owner/repo, or work facets from catalog_filters.
++        All selected facets must match one linked work. Counts refer to distinct developers;
++        request facet counts for available alternatives. Stars count only matching repos the user owns.
++        Pass a result's github_id to get_developer."""
++        return catalog.developers(dict(q=q, topic=topic, target=target, contribution=contribution,
++                                       repository=repository, sort=sort, include_facet_counts=include_facet_counts,
++                                       limit=limit, offset=offset))
++
++    @server.tool(annotations=READ_ONLY, structured_output=True)
++    def get_developer(github_id: Annotated[int, Field(gt=0, le=9223372036854775807)]) -> dict[str, Any]:
++        """Get a developer's tracked GitHub repos, ownership and GitHub-reported commit totals.
++        Repo contributions do not establish paper authorship."""
++        return catalog.developer(github_id)
++
+     @server.tool(annotations=READ_ONLY, structured_output=True)
+     def search_papers(
+         query: Query,
+-        mode: Literal["hybrid", "keyword", "semantic"] = DEFAULT_SEARCH_MODE,
++        mode: Literal["keyword"] = DEFAULT_SEARCH_MODE,
+         page: Page = 1,
+         limit: Limit = 10,
+         published_after: IsoDate | None = None,
+         published_before: IsoDate | None = None,
+         has_official_implementation: bool = False,
+     ) -> PaperPage:
+-        """Search papers by title, topic, author, or arXiv ID (`pwc search`). Broad discovery only: for best, top, or state-of-the-art model questions start with get_task, list_benchmarks, and get_benchmark, which return leaderboard evidence that search cannot. Mode defaults to hybrid like `pwc search`; use keyword for exact terminology or to stay under the semantic search rate limit."""
++        """Search papers by title, topic, author, or arXiv ID (`pwc search`). Broad discovery only: for best, top, or state-of-the-art model questions start with get_task, list_benchmarks, and get_benchmark, which return leaderboard evidence that search cannot. This catalog searches indexed terms without model calls."""
+         _validate_date_range(published_after, published_before)
+         result = _paper_page(
+             run(
+@@ -617,7 +661,7 @@ def build_server(
+         repo_limit: ResourceLimit = 5,
+         include_evaluations: bool = False,
+     ) -> PaperInfoResult:
+-        """Get compact paper metadata and official-first code. Set include_resources for additional repositories, project pages, Hugging Face artifacts, and author X threads introducing the paper, repo_limit to cap each list, and include_evaluations only for bounded legacy compatibility (`pwc paper info`). A paper not indexed on Papers With Code returns public Hugging Face Papers, arXiv, or Crossref metadata with in_catalog=false, a note, and available_at links to cite instead of a Papers With Code page."""
++        """Get compact paper metadata and official-first code. Set include_resources for additional repositories, project pages, Hugging Face artifacts, and author X threads introducing the paper, repo_limit to cap each list, and include_evaluations only for bounded legacy compatibility (`pwc paper info`). Only papers in the curated catalog are available in the catalog-only profile."""
+         options = {
+             # Fetch once so the compact default can retain official code while
+             # omitting hundreds of community repositories from the response.
+@@ -644,6 +688,7 @@ def build_server(
+             raise TypeError("paper response did not contain a paper")
+         evaluations = data.get("evaluations")
+         result = PaperInfoResult(
++            discovery=catalog.discovery(f"papers/{data['id']}"),
+             paper=paper_detail(
+                 data, include_resources=include_resources, repo_limit=repo_limit
+             ),
+@@ -699,7 +744,7 @@ def build_server(
+             ),
+         ] = None,
+     ) -> PaperReadResult:
+-        """Read stored paper Markdown, continuing oversized documents with a cursor (`pwc paper read`). Pass the next_cursor value from the previous result together with the same paper (any reference to that paper works); omit cursor to start from the beginning. To continue after text already supplied in context, pass offset (the byte count of that text) with the same paper and no cursor; offset cannot be combined with cursor. A paper not indexed on Papers With Code returns its public metadata and abstract as Markdown with in_catalog=false and available_at links to cite instead of a Papers With Code page."""
++        """Read stored paper Markdown, continuing oversized documents with a cursor (`pwc paper read`). Pass the next_cursor value from the previous result together with the same paper (any reference to that paper works); omit cursor to start from the beginning. To continue after text already supplied in context, pass offset (the byte count of that text) with the same paper and no cursor; offset cannot be combined with cursor. The catalog-only profile reads cached text and gives a source link if no document is available."""
+         if cursor is not None and cursor.strip().casefold() in PLACEHOLDER_CURSORS:
+             # Not a token: nothing was saved to continue from.
+             cursor = None
+@@ -1045,7 +1090,7 @@ def build_server(
+                     else None
+                 ),
+                 source_url=(
+-                    f"https://paperswithcode.co{item['source_url']}"
++                    f"{SITE_URL}{item['source_url']}"
+                     if str(item.get("source_url") or "").startswith("/")
+                     else str(item["source_url"])
+                     if item.get("source_url")
+@@ -1104,9 +1149,9 @@ def build_server(
+         return QueryResult(data=run("get_organization", organization=organization))
+ 
+     @server.tool(annotations=READ_ONLY, structured_output=True)
+-    def list_organizations(featured_only: bool = False) -> QueryResult:
++    def list_organizations(featured_only: bool = False, sort: Literal["trending", "papers", "stars", "name"] | None = None) -> QueryResult:
+         """List research organizations (`pwc organization list`)."""
+-        return QueryResult(data=run("list_organizations", featured_only=featured_only))
++        return QueryResult(data=run("list_organizations", featured_only=featured_only, sort=sort))
+ 
+     @server.tool(annotations=READ_ONLY, structured_output=True)
+     def get_framework(framework: Entity) -> QueryResult:
+diff --git a/standalone_cli/src/pwc_cli/cli.py b/standalone_cli/src/pwc_cli/cli.py
+index 4380d38..11bf055 100644
+--- a/standalone_cli/src/pwc_cli/cli.py
++++ b/standalone_cli/src/pwc_cli/cli.py
+@@ -2,6 +2,8 @@
+ 
+ from __future__ import annotations
+ 
++from pwc_cli.transport import SITE_URL
++
+ import argparse
+ import difflib
+ import json
+@@ -660,7 +662,7 @@ def _paper_info_lineage_markdown(item: dict[str, Any]) -> str:
+     published = f" ({item['published']})" if item.get("published") else ""
+     if not reference:
+         return f"- {title}{published}"
+-    url = f"https://paperswithcode.co/paper/{quote(str(reference), safe='.')}"
++    url = f"{SITE_URL}/paper/{quote(str(reference), safe='.')}"
+     return f"- [{title}]({url}){published}"
+ 
+ 
+@@ -915,7 +917,7 @@ def _lineage_markdown(item: dict[str, Any]) -> str:
+     )
+     if not reference:
+         return f"- {title}"
+-    url = f"https://paperswithcode.co/paper/{quote(str(reference), safe='.')}"
++    url = f"{SITE_URL}/paper/{quote(str(reference), safe='.')}"
+     return f"- [{title}]({url}) (`{_clean(reference)}`)"
+ 
+ 
+@@ -1125,7 +1127,7 @@ def _task_match(name: str, items: list[dict[str, Any]]) -> dict[str, Any] | None
+ def _task_reference(item: dict[str, Any], *, markdown: bool) -> str:
+     name = str(item.get("name") or item.get("slug") or item.get("id") or "Task")
+     slug = item.get("slug") or item.get("id")
+-    url = f"https://paperswithcode.co/tasks/{quote(str(slug), safe='-')}"
++    url = f"{SITE_URL}/tasks/{quote(str(slug), safe='-')}"
+     return f"[{_markdown_text(name)}]({url})" if markdown else f"{name} [{slug}]"
+ 
+ 
+@@ -1133,7 +1135,7 @@ def _task_paper_reference(item: dict[str, Any], *, markdown: bool) -> str:
+     title = str(item.get("title") or item.get("arxiv_id") or item.get("id") or "Paper")
+     reference = item.get("arxiv_id") or item.get("id")
+     url = item.get("url_abs") or (
+-        f"https://paperswithcode.co/paper/{quote(str(reference), safe='.')}"
++        f"{SITE_URL}/paper/{quote(str(reference), safe='.')}"
+         if reference
+         else None
+     )
+@@ -1282,7 +1284,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+         description = str(task["description"]).replace("\r", " ").replace("\n", " ")
+         print(f"\n{_markdown_text(description) if markdown else description}")
+     task_slug = task.get("slug") or task.get("id")
+-    task_url = f"https://paperswithcode.co/tasks/{quote(str(task_slug), safe='-')}"
++    task_url = f"{SITE_URL}/tasks/{quote(str(task_slug), safe='-')}"
+     task_link = f"[View task]({task_url})" if markdown else f"View task: {task_url}"
+     print(f"\n{task_link}")
+ 
+@@ -1334,7 +1336,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+             )
+             method_slug = method.get("slug") or method.get("id")
+             method_url = (
+-                f"https://paperswithcode.co/methods/{quote(str(method_slug), safe='-')}"
++                f"{SITE_URL}/methods/{quote(str(method_slug), safe='-')}"
+             )
+             label = (
+                 f"[{_markdown_text(method_name)}]({method_url})"
+@@ -1351,7 +1353,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+                 benchmark.get("name") or benchmark.get("slug") or benchmark.get("id")
+             )
+             benchmark_slug = benchmark.get("slug") or benchmark.get("id")
+-            benchmark_url = f"https://paperswithcode.co/benchmark/{quote(str(benchmark_slug), safe='-')}"
++            benchmark_url = f"{SITE_URL}/benchmark/{quote(str(benchmark_slug), safe='-')}"
+             label = (
+                 f"[{_markdown_text(benchmark_name)}]({benchmark_url})"
+                 if markdown
+@@ -1389,7 +1391,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+                 )
+                 benchmark_slug = benchmark.get("slug") or benchmark.get("id")
+                 benchmark_url = (
+-                    "https://paperswithcode.co/benchmark/"
++                    f"{SITE_URL}/benchmark/"
+                     f"{quote(str(benchmark_slug), safe='-')}"
+                 )
+                 label = (
+@@ -1490,11 +1492,11 @@ def method_detail(args: argparse.Namespace, client: Client) -> int:
+     source_url = method.get("source_url")
+     if source_url:
+         if str(source_url).startswith("/"):
+-            source_url = f"https://paperswithcode.co{source_url}"
++            source_url = f"{SITE_URL}{source_url}"
+         source_label = method.get("source_title") or "Source paper"
+         print(f"\n{_entity_link(str(source_label), str(source_url))}")
+     slug = method.get("slug") or method.get("id")
+-    url = f"https://paperswithcode.co/methods/{quote(str(slug), safe='-')}"
++    url = f"{SITE_URL}/methods/{quote(str(slug), safe='-')}"
+     print(f"\n{_entity_link('View method', url)}")
+     return 0
+ 
+@@ -1574,7 +1576,7 @@ def conference_detail(args: argparse.Namespace, client: Client) -> int:
+     for label, field in (("Conference website", "url"), ("Hugging Face", "hf_url")):
+         if conference.get(field):
+             print(f"\n{_entity_link(label, str(conference[field]))}")
+-    url = f"https://paperswithcode.co/conferences/{quote(slug, safe='-')}"
++    url = f"{SITE_URL}/conferences/{quote(slug, safe='-')}"
+     print(f"\n{_entity_link('View conference', url)}")
+     return 0
+ 
+@@ -1645,13 +1647,16 @@ def organization_detail(args: argparse.Namespace, client: Client) -> int:
+     ):
+         if organization.get(field):
+             print(f"\n{_entity_link(label, str(organization[field]))}")
+-    url = f"https://paperswithcode.co/orgs/{quote(slug, safe='-')}"
++    url = f"{SITE_URL}/orgs/{quote(slug, safe='-')}"
+     print(f"\n{_entity_link('View organization', url)}")
+     return 0
+ 
+ 
+ def organization_list(args: argparse.Namespace, client: Client) -> int:
+-    payload = client.get("organizations/", {"featured_only": args.featured_only}).json()
++    params = {"featured_only": args.featured_only}
++    if getattr(args, "sort", None):
++        params["sort"] = args.sort
++    payload = client.get("organizations/", params).json()
+ 
+     def render(items: list[dict[str, Any]]) -> None:
+         _print_table(
+@@ -1731,10 +1736,10 @@ def framework_detail(args: argparse.Namespace, client: Client) -> int:
+             print(f"\n{_entity_link(label, str(framework[field]))}")
+     paper = framework.get("introducing_paper_arxiv_id")
+     if paper:
+-        url = f"https://paperswithcode.co/paper/{quote(str(paper), safe='.')}"
++        url = f"{SITE_URL}/paper/{quote(str(paper), safe='.')}"
+         print(f"\n{_entity_link(f'Introducing paper {paper}', url)}")
+     slug = framework.get("slug") or framework.get("id")
+-    url = f"https://paperswithcode.co/frameworks/{quote(str(slug), safe='-')}"
++    url = f"{SITE_URL}/frameworks/{quote(str(slug), safe='-')}"
+     print(f"\n{_entity_link('View framework', url)}")
+     return 0
+ 
+@@ -2526,7 +2531,7 @@ def _paper_markdown(item: dict[str, Any]) -> str:
+     reference = item.get("paper_arxiv_id") or item.get("paper_id")
+     if not reference:
+         return title
+-    url = f"https://paperswithcode.co/paper/{quote(str(reference), safe='.')}"
++    url = f"{SITE_URL}/paper/{quote(str(reference), safe='.')}"
+     return f"[{title}]({url})"
+ 
+ 
+@@ -2615,7 +2620,7 @@ def benchmark_detail(args: argparse.Namespace, client: Client) -> int:
+         )
+         print(f"\n{description}")
+     slug = benchmark.get("slug") or benchmark.get("id")
+-    benchmark_url = f"https://paperswithcode.co/benchmark/{quote(str(slug), safe='-')}"
++    benchmark_url = f"{SITE_URL}/benchmark/{quote(str(slug), safe='-')}"
+     link = (
+         f"View benchmark: {benchmark_url}"
+         if interactive
+@@ -2945,6 +2950,7 @@ def build_parser(
+         action="store_true",
+         help="return only curated featured organizations",
+     )
++    organizations.add_argument("--sort", choices=("trending", "papers", "stars", "name"))
+     _json(organizations)
+     organizations.set_defaults(handler=organization_list)
+ 
+diff --git a/standalone_cli/src/pwc_cli/transport.py b/standalone_cli/src/pwc_cli/transport.py
+index 9b6a172..96bd503 100644
+--- a/standalone_cli/src/pwc_cli/transport.py
++++ b/standalone_cli/src/pwc_cli/transport.py
+@@ -12,6 +12,7 @@ from typing import Any
+ 
+ from pwc_cli import __version__
+ 
++SITE_URL = os.environ.get("PWC_SITE_URL", "https://paperswithcode.co").rstrip("/")
+ DEFAULT_API_URL = "https://paperswithcode.co/api/v1"
+ MAX_RESPONSE_BYTES = 2 * 1024 * 1024
+ 

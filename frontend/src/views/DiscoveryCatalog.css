@@ -1,0 +1,16 @@
+.discovery-filters {display:flex;flex-wrap:wrap;gap:1rem;margin:1.5rem 0;}
+.discovery-filters > button {align-self:end;padding:.5rem 0;color:var(--accent-text);font:.75rem var(--mono);}
+.discovery-filters label {display:grid;grid-template-columns:minmax(0,1fr);max-width:100%;gap:.35rem;font:12px var(--mono);color:var(--ink-muted);}
+.discovery-filters select {max-width:100%;border:1px solid var(--border);background:var(--bg);color:var(--ink);padding:.5rem;border-radius:4px;}
+.discovery a,.discovery-paper a {text-decoration:underline;text-underline-offset:.16em;}
+.discovery-count,.discovery-list small {color:var(--ink-muted);font:12px var(--mono);}
+.discovery-count {margin:1.25rem 0;}
+.discovery-list {list-style:none;padding:0;}
+.discovery-list li {border-top:1px solid var(--border);padding:1rem 0;display:grid;gap:.4rem;}
+.discovery-list a {font-size:1.15rem;font-weight:600;}
+.discovery-pager,.discovery-resources {display:flex;gap:1rem;margin:1rem 0;flex-wrap:wrap;}
+.discovery-pager button {border:1px solid var(--border);padding:.35rem .7rem;border-radius:4px;}
+.discovery-paper {border-block:1px solid var(--border);padding:1rem 0;margin:1.5rem 0;}
+.discovery-paper dl {display:grid;grid-template-columns:max-content 1fr;gap:.3rem .8rem;margin:.8rem 0;}
+.discovery-paper dt {color:var(--ink-muted);}
+.discovery-paper dd a + a {margin-left:.5rem;}

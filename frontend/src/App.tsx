@@ -1,3 +1,4 @@
+import { catalogPageview } from "@/lib/catalogAnalytics";
 /**
  * Root app: react-router-dom routes. Every page is bookmarkable and the
  * browser back button works as expected.
@@ -27,6 +28,7 @@ import {
   adminDashboardUrl,
   isAuthDisabled,
   isChatEnabled,
+  isDiscoveryCatalog,
   isNativePdfReaderEnabled,
   shouldUseHashRouter,
 } from "@/lib/apiUrl";
@@ -50,6 +52,7 @@ if (!useHashRouter && typeof window !== "undefined") {
 // for visitors landing on a single route.
 const AuthorizePaperEditView = React.lazy(() => import("@/views/AuthorizePaperEditView"));
 const FollowingView = React.lazy(() => import("@/views/FollowingView"));
+const DiscoveryCatalogView = React.lazy(() => import("@/views/DiscoveryCatalogView"));
 const FeedView = React.lazy(() => import("@/views/FeedView"));
 const ChatView = React.lazy(() => import("@/views/ChatView"));
 const SharedChatView = React.lazy(() => import("@/views/SharedChatView"));
@@ -65,6 +68,8 @@ const ConferencesIndexView = React.lazy(() => import("@/views/ConferencesIndexVi
 const AiDeadlinesView = React.lazy(() => import("@/views/AiDeadlinesView"));
 const ConferenceDetailView = React.lazy(() => import("@/views/ConferenceDetailView"));
 const ConferenceTaskView = React.lazy(() => import("@/views/ConferenceTaskView"));
+const DevelopersIndex = React.lazy(() => import("@/views/Developers").then(m => ({ default: m.DevelopersIndex })));
+const DeveloperDetail = React.lazy(() => import("@/views/Developers").then(m => ({ default: m.DeveloperDetail })));
 const OrganizationsIndexView = React.lazy(() => import("@/views/OrganizationsIndexView"));
 const OrganizationDetailView = React.lazy(() => import("@/views/OrganizationDetailView"));
 const OrganizationTaskView = React.lazy(() => import("@/views/OrganizationDetailView"));
@@ -75,6 +80,7 @@ const SavedPapersView = React.lazy(() => import("@/views/SavedPapersView"));
 const SettingsView = React.lazy(() => import("@/views/SettingsView"));
 const PrivacyView = React.lazy(() => import("@/views/PrivacyView"));
 const ApiDocsView = React.lazy(() => import("@/views/ApiDocsView"));
+const PersonalAgentsView = React.lazy(() => import("@/views/PersonalAgentsView"));
 const McpView = React.lazy(() => import("@/views/McpView"));
 const SubmitView = React.lazy(() => import("@/views/SubmitView"));
 const CronDashboard = React.lazy(() => import("@/pages/CronDashboard"));
@@ -261,6 +267,12 @@ const SiteLayout: React.FC<{ reader?: boolean }> = ({ reader = false }) => {
 };
 
 const Shell: React.FC = () => {
+  const { pathname } = useLocation();
+  const lastPath = React.useRef<string>();
+  React.useEffect(() => {
+    if (lastPath.current !== pathname) catalogPageview(pathname);
+    lastPath.current = pathname;
+  }, [pathname]);
   useScrollToTop();
   React.useLayoutEffect(() => {
     document.getElementById("initial-discovery-footer")?.remove();
@@ -284,8 +296,9 @@ const Shell: React.FC = () => {
       </Route>
       <Route element={<SiteLayout />}>
         <Route path="/" element={<FeedView />} />
-        <Route path="/following" element={<FollowingView />} />
-        <Route path="/x-trending" element={<FeedView xTrending />} />
+        {isDiscoveryCatalog() && <Route path="/catalog" element={<DiscoveryCatalogView />} />}
+        <Route path="/following" element={isDiscoveryCatalog() ? <Navigate to="/" replace /> : <FollowingView />} />
+        <Route path="/x-trending" element={isDiscoveryCatalog() ? <Navigate to="/" replace /> : <FeedView xTrending />} />
         {/* Keep new and persisted chats on the same route instance. A new
             turn replaces /chat with /chat/:sessionId as soon as the server
             allocates it; sibling routes would unmount ChatView and abort
@@ -312,18 +325,21 @@ const Shell: React.FC = () => {
         <Route path="/ai-deadlines" element={<AiDeadlinesView />} />
         <Route path="/conferences/:confSlug" element={<ConferenceDetailView />} />
         <Route path="/conferences/:confSlug/:taskSlug" element={<ConferenceTaskView />} />
+        {isDiscoveryCatalog() && <Route path="/developers" element={<DevelopersIndex />} />}
+        {isDiscoveryCatalog() && <Route path="/developers/:id" element={<DeveloperDetail />} />}
         <Route path="/organizations" element={<OrganizationsIndexView />} />
         <Route path="/orgs/:orgSlug" element={<OrganizationDetailView />} />
         <Route path="/orgs/:orgSlug/:taskSlug" element={<OrganizationTaskView />} />
         <Route path="/authors/:authorId" element={<AuthorDetailView />} />
         <Route path="/benchmark/:datasetSlug" element={<BenchmarkDetailView />} />
         <Route path="/authorize-paper-edit/:authorizationId" element={<AuthorizePaperEditView />} />
-        <Route path="/submit" element={<SubmitView />} />
+        <Route path="/submit" element={isDiscoveryCatalog() ? <Navigate to="/catalog" replace /> : <SubmitView />} />
         <Route path="/saved" element={<AuthGatedRoute element={<SavedPapersView />} />} />
         <Route path="/settings" element={<SettingsView />} />
         <Route path="/privacy" element={<PrivacyView />} />
         <Route path="/docs/api" element={<ApiDocsView />} />
         <Route path="/mcp" element={<McpView />} />
+        {isDiscoveryCatalog() && <Route path="/personal-agents" element={<PersonalAgentsView />} />}
         <Route path="/admin-dashboard" element={<AdminDashboardRoute />} />
         <Route path="/autonomous-operations" element={<AdminGatedRoute element={<AutonomousOperations />} />} />
         <Route path="/cron-dashboard" element={<Navigate to="/admin-dashboard" replace />} />
@@ -345,7 +361,7 @@ const App: React.FC = () => (
         <Shell />
       </Router>
       <Toaster />
-      {import.meta.env.DEV && <ReactQueryDevtools initialIsOpen={false} />}
+      {import.meta.env.DEV && !isDiscoveryCatalog() && <ReactQueryDevtools initialIsOpen={false} />}
     </AuthProvider>
   </QueryClientProvider>
 );

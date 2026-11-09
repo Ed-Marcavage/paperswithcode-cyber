@@ -1,3 +1,4 @@
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -8,10 +9,10 @@ import { catalogApi } from "@/lib/api/catalog";
 import "./Organizations.css";
 import { catalogQueryKeys, TEN_MINUTES } from "@/lib/api/queryKeys";
 
-type SortMode = "trending" | "papers" | "name";
+type SortMode = "trending" | "papers" | "stars" | "name";
 
 const parseSort = (value: string | null): SortMode =>
-  value === "papers" || value === "name" ? value : "trending";
+  value === "papers" || value === "stars" || value === "name" ? value : "trending";
 
 const Logo: React.FC<{ organization: Organization }> = ({ organization }) => {
   const [failed, setFailed] = useState(false);
@@ -36,12 +37,13 @@ const Logo: React.FC<{ organization: Organization }> = ({ organization }) => {
 };
 
 const OrganizationsIndexView: React.FC = () => {
+  const discovery = isDiscoveryCatalog();
   const [params, setParams] = useSearchParams();
   const sort = parseSort(params.get("sort"));
   const query = params.get("q") ?? "";
   const organizationsQ = useQuery({
-    queryKey: [...catalogQueryKeys.organizations, "featured"],
-    queryFn: () => catalogApi.organizationIndex(),
+    queryKey: [...catalogQueryKeys.organizations, "featured", discovery ? sort : undefined],
+    queryFn: () => catalogApi.organizationIndex(discovery ? sort : undefined),
     staleTime: TEN_MINUTES,
   });
 
@@ -64,6 +66,7 @@ const OrganizationsIndexView: React.FC = () => {
         .toLocaleLowerCase()
         .includes(needle),
     );
+    if (discovery) return filtered;
     if (sort === "papers") {
       return [...filtered].sort(
         (a, b) =>
@@ -78,18 +81,17 @@ const OrganizationsIndexView: React.FC = () => {
       );
     }
     return filtered;
-  }, [organizationsQ.data, query, sort]);
+  }, [organizationsQ.data, query, sort, discovery]);
 
   return (
     <div className="page organizations-page">
       <div className="feed-header">
         <div>
           <h1 className="feed-title">
-            AI <em>Organizations</em>
+            {!discovery && "AI "}<em>Organizations</em>
           </h1>
           <div className="feed-subtitle">
-            Explore papers from leading AI organizations, ranked by sustained
-            community momentum over the past 30 days.
+            {discovery ? "Browse security research, engineering posts, and repositories by organization." : "Explore papers from leading AI organizations, ranked by sustained community momentum over the past 30 days."}
           </div>
         </div>
       </div>
@@ -106,7 +108,7 @@ const OrganizationsIndexView: React.FC = () => {
               ? "Ranked by 30-day momentum"
               : sort === "papers"
                 ? "Sorted by linked papers"
-                : "Sorted A–Z"}
+                : sort === "stars" ? "Stars across cataloged repositories" : "Sorted A–Z"}
           </span>
         </div>
         <div className="organizations-controls">
@@ -124,6 +126,7 @@ const OrganizationsIndexView: React.FC = () => {
               [
                 ["trending", "Trending"],
                 ["papers", "Most papers"],
+                ...(discovery ? [["stars", "Most stars"]] as const : []),
                 ["name", "A–Z"],
               ] as const
             ).map(([value, label]) => (
@@ -180,6 +183,15 @@ const OrganizationsIndexView: React.FC = () => {
           <div className="organizations-grid">
             {organizations.map((organization) => {
               const count = organization.paper_count ?? 0;
+              const showStars = discovery && sort === "stars";
+              const workCounts = [
+                [count, "paper", "papers"],
+                [organization.post_count, "post", "posts"],
+                [organization.repository_count, "repository", "repositories"],
+              ] as const;
+              const kinds = workCounts.filter(([n]) => n && n > 0)
+                .map(([n, singular, plural]) => `${n} ${n === 1 ? singular : plural}`).join(" · ");
+              const githubLogin = organization.github_url?.split("/").filter(Boolean).pop();
               const years =
                 organization.first_paper_year && organization.latest_paper_year
                   ? organization.first_paper_year === organization.latest_paper_year
@@ -191,36 +203,35 @@ const OrganizationsIndexView: React.FC = () => {
                   key={organization.id}
                   to={`/orgs/${organization.slug}`}
                   className="organization-card"
-                  aria-label={
-                    count
-                      ? `Browse ${count.toLocaleString()} ${organization.name} papers`
-                      : `Browse ${organization.name} papers`
-                  }
+                  aria-label={discovery ? `Browse ${organization.name}` : count ? `Browse ${count.toLocaleString()} ${organization.name} papers` : `Browse ${organization.name} papers`}
                 >
                   <div className="organization-card-header">
                     <Logo organization={organization} />
                     <div>
                       <h3>{organization.name}</h3>
-                      <span>@{organization.hf_slug ?? organization.slug}</span>
+                      {discovery ? (githubLogin && <span>@{githubLogin}</span>) : <span>@{organization.hf_slug ?? organization.slug}</span>}
                     </div>
                   </div>
                   <div className="organization-card-metrics">
-                    <strong>{count.toLocaleString()}</strong>
-                    <span>{count === 1 ? "paper" : "papers"}</span>
-                    {sort === "trending" && organization.trending_rank && (
+                    <strong>{showStars ? (organization.catalog_stars?.toLocaleString() ?? "—") : count.toLocaleString()}</strong>
+                    <span>{showStars ? "stars" : count === 1 ? "paper" : "papers"}</span>
+                    {discovery && <span className="organization-kind-summary">{kinds}
+                      {!showStars && organization.catalog_stars != null && ` · ★ ${organization.catalog_stars.toLocaleString()}`}
+                    </span>}
+                    {sort === "trending" && (!discovery || (organization.organization_trending_score ?? 0) > 0) && organization.trending_rank && (
                       <span className="organization-rank">
                         #{organization.trending_rank}
                       </span>
                     )}
                   </div>
                   <div className="organization-highlight">
-                    <span>Trending paper</span>
+                    <span>{discovery ? "Featured work" : "Trending paper"}</span>
                     <strong>
                       {organization.top_trending_paper?.title ?? "No papers indexed yet"}
                     </strong>
                   </div>
                   <div className="organization-card-footer">
-                    {years ? `Publishing ${years}` : "Research archive ready"}
+                    {years ? `${discovery ? "Catalog" : "Publishing"} ${years}` : discovery ? "View profile" : "Research archive ready"}
                     <span aria-hidden="true">↗</span>
                   </div>
                 </Link>

@@ -145,14 +145,14 @@ export function isAuthDisabled(): boolean {
   return enabledBuildFlag(import.meta.env.VITE_DISABLE_AUTH);
 }
 
-/**
- * `true` only for builds that explicitly opt into the research chat UI.
- * Production intentionally leaves this unset; staging sets it in
- * `.env.staging`. Keep this separate from `VITE_CHAT_LIVE`, which selects the
- * transport implementation and must not make the interface public by itself.
- */
+/** Read-only deployment of the curated research catalog. */
+export function isDiscoveryCatalog(): boolean {
+  return enabledBuildFlag(import.meta.env.VITE_LOCAL_CATALOG);
+}
+
+/** Chat must be opted into and is unavailable in discovery deployments. */
 export function isChatEnabled(): boolean {
-  return enabledBuildFlag(import.meta.env.VITE_CHAT_ENABLED);
+  return !isDiscoveryCatalog() && enabledBuildFlag(import.meta.env.VITE_CHAT_ENABLED);
 }
 
 /**
@@ -164,7 +164,7 @@ export const CANONICAL_CHAT_URL = "https://paperswithcode.co/chat";
 
 /** `true` for the Space mirror: chat entry points hand off to the canonical site. */
 export function isChatMirror(): boolean {
-  return isAuthDisabled() && !isChatEnabled();
+  return !isDiscoveryCatalog() && isAuthDisabled() && !isChatEnabled();
 }
 
 export function isNativePdfReaderEnabled(): boolean {

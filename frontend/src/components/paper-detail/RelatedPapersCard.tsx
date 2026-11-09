@@ -1,3 +1,4 @@
+import { paperLinkHandlers } from "@/lib/catalogAnalytics";
 import { Link } from "react-router-dom";
 
 import LatexTitle from "@/components/LatexTitle";
@@ -27,6 +28,7 @@ export function RelatedPapersCard({
         <Link
           key={paper.id}
           to={`/paper/${paper.arxiv_id || paper.id}`}
+          {...paperLinkHandlers(String(paper.id), paper.title, "title", "related_papers")}
           target="_blank"
           rel="noopener noreferrer"
           className="related-paper"

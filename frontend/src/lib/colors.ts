@@ -6,7 +6,18 @@
  * deterministic non-crypto hashes the v2 source uses elsewhere (see `seedRand`
  * in components.tsx). Same input ⇒ same hue forever.
  */
+const catalogHues: Record<string, number> = {
+  "cyberintel-penetration-testing": 154,
+  "cyberintel-exploit-development": 35,
+  "cyberintel-vulnerability-analysis": 244,
+  "cyberintel-binary-analysis": 310,
+  "cyberintel-fuzzing": 92,
+  "cyberintel-repair": 195,
+  "cyberintel-ai-system-security": 350,
+};
+
 export function hueFromSlug(slug: string): number {
+  if (Object.prototype.hasOwnProperty.call(catalogHues, slug)) return catalogHues[slug];
   let h = 2166136261;
   const s = slug || "";
   for (let i = 0; i < s.length; i++) {

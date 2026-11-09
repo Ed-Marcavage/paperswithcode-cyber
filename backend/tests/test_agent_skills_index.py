@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from pathlib import Path
 
 from backend.chat_sandbox_worker.prompt import render
@@ -19,9 +20,9 @@ def test_agent_skills_index_matches_published_skill():
     )
     assert skill["name"] == "pwc-cli"
     assert skill["type"] == "skill-md"
-    assert skill["url"] == (
-        "https://raw.githubusercontent.com/huggingface/pwc-cli/"
-        "main/standalone_cli/SKILL.md"
+    assert re.fullmatch(
+        r"https://raw\.githubusercontent\.com/Ed-Marcavage/pwc-cli/"
+        r"[a-f0-9]{40}/standalone_cli/SKILL\.md", skill["url"]
     )
     assert skill["description"] in SKILL_PATH.read_text(encoding="utf-8")
     digest = hashlib.sha256(SKILL_PATH.read_bytes()).hexdigest()

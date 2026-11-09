@@ -1,0 +1,29 @@
+.developers-page .organizations-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 225px), 1fr)); }
+.developers-page .developer-card { min-height: 166px; }
+.developers-page .developer-avatar { display: grid; border-radius: 50%; place-items: center; color: var(--ink-soft); background: var(--bg); }
+.developers-page .developer-avatar img { padding: 0; object-fit: cover; }
+.developer-card .organization-highlight strong, .developer-work-row strong { overflow-wrap: anywhere; }
+.developer-pagination { display: flex; justify-content: center; align-items: center; gap: 1rem; margin-top: 1.5rem; font: .76rem var(--mono); }
+.developer-pagination button, .developers-page .organizations-empty button { border: 1px solid var(--hairline-strong); border-radius: 3px; padding: .5rem .8rem; background: var(--bg-subtle); color: var(--ink); }
+.developer-pagination button:disabled { opacity: .45; }
+.developer-back, .developer-github { display: inline-block; color: var(--accent-text); font: .8rem var(--mono); }
+.developer-back { margin-block: 1rem; }
+.developer-profile-header { display: flex; align-items: center; justify-content: flex-start; gap: 1.1rem; }
+.developer-profile-header .developer-avatar { width: 68px; height: 68px; flex-basis: 68px; }
+.developer-profile-header .feed-title { overflow-wrap: anywhere; }
+.developer-work-list { margin-top: 1rem; border: 1px solid var(--hairline-strong); border-radius: 4px; overflow: hidden; }
+.developer-work-row { display: flex; align-items: center; gap: 1rem; padding: 1rem; color: var(--ink); text-decoration: none; background: var(--bg-subtle); }
+.developer-work-row + .developer-work-row { border-top: 1px solid var(--hairline); }
+.developer-work-row:hover, .developer-work-row:focus-visible { background: var(--accent-subtle); }
+.developer-work-main { display: grid; flex: 1; gap: .35rem; min-width: 0; }
+.developer-work-main strong { font: 500 1.05rem/1.2 var(--serif); }
+.developer-work-main > span, .developer-commits { color: var(--ink-soft); font: .72rem var(--mono); }
+@media (max-width: 640px) { .developer-work-row { gap: .5rem; padding: .8rem; } }
+
+.developer-filters { align-items: end; margin-top: 0; }
+.developer-repo-team { color: var(--accent-text); font: .75rem var(--mono); }
+.developer-work-main a { color: inherit; }
+@media (max-width: 640px) {
+  .developer-work-row { flex-wrap: wrap; }
+  .developer-work-main { flex-basis: 60%; }
+}

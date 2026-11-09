@@ -1,3 +1,4 @@
+import { resourceClicked } from "@/lib/catalogAnalytics";
 import { useState } from "react";
 
 import { Icon } from "@/components/Icon";
@@ -7,6 +8,7 @@ import type { AuthUser } from "@/lib/authContext";
 import type { HuggingFaceArtifactsViewer } from "@/lib/paperDetailPresentation";
 import { safeExternalHref } from "@/lib/safeExternalHref";
 
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { CopyToBucketCard, paperArtifactBucketName } from "./CopyToBucketCard";
 import { RelatedPapersCard } from "./RelatedPapersCard";
 import { XThreadsCard } from "./XThreadsCard";
@@ -73,9 +75,9 @@ export function PaperResourceSidebar({
           <span>GitHub</span>
           <span className="badge">
             {sortedRepos.length} repo{sortedRepos.length === 1 ? "" : "s"}
-            <button type="button" onClick={onEditRepositories} className="edit-link">
+            {!isDiscoveryCatalog() && <button type="button" onClick={onEditRepositories} className="edit-link">
               edit
-            </button>
+            </button>}
           </span>
         </div>
         {visibleRepos.filter(({ safeHref }) => safeHref).map((repository) => (
@@ -85,6 +87,7 @@ export function PaperResourceSidebar({
             target="_blank"
             rel="noopener noreferrer"
             className="code-line"
+            onClick={() => resourceClicked(paper.id, "code")}
             style={{ textDecoration: "none" }}
           >
             <span className="code-line-repo">
@@ -94,7 +97,7 @@ export function PaperResourceSidebar({
               </span>
               {repository.is_official && <span className="code-line-official">· Official</span>}
             </span>
-            <span className="code-line-stars">★ {formatStars(repository.num_stars)}</span>
+            <span className="code-line-stars" title="Stars for the entire repository">★ {formatStars(repository.num_stars)}</span>
           </a>
         ))}
         {sortedRepos.length === 0 && (
@@ -115,6 +118,7 @@ export function PaperResourceSidebar({
         )}
       </div>
 
+      {!isDiscoveryCatalog() && <>
       <HuggingFaceArtifactsCard viewer={hfArtifactViewer} onEdit={onEditHfArtifacts} />
       <XThreadsCard threads={paper.x_threads ?? []} onEdit={onEditXThreads} />
       <CopyToBucketCard
@@ -128,6 +132,7 @@ export function PaperResourceSidebar({
         isSignedIn={Boolean(user)}
         suggestedBucketId={user ? `${user.username}/${paperArtifactBucketName(paper.title)}` : undefined}
       />
+      </>}
       <RelatedPapersCard isLoading={relatedIsLoading} papers={relatedPapers} />
 
       <div className="sidebar-card">

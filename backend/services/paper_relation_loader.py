@@ -5,9 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Sequence, TypeVar
 
-from sqlalchemy import Integer, and_, cast, desc, func, or_
+from sqlalchemy import Integer, and_, cast, desc, func, or_, text
 from sqlalchemy.orm import Session, aliased
 
+from backend.config import get_settings
 from backend.models.evaluations import (
     BenchmarkSummary,
     LeaderboardRankSummary,
@@ -79,6 +80,8 @@ class PaperRelations:
     authors: dict[int, list[str]] = field(default_factory=dict)
     author_links: dict[int, list[AuthorLink]] = field(default_factory=dict)
     tasks: dict[int, list[TaskSummary]] = field(default_factory=dict)
+    catalog_kinds: dict[int, str] = field(default_factory=dict)
+    catalog_contributions: dict[int, list[str]] = field(default_factory=dict)
     methods: dict[int, list[MethodSummary]] = field(default_factory=dict)
     organizations: dict[int, list[OrganizationSummary]] = field(default_factory=dict)
     leaderboard_ranks: dict[int, list[LeaderboardRankSummary]] = field(
@@ -491,6 +494,14 @@ class PaperRelationLoader:
         relations: PaperRelations,
         author_link_limit: int | None = CARD_AUTHOR_LINKS,
     ) -> None:
+        if get_settings().discovery_catalog:
+            rows = self.db.execute(text(
+                "SELECT paper_id, facets->'contribution', facets->'kind'->>0 "
+                "FROM discovery_works WHERE paper_id = ANY(:ids)"
+            ), {"ids": paper_ids})
+            for paper_id, contributions, kind in rows:
+                relations.catalog_contributions[paper_id] = contributions or []
+                relations.catalog_kinds[paper_id] = kind
         author_rows: list[_AuthorRow] = (
             self.db.query(
                 PaperAuthor.paper_id,

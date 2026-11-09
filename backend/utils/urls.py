@@ -46,7 +46,9 @@ def get_arxiv_abs_url(arxiv_id: str, version: Optional[str] = None) -> Optional[
 
     settings = get_settings()
 
-    if version and version != "v1":
+    # The discovery catalog imports reviewed revisions, including v1. An
+    # unversioned link can silently open a newer paper than its cached text.
+    if version and (version != "v1" or settings.discovery_catalog):
         return f"{settings.arxiv_base_url}/abs/{arxiv_id}{version}"
     else:
         # No version returns latest version (ArXiv default behavior)
@@ -70,7 +72,7 @@ def get_arxiv_pdf_url(arxiv_id: str, version: Optional[str] = None) -> Optional[
 
     settings = get_settings()
 
-    if version and version != "v1":
+    if version and (version != "v1" or settings.discovery_catalog):
         return f"{settings.arxiv_base_url}/pdf/{arxiv_id}{version}.pdf"
     else:
         # No version returns latest version (ArXiv default behavior)
@@ -124,16 +126,16 @@ def get_paper_abs_url(
 
 
 def get_paper_pdf_url(
-    source: str, arxiv_id: Optional[str], version: Optional[str]
+    source: str, arxiv_id: Optional[str], version: Optional[str], conference_url_pdf: Optional[str] = None
 ) -> Optional[str]:
     """
     Source-aware "PDF URL" for a paper row.
 
-    Only ArXiv rows have a derivable PDF URL; external rows return ``None``
-    unless a future column tracks an explicit PDF link separately.
+    Derive arXiv URLs from the revision. In discovery mode, an external
+    conference paper may supply its verified publisher PDF separately.
     """
     if source == "external":
-        return None
+        return conference_url_pdf if conference_url_pdf and get_settings().discovery_catalog else None
     if arxiv_id:
         return get_arxiv_pdf_url(arxiv_id, version)
     return None

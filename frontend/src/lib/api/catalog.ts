@@ -232,8 +232,8 @@ export class CatalogApi {
     return this.request(endpoint("/organizations/", { q, limit }));
   }
 
-  organizationIndex(): Promise<Organizations> {
-    return this.request("/organizations/index/cards");
+  organizationIndex(sort?: string): Promise<Organizations> {
+    return this.request(endpoint("/organizations/index/cards", { sort }));
   }
 
   getOrganization(slug: string): Promise<Organization> {

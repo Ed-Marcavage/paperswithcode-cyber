@@ -31,7 +31,7 @@ rollback target.
 /var/lib/paperswithcode/{shared,production,staging}
 
 /srv/paperswithcode/mcp/
-  repository.git                 # huggingface/pwc-cli mirror
+  repository.git                 # Ed-Marcavage/pwc-cli mirror
   releases/<sha16>/
   environments/{production,staging}/{current,previous}
 
@@ -215,7 +215,7 @@ release, like any other pinned value.
 
 The remote MCP server is an independent immutable component even though its
 lifecycle code lives in this monorepo. Its source comes from an exact commit in
-the separate `huggingface/pwc-cli` mirror. A release archives only
+the separate `Ed-Marcavage/pwc-cli` mirror. A release archives only
 `mcp_server/` and `standalone_cli/`, installs the committed `mcp_server/uv.lock`,
 and records the source SHA, lock and artifact hashes, package and SDK versions,
 protocol matrix, health schema, and fixed catalog URLs in `manifest.json`.
@@ -351,7 +351,7 @@ area/task taxonomy in `TASK_CATALOG.md`, and the area-grouped method snapshot in
 prompt or skill change reaches chat with the next exact-SHA `pwc-deploy`; a new
 Modal image is needed only for sandbox executor changes. The hourly
 `sync-pwc-cli-skill.yml` workflow compares the CLI skill with
-`huggingface/pwc-cli:standalone_cli/SKILL.md`. Because that text is appended
+`Ed-Marcavage/pwc-cli:standalone_cli/SKILL.md`. Because that text is appended
 verbatim to the system prompt, a validated change is never pushed to `main`.
 The workflow pushes it to an `automation/sync-pwc-cli-skill-<upstream-sha>`
 branch and opens a pull request for review, one per upstream commit.

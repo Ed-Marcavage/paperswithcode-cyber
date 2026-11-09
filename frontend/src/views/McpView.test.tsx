@@ -13,7 +13,10 @@ const renderView = () => {
   );
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllEnvs();
+});
 
 describe("McpView", () => {
   it("shows the connection URL and degrades cleanly when health fails", async () => {
@@ -31,8 +34,8 @@ describe("McpView", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 503 }));
     renderView();
 
-    const banner = screen.getByRole("link", { name: /huggingface\/pwc-cli/ });
-    expect(banner).toHaveAttribute("href", "https://github.com/huggingface/pwc-cli");
+    const banner = screen.getByRole("link", { name: /Ed-Marcavage\/pwc-cli/ });
+    expect(banner).toHaveAttribute("href", "https://github.com/Ed-Marcavage/pwc-cli");
   });
 
   it("reports healthy version and protocol without blocking the page", async () => {
@@ -103,7 +106,20 @@ describe("McpView", () => {
     expect(screen.getByText(/"type": "http"/)).toBeInTheDocument();
   });
 
-  it("states limits, privacy, examples, and supporting documentation", () => {
+  it("documents the cyber catalog tools and anonymous read access", () => {
+    vi.stubEnv("VITE_LOCAL_CATALOG", "true");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 503 }));
+    renderView();
+
+    expect(screen.getByText("browse_catalog")).toBeInTheDocument();
+    expect(screen.getByText(/No account or API key is needed/)).toBeInTheDocument();
+    for (const tool of ["list_developers", "get_developer"]) expect(screen.getByText(tool)).toBeInTheDocument();
+    expect(screen.getByText(/Find three developers/)).toBeInTheDocument();
+    expect(screen.getByText(/Find SEC-bench Pro/)).toBeInTheDocument();
+  });
+
+  it("states limits, privacy, examples, and supporting documentation for the general catalog", () => {
+    vi.stubEnv("VITE_LOCAL_CATALOG", "false");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(new Response("", { status: 503 }));
     renderView();
 
@@ -113,7 +129,7 @@ describe("McpView", () => {
     expect(screen.getByText(/Trace the predecessor and successor papers/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /CLI repository/ })).toHaveAttribute(
       "href",
-      "https://github.com/huggingface/pwc-cli",
+      "https://github.com/Ed-Marcavage/pwc-cli",
     );
     expect(screen.getByRole("link", { name: /llms.txt/ })).toHaveAttribute(
       "href",

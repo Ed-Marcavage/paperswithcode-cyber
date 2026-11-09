@@ -34,6 +34,7 @@ from backend.utils.csrf import cookie_request_passes_csrf
 # `PWC_SLOW_REQUEST_MS` env var.
 _SLOW_REQUEST_MS = float(os.getenv("PWC_SLOW_REQUEST_MS", "1000"))
 _timing_logger = logging.getLogger("backend.timing")
+_DISCOVERY_READ_METHODS = ("GET", "HEAD", "OPTIONS")
 
 _STAGING_CATALOG_PREFIXES = (
     "/api/v1/papers",
@@ -403,7 +404,7 @@ def create_app() -> FastAPI:
     cors_kwargs = dict(
         allow_origins=settings.cors_allowed_origins,
         allow_credentials=True,
-        allow_methods=["GET", "POST", "PUT", "DELETE"],
+        allow_methods=_DISCOVERY_READ_METHODS if settings.discovery_catalog else ["GET", "POST", "PUT", "DELETE"],
         allow_headers=["*"],
     )
     if settings.extra_allowed_origin_regex:
@@ -565,6 +566,10 @@ def create_app() -> FastAPI:
     app.include_router(papers.router, prefix="/api/v1", tags=["papers"])
     app.include_router(paper_reader.router, prefix="/api/v1", tags=["papers"])
     app.include_router(research_catalog.router, prefix="/api/v1", tags=["research"])
+    if get_settings().discovery_catalog:
+        from backend.routers import developers, discovery_catalog
+        app.include_router(developers.router, prefix="/api/v1")
+        app.include_router(discovery_catalog.router, prefix="/api/v1")
     # External-resource ingestion endpoints share the `/papers` prefix because
     # the resulting rows live in the same `papers` table.
     app.include_router(
@@ -706,6 +711,19 @@ def create_app() -> FastAPI:
         allowed_origins=settings.cors_allowed_origins,
         allow_origin_regex=settings.extra_allowed_origin_regex or None,
     )
+
+    if settings.discovery_catalog:
+        @app.middleware("http")
+        async def enforce_read_only_catalog(request: Request, call_next):
+            # Check the same decoded path the ASGI router dispatches.
+            path = request.scope["path"]
+            if request.method not in _DISCOVERY_READ_METHODS and (path == "/api" or path.startswith("/api/")):
+                return JSONResponse(
+                    {"detail": "This catalog is read-only."},
+                    status_code=405,
+                    headers={"Allow": ", ".join(_DISCOVERY_READ_METHODS)},
+                )
+            return await call_next(request)
 
     return app
 

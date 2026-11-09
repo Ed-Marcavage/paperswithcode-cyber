@@ -1,8 +1,8 @@
 # AGENTS.md
 
-Guidance for agents working in the Papers with Code monorepo. The site at
-https://paperswithcode.co makes open AI research and its artifacts accessible.
-It runs on a Hetzner CPX42 with 8 vCPUs, 16 GB RAM, and an 80 GB disk.
+This repository is the Cyber catalog fork of Hugging Face's Papers with Code. For work on this fork use the [local discovery setup](local-dev/README.md), the `Ed-Marcavage/paperswithcode` repository and <https://paperswithcode-cyber.com>. Its code releases and data imports are separate operations.
+
+The production and staging hosts, services, deploy commands, GitHub review automation and automatic merge/deploy instructions below describe the upstream Hugging Face project. They apply only to work authorized for upstream. For this fork, use the target environment and publication scope requested by its maintainer.
 
 ## Guardrails
 

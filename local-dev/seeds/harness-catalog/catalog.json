@@ -1,0 +1,1028 @@
+{
+  "schema_version": 1,
+  "names": {
+    "topic": {
+      "vulnerability-analysis": "Vulnerability detection and triage",
+      "penetration-testing": "Penetration testing",
+      "exploit-development": "Exploit construction and validation",
+      "fuzzing": "Fuzzing and test generation",
+      "repair": "Vulnerability repair",
+      "binary-analysis": "Binary analysis",
+      "ai-system-security": "AI-system security"
+    },
+    "target": {
+      "web": "Web applications",
+      "source-code": "Source code",
+      "networks": "Hosts and networks",
+      "protocols": "Network protocols",
+      "binaries": "Native binaries",
+      "smart-contracts": "Smart contracts",
+      "ai-systems": "AI systems",
+      "compilers": "Compilers and runtimes",
+      "libraries": "Software libraries",
+      "embedded": "Embedded systems"
+    },
+    "contribution": {
+      "system": "System or technique",
+      "benchmark": "Benchmark",
+      "dataset": "Dataset",
+      "study": "Empirical study / experience",
+      "synthesis": "Survey / review"
+    },
+    "kind": {
+      "paper": "Research paper",
+      "post": "Engineering post",
+      "repository": "Repository"
+    },
+    "year": {
+      "2026": "2026",
+      "2025": "2025",
+      "2024": "2024",
+      "2023": "2023",
+      "2022": "2022",
+      "2021": "2021",
+      "2020": "2020",
+      "2019": "2019",
+      "2018": "2018",
+      "2017": "2017"
+    }
+  },
+  "rows": [
+    {
+      "id": "arxiv:2505.11565",
+      "title": "ACSE-Eval: Can LLMs threat model real-world cloud infrastructure?",
+      "authors": [
+        "Sarthak Munshi",
+        "Swapnil Pathak",
+        "Sonam Ghatode",
+        "Thenuga Priyadarshini",
+        "Dhivya Chandramouleeswaran",
+        "Ashutosh Rana"
+      ],
+      "abstract": "While Large Language Models have shown promise in cybersecurity applications, their effectiveness in identifying security threats within cloud deployments remains unexplored. This paper introduces AWS Cloud Security Engineering Eval, a novel dataset for evaluating LLMs cloud security threat modeling capabilities. ACSE-Eval contains 100 production grade AWS deployment scenarios, each featuring detailed architectural specifications, Infrastructure as Code implementations, documented security vulnerabilities, and associated threat modeling parameters. Our dataset enables systemic assessment of LLMs abilities to identify security risks, analyze attack vectors, and propose mitigation strategies in cloud environments. Our evaluations on ACSE-Eval demonstrate that GPT 4.1 and Gemini 2.5 Pro excel at threat identification, with Gemini 2.5 Pro performing optimally in 0-shot scenarios and GPT 4.1 showing superior results in few-shot settings. While GPT 4.1 maintains a slight overall performance advantage, Claude 3.7 Sonnet generates the most semantically sophisticated threat models but struggles with threat categorization and generalization. To promote reproducibility and advance research in automated cybersecurity threat analysis, we open-source our dataset, evaluation metrics, and methodologies.",
+      "url": "https://arxiv.org/abs/2505.11565v2",
+      "arxiv_id": "2505.11565",
+      "version": "v2",
+      "date": "2025-05-16",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/ACSE-Eval/acse-eval-experiments",
+      "preview_file": null
+    },
+    {
+      "id": "arxiv:2402.11814",
+      "title": "An Empirical Evaluation of LLMs for Solving Offensive Security Challenges",
+      "authors": [
+        "Minghao Shao",
+        "Boyuan Chen",
+        "Sofija Jancheska",
+        "Brendan Dolan-Gavitt",
+        "Siddharth Garg",
+        "Ramesh Karri",
+        "Muhammad Shafique"
+      ],
+      "abstract": "Capture The Flag (CTF) challenges are puzzles related to computer security scenarios. With the advent of large language models (LLMs), more and more CTF participants are using LLMs to understand and solve the challenges. However, so far no work has evaluated the effectiveness of LLMs in solving CTF challenges with a fully automated workflow. We develop two CTF-solving workflows, human-in-the-loop (HITL) and fully-automated, to examine the LLMs' ability to solve a selected set of CTF challenges, prompted with information about the question. We collect human contestants' results on the same set of questions, and find that LLMs achieve higher success rate than an average human participant. This work provides a comprehensive evaluation of the capability of LLMs in solving real world CTF challenges, from real competition to fully automated workflow. Our results provide references for applying LLMs in cybersecurity education and pave the way for systematic evaluation of offensive cybersecurity capabilities in LLMs.",
+      "url": "https://arxiv.org/abs/2402.11814v1",
+      "arxiv_id": "2402.11814",
+      "version": "v1",
+      "date": "2024-02-19",
+      "year": 2024,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2024"
+        ],
+        "topic": [
+          "penetration-testing",
+          "exploit-development"
+        ],
+        "target": [
+          "binaries",
+          "web"
+        ],
+        "contribution": [
+          "study"
+        ]
+      },
+      "artifact_url": "https://github.com/NickNameInvalid/LLM_CTF",
+      "preview_file": null
+    },
+    {
+      "id": "arxiv:2508.03936",
+      "title": "ASTRA: Autonomous Spatial-Temporal Red-teaming for AI Software Assistants",
+      "authors": [
+        "Xiangzhe Xu",
+        "Guangyu Shen",
+        "Zian Su",
+        "Siyuan Cheng",
+        "Hanxi Guo",
+        "Lu Yan",
+        "Xuan Chen",
+        "Jiasheng Jiang",
+        "Xiaolong Jin",
+        "Chengpeng Wang",
+        "Zhuo Zhang",
+        "Xiangyu Zhang"
+      ],
+      "abstract": "AI coding assistants like GitHub Copilot are rapidly transforming software development, but their safety remains deeply uncertain-especially in high-stakes domains like cybersecurity. Current red-teaming tools often rely on fixed benchmarks or unrealistic prompts, missing many real-world vulnerabilities. We present ASTRA, an automated agent system designed to systematically uncover safety flaws in AI-driven code generation and security guidance systems. ASTRA works in three stages: (1) it builds structured domain-specific knowledge graphs that model complex software tasks and known weaknesses; (2) it performs online vulnerability exploration of each target model by adaptively probing both its input space, i.e., the spatial exploration, and its reasoning processes, i.e., the temporal exploration, guided by the knowledge graphs; and (3) it generates high-quality violation-inducing cases to improve model alignment. Unlike prior methods, ASTRA focuses on realistic inputs-requests that developers might actually ask-and uses both offline abstraction guided domain modeling and online domain knowledge graph adaptation to surface corner-case vulnerabilities. Across two major evaluation domains, ASTRA finds 11-66% more issues than existing techniques and produces test cases that lead to 17% more effective alignment training, showing its practical value for building safer AI systems.",
+      "url": "https://arxiv.org/abs/2508.03936v1",
+      "arxiv_id": "2508.03936",
+      "version": "v1",
+      "date": "2025-08-05",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "ai-system-security"
+        ],
+        "target": [
+          "ai-systems"
+        ],
+        "contribution": [
+          "system"
+        ]
+      },
+      "artifact_url": "https://github.com/PurCL/ASTRA",
+      "preview_file": "previews/d1a9109946eaf4ee925fea128a1fdd07e8967a868ac7e2afc33310d638efab41.jpg",
+      "text_file": "text/d1a9109946eaf4ee925fea128a1fdd07e8967a868ac7e2afc33310d638efab41.txt"
+    },
+    {
+      "id": "arxiv:2510.18131",
+      "title": "BlueCodeAgent: A Blue Teaming Agent Powered by Automated Red Teaming for CodeGen AI",
+      "authors": [
+        "Chengquan Guo",
+        "Yuzhou Nie",
+        "Chulin Xie",
+        "Zinan Lin",
+        "Wenbo Guo",
+        "Bo Li"
+      ],
+      "abstract": "Existing research on CodeGen AI security mainly focuses on red teaming, which aims to uncover vulnerabilities and risks in AI-generated code. However, progress on the blue teaming side remains limited, as effective defenses require a deep security analysis of given tasks and edge cases. To fill in this gap, we propose BlueCodeAgent, an end-to-end blue teaming agent powered by automated red teaming. Our red teaming component generates diverse risky instances, providing effective edge cases and guidance for the subsequent blue teaming process. Our blue teaming agent then conducts multi-level defense, leveraging these red teaming examples to detect previously seen and unseen risk scenarios through constitution summarization and dynamic code analysis. Our evaluation across four representative code-related tasks (bias instruction detection, malicious instruction detection, vulnerable code detection, and prompt injection detection) shows that BlueCodeAgent achieves significant gains over diverse baselines. In particular, for vulnerability detection tasks, BlueCodeAgent integrates dynamic analysis to effectively reduce false positives, a challenging problem as base models tend to be over-conservative. Overall, with GPT-4o as the base model, BlueCodeAgent achieves an average F1 score improvement of 14.7% across four tasks compared to directly prompting the model, attributed to its ability to summarize actionable constitutions and perform dynamic analysis. Our code and data are available at https://github.com/1mocat/BlueCodeAgent.",
+      "url": "https://arxiv.org/abs/2510.18131v2",
+      "arxiv_id": "2510.18131",
+      "version": "v2",
+      "date": "2025-10-20",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "repair",
+          "ai-system-security"
+        ],
+        "target": [
+          "source-code",
+          "ai-systems"
+        ],
+        "contribution": [
+          "system"
+        ]
+      },
+      "artifact_url": "https://github.com/1mocat/BlueCodeAgent",
+      "preview_file": "previews/e5e399d8a631b455d0d447f7268c5325f2fbbabc519afd62adbb58108ef05409.jpg",
+      "text_file": "text/e5e399d8a631b455d0d447f7268c5325f2fbbabc519afd62adbb58108ef05409.txt"
+    },
+    {
+      "id": "arxiv:2602.05523",
+      "title": "Capture the Flags: Family-Based Evaluation of Agentic LLMs via Semantics-Preserving Transformations",
+      "authors": [
+        "Shahin Honarvar",
+        "Amber Gorzynski",
+        "James Lee-Jones",
+        "Harry Coppock",
+        "Marek Rei",
+        "Joseph Ryan",
+        "Alastair F. Donaldson"
+      ],
+      "abstract": "Agentic large language models (LLMs) are increasingly evaluated on cybersecurity tasks using capture-the-flag (CTF) benchmarks, yet existing pointwise benchmarks offer limited insight into agent robustness and generalisation across alternative versions of the source code. We introduce CTF challenge families, whereby a single CTF is used to generate a family of semantically-equivalent challenges via semantics-preserving program transformations, enabling controlled evaluation of robustness while keeping the underlying exploit strategy fixed. We present Evolve-CTF, a tool that generates CTF families from Python challenges using a range of transformations. Using Evolve-CTF to derive families from Cybench and Intercode challenges, we evaluate 13 agentic LLM configurations with tool access. We find that models are remarkably robust to renaming and code insertion, but that composed transformations and deeper obfuscation degrade performance by requiring more sophisticated tool use. Enabling explicit reasoning has little effect on success rates. Our work contributes a technique and tool for future LLM evaluations, and a large dataset characterising the capabilities of current state-of-the-art models in this domain.",
+      "url": "https://arxiv.org/abs/2602.05523v2",
+      "arxiv_id": "2602.05523",
+      "version": "v2",
+      "date": "2026-02-05",
+      "year": 2026,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2026"
+        ],
+        "topic": [
+          "penetration-testing",
+          "exploit-development"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "benchmark",
+          "system"
+        ]
+      },
+      "artifact_url": "https://zenodo.org/records/22235944",
+      "preview_file": "previews/ec6d001277920577f0f0d378bd19dfaf5566029a68df4262c7ac7ed8a36fe427.jpg",
+      "text_file": "text/ec6d001277920577f0f0d378bd19dfaf5566029a68df4262c7ac7ed8a36fe427.txt"
+    },
+    {
+      "id": "arxiv:2610.07557",
+      "title": "CheckerBench: Can Long-Horizon Agents Synthesize Static-Analysis Checkers?",
+      "authors": [
+        "Hang He",
+        "Li Wang",
+        "Hao Chen",
+        "Yuchen Shao",
+        "Yuling Shi",
+        "Lisheng Wang",
+        "Peiyang Liu",
+        "Goose Lin",
+        "Zaiyuan Wang",
+        "Haiying Sun",
+        "Ting Su",
+        "Chengcheng Wan"
+      ],
+      "abstract": "Static-analysis checker synthesis requires agents to interpret a defect specification, inspect a repository, implement analyzer-specific logic, and refine the checker through repeated compilation and analysis feedback. Existing coding-agent benchmarks focus on tasks such as patch generation or vulnerability detection and rarely assess whether an agent can develop a working checker in a repository from start to finish. We introduce CheckerBench, an executable benchmark of 300 tasks derived from 297 CVEs across 167 repositories, 85 CWEs, and five language ecosystems. Each task includes vulnerable and fixed revisions, a pinned analysis environment, and a checker scaffold. We further introduce CheckerLab, a common evaluation framework that independently rebuilds submitted checkers and measures vulnerable-fixed diagnostic contrast, patch localization, false positives, and tool use. Across 21 model-harness configurations and three independent repeats per configuration, mean Pass@1 is 32.30%, while the best reaches 45.33%. These results show that reliable, reusable checker development remains challenging for current coding agents.",
+      "url": "https://arxiv.org/abs/2610.07557v1",
+      "arxiv_id": "2610.07557",
+      "version": "v1",
+      "date": "2026-10-06",
+      "year": 2026,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2026"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/ahang0712/CheckerBench-Dataset",
+      "preview_file": "previews/bc02c20f3a1b9d10da284c6b0bf4591f7550359bfa1ea1ce9c5415df7378dbdd.jpg",
+      "text_file": "text/bc02c20f3a1b9d10da284c6b0bf4591f7550359bfa1ea1ce9c5415df7378dbdd.txt"
+    },
+    {
+      "id": "arxiv:2404.13161",
+      "title": "CyberSecEval 2: A Wide-Ranging Cybersecurity Evaluation Suite for Large Language Models",
+      "authors": [
+        "Manish Bhatt",
+        "Sahana Chennabasappa",
+        "Yue Li",
+        "Cyrus Nikolaidis",
+        "Daniel Song",
+        "Shengye Wan",
+        "Faizan Ahmad",
+        "Cornelius Aschermann",
+        "Yaohui Chen",
+        "Dhaval Kapil",
+        "David Molnar",
+        "Spencer Whitman",
+        "Joshua Saxe"
+      ],
+      "abstract": "Large language models (LLMs) introduce new security risks, but there are few comprehensive evaluation suites to measure and reduce these risks. We present BenchmarkName, a novel benchmark to quantify LLM security risks and capabilities. We introduce two new areas for testing: prompt injection and code interpreter abuse. We evaluated multiple state-of-the-art (SOTA) LLMs, including GPT-4, Mistral, Meta Llama 3 70B-Instruct, and Code Llama. Our results show that conditioning away risk of attack remains an unsolved problem; for example, all tested models showed between 26% and 41% successful prompt injection tests. We further introduce the safety-utility tradeoff: conditioning an LLM to reject unsafe prompts can cause the LLM to falsely reject answering benign prompts, which lowers utility. We propose quantifying this tradeoff using False Refusal Rate (FRR). As an illustration, we introduce a novel test set to quantify FRR for cyberattack helpfulness risk. We find many LLMs able to successfully comply with \"borderline\" benign requests while still rejecting most unsafe requests. Finally, we quantify the utility of LLMs for automating a core cybersecurity task, that of exploiting software vulnerabilities. This is important because the offensive capabilities of LLMs are of intense interest; we quantify this by creating novel test sets for four representative problems. We find that models with coding capabilities perform better than those without, but that further work is needed for LLMs to become proficient at exploit generation. Our code is open source and can be used to evaluate other LLMs.",
+      "url": "https://arxiv.org/abs/2404.13161v1",
+      "arxiv_id": "2404.13161",
+      "version": "v1",
+      "date": "2024-04-19",
+      "year": 2024,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2024"
+        ],
+        "topic": [
+          "exploit-development",
+          "ai-system-security"
+        ],
+        "target": [
+          "ai-systems"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/meta-llama/PurpleLlama/tree/main/CybersecurityBenchmarks",
+      "preview_file": "previews/d3877938f8dc5510ce77259bd957eb945833c25a36752f69a9c6d7aa03476181.jpg",
+      "text_file": "text/d3877938f8dc5510ce77259bd957eb945833c25a36752f69a9c6d7aa03476181.txt"
+    },
+    {
+      "id": "arxiv:2610.02206",
+      "title": "KaliBench: A Fine-Grained Benchmark for Cybersecurity Tool Use on Kali Linux with Runtime-Free Verifiable Rewards",
+      "authors": [
+        "Pengfei Li",
+        "Naufal Suryanto",
+        "Sicheng Zhang",
+        "Muzammal Naseer"
+      ],
+      "abstract": "LLMs are increasingly applied to cybersecurity workflows, where they are expected to translate analysts' intent into tool invocations. However, existing evaluations focus on knowledge-based assessments or end-to-end agentic tasks, and do not directly measure LLMs' ability to generate executable commands for real-world cybersecurity tools. This gap is critical because cybersecurity operations rely on strict command-line interfaces (CLIs), where minor syntax errors, incorrect flag--value bindings, or argument misordering can invalidate execution. We introduce KaliBench, a fine-grained benchmark and dataset for natural-language--to--CLI translation on Kali Linux, comprising 8,504 query--command pairs spanning 1,642 tools across 23 capability dimensions and 5 security phases. KaliBench is constructed via a manuscript-grounded pipeline with deterministic canonicalization and alias-aware evaluation, enabling precise and reproducible assessment of tool selection and argument construction. To ensure both semantic correctness and practical executability, we develop a multi-stage verification pipeline that combines LLM-based validation, sandboxed terminal execution, and human-in-the-loop refinement. Building on these fine-grained, deterministic signals, KaliBench further enables runtime-free verifiable rewards for training. Across three evaluation modes and 24 configurations of general-purpose and security-focused open-weight models, no open-weight model exceeds 42% exact-command accuracy in the unrestricted setting, highlighting the difficulty of accurate CLI-based cybersecurity tool use without explicit tool hints. We further show that supervised fine-tuning and reinforcement learning with verifiable rewards derived from KaliBench significantly improve an 8B model and achieve performance comparable to a 685B MoE model.",
+      "url": "https://arxiv.org/abs/2610.02206v1",
+      "arxiv_id": "2610.02206",
+      "version": "v1",
+      "date": "2026-10-01",
+      "year": 2026,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2026"
+        ],
+        "topic": [
+          "penetration-testing"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "benchmark",
+          "dataset"
+        ]
+      },
+      "artifact_url": "https://github.com/RISys-Lab/KaliBench",
+      "preview_file": "previews/8ac0cb5873c4983acf5958fedea542dababc1bb208fe144cd2cdf501742c206c.jpg",
+      "text_file": "text/8ac0cb5873c4983acf5958fedea542dababc1bb208fe144cd2cdf501742c206c.txt"
+    },
+    {
+      "id": "arxiv:2308.12086",
+      "title": "Out of the Cage: How Stochastic Parrots Win in Cyber Security Environments",
+      "authors": [
+        "Maria Rigaki",
+        "Ondřej Lukáš",
+        "Carlos A. Catania",
+        "Sebastian Garcia"
+      ],
+      "abstract": "Large Language Models (LLMs) have gained widespread popularity across diverse domains involving text generation, summarization, and various natural language processing tasks. Despite their inherent limitations, LLM-based designs have shown promising capabilities in planning and navigating open-world scenarios. This paper introduces a novel application of pre-trained LLMs as agents within cybersecurity network environments, focusing on their utility for sequential decision-making processes. We present an approach wherein pre-trained LLMs are leveraged as attacking agents in two reinforcement learning environments. Our proposed agents demonstrate similar or better performance against state-of-the-art agents trained for thousands of episodes in most scenarios and configurations. In addition, the best LLM agents perform similarly to human testers of the environment without any additional training process. This design highlights the potential of LLMs to efficiently address complex decision-making tasks within cybersecurity. Furthermore, we introduce a new network security environment named NetSecGame. The environment is designed to eventually support complex multi-agent scenarios within the network security domain. The proposed environment mimics real network attacks and is designed to be highly modular and adaptable for various scenarios.",
+      "url": "https://arxiv.org/abs/2308.12086v2",
+      "arxiv_id": "2308.12086",
+      "version": "v2",
+      "date": "2023-08-23",
+      "year": 2023,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2023"
+        ],
+        "topic": [
+          "penetration-testing"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "system",
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/stratosphereips/NetSecGame",
+      "preview_file": null
+    },
+    {
+      "id": "arxiv:2510.11688",
+      "title": "PACEbench: A Framework for Evaluating Practical AI Cyber-Exploitation Capabilities",
+      "authors": [
+        "Zicheng Liu",
+        "Lige Huang",
+        "Jie Zhang",
+        "Dongrui Liu",
+        "Yuan Tian",
+        "Jing Shao"
+      ],
+      "abstract": "The increasing autonomy of Large Language Models (LLMs) necessitates a rigorous evaluation of their potential to aid in cyber offense. Existing benchmarks often lack real-world complexity and are thus unable to accurately assess LLMs' cybersecurity capabilities. To address this gap, we introduce PACEbench, a practical AI cyber-exploitation benchmark built on the principles of realistic vulnerability difficulty, environmental complexity, and cyber defenses. Specifically, PACEbench comprises four scenarios spanning single, blended, chained, and defense vulnerability exploitations. To handle these complex challenges, we propose PACEagent, a novel agent that emulates human penetration testers by supporting multi-phase reconnaissance, analysis, and exploitation. Extensive experiments with seven frontier LLMs demonstrate that current models struggle with complex cyber scenarios, and none can bypass defenses. These findings suggest that current models do not yet pose a generalized cyber offense threat. Nonetheless, our work provides a robust benchmark to guide the trustworthy development of future models.",
+      "url": "https://arxiv.org/abs/2510.11688v1",
+      "arxiv_id": "2510.11688",
+      "version": "v1",
+      "date": "2025-10-13",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "exploit-development",
+          "penetration-testing"
+        ],
+        "target": [
+          "web",
+          "networks"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/RyuKosei/PACEbench",
+      "preview_file": null
+    },
+    {
+      "id": "arxiv:2511.11019",
+      "title": "PATCHEVAL: A New Benchmark for Evaluating LLMs on Patching Real-World Vulnerabilities",
+      "authors": [
+        "Zichao Wei",
+        "Jun Zeng",
+        "Ming Wen",
+        "Zeliang Yu",
+        "Kai Cheng",
+        "Yiding Zhu",
+        "Jingyi Guo",
+        "Shiqi Zhou",
+        "Le Yin",
+        "Xiaodong Su",
+        "Zhechao Ma"
+      ],
+      "abstract": "Software vulnerabilities are increasing at an alarming rate. However, manual patching is both time-consuming and resource-intensive, while existing automated vulnerability repair (AVR) techniques remain limited in effectiveness. Recent advances in large language models (LLMs) have opened a new paradigm for AVR, demonstrating remarkable progress. To examine the capability of LLMs in AVR, several vulnerability benchmarks have been proposed recently. However, they still suffer from key limitations of outdated vulnerabilities, limited language coverage, unreliable patch validation, and insufficient reproducibility. To overcome these challenges, we introduce PATCHEVAL, a multilingual benchmark for Go, JavaScript, and Python, languages for which existing benchmarks remain unexplored. PATCHEVAL curates a dataset of 1,000 vulnerabilities drawn from CVEs reported between 2015 and 2025, covering 65 distinct CWEs. A subset of 230 CVEs is further equipped with runtime sandbox environments, enabling patch verification through both security tests and functionality tests. To provide a systematic comparison of LLM-based vulnerability repair, we evaluate a series of state-of-the-art LLMs and agents, presenting an in-depth analysis that empirically yields key insights to guide future research in AVR.",
+      "url": "https://arxiv.org/abs/2511.11019v1",
+      "arxiv_id": "2511.11019",
+      "version": "v1",
+      "date": "2025-11-14",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "repair",
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/bytedance/PatchEval",
+      "preview_file": null
+    },
+    {
+      "id": "arxiv:2603.02277",
+      "title": "Quantifying Frontier LLM Capabilities for Container Sandbox Escape",
+      "authors": [
+        "Rahul Marchand",
+        "Art O Cathain",
+        "Jerome Wynne",
+        "Philippos Maximos Giavridis",
+        "Stuart Jennings",
+        "Freddy Tuxworth",
+        "Tolga H. Dur",
+        "Sam Deverett",
+        "John Wilkinson",
+        "Jason Gwartz",
+        "Harry Coppock"
+      ],
+      "abstract": "Large language models (LLMs) increasingly act as autonomous agents, using tools to execute code, read and write files, and access networks, creating novel security risks. To mitigate these risks, agents are commonly deployed and evaluated in isolated \"sandbox\" environments, often implemented using Docker/OCI containers. We introduce SANDBOXESCAPEBENCH, an open benchmark that safely measures an LLM's capacity to break out of these sandboxes. The benchmark is implemented as an Inspect AI Capture the Flag (CTF) evaluation utilising a nested sandbox architecture with the outer layer containing the flag and no known vulnerabilities. Following a threat model of a motivated adversarial agent with shell access inside a container, SANDBOXESCAPEBENCH covers a spectrum of sandboxescape mechanisms spanning misconfiguration, privilege allocation mistakes, kernel flaws, and runtime/orchestration weaknesses. We find that, when vulnerabilities are added, LLMs are able to identify and exploit them, showing that use of evaluation like SANDBOXESCAPEBENCH is needed to ensure sandboxing continues to provide the encapsulation needed for highly-capable models.",
+      "url": "https://arxiv.org/abs/2603.02277v3",
+      "arxiv_id": "2603.02277",
+      "version": "v3",
+      "date": "2026-03-01",
+      "year": 2026,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2026"
+        ],
+        "topic": [
+          "penetration-testing",
+          "exploit-development"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/UKGovernmentBEIS/sandbox_escape_bench",
+      "preview_file": "previews/e692b6075e05c3708e32e094628602766dc453c435ce10707be28b310cda3f03.jpg",
+      "text_file": "text/e692b6075e05c3708e32e094628602766dc453c435ce10707be28b310cda3f03.txt"
+    },
+    {
+      "id": "arxiv:2507.19399",
+      "title": "Running in CIRCLE? A Simple Benchmark for LLM Code Interpreter Security",
+      "authors": [
+        "Gabriel Chua"
+      ],
+      "abstract": "As large language models (LLMs) increasingly integrate native code interpreters, they enable powerful real-time execution capabilities, substantially expanding their utility. However, such integrations introduce potential system-level cybersecurity threats, fundamentally different from prompt-based vulnerabilities. To systematically evaluate these interpreter-specific risks, we propose CIRCLE (Code-Interpreter Resilience Check for LLM Exploits), a simple benchmark comprising 1,260 prompts targeting CPU, memory, and disk resource exhaustion. Each risk category includes explicitly malicious (\"direct\") and plausibly benign (\"indirect\") prompt variants. Our automated evaluation framework assesses not only whether LLMs refuse or generates risky code, but also executes the generated code within the interpreter environment to evaluate code correctness, simplifications made by the LLM to make the code safe, or execution timeouts. Evaluating 7 commercially available models from OpenAI and Google, we uncover significant and inconsistent vulnerabilities. For instance, evaluations show substantial disparities even within providers - OpenAI's o4-mini correctly refuses risky requests at 7.1%, notably higher rates compared to GPT-4.1 at 0.5%. Results particularly underscore that indirect, socially-engineered prompts substantially weaken model defenses. This highlights an urgent need for interpreter-specific cybersecurity benchmarks, dedicated mitigation tools (e.g., guardrails), and clear industry standards to guide safe and responsible deployment of LLM interpreter integrations. The benchmark dataset and evaluation code are publicly released to foster further research.",
+      "url": "https://arxiv.org/abs/2507.19399v1",
+      "arxiv_id": "2507.19399",
+      "version": "v1",
+      "date": "2025-07-25",
+      "year": 2025,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2025"
+        ],
+        "topic": [
+          "ai-system-security"
+        ],
+        "target": [
+          "ai-systems"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/govtech-responsibleai/CIRCLE",
+      "preview_file": "previews/9c4750717a9d1bb7f0a53558268141e4d55579473840f15898982a9c7de0fc70.jpg",
+      "text_file": "text/9c4750717a9d1bb7f0a53558268141e4d55579473840f15898982a9c7de0fc70.txt"
+    },
+    {
+      "id": "arxiv:2607.26791",
+      "title": "SecRespond: Benchmarking AI Agents for Real-World Post-Compromise Incident Response",
+      "authors": [
+        "Lehan Wang",
+        "Boli Chen",
+        "Ruixue Ding",
+        "Pengjun Xie",
+        "Jinwei Huang",
+        "Zhendong Liu",
+        "Shuo Wang",
+        "Tao Lei",
+        "Xin Ouyang",
+        "Xiaomeng Li"
+      ],
+      "abstract": "Large Language Model (LLM) agents are increasingly adopted in real-world security operations with access to host artifacts and command-line interfaces (CLIs), making it critical to thoroughly assess their security capabilities. However, existing cybersecurity benchmarks focus on pre-compromise settings where agents are placed in a clean and idealized environment before an attack occurs. This leaves the post-compromise setting underexplored. To address this gap, we introduce SecRespond, the first benchmark for evaluating LLM agents on the post-compromise incident-response workflow. Given a forensic disk snapshot of a compromised host together with the alerts, vulnerability scans, and baseline checks reported by a host security product, agents are required to produce forensic reports on intrusions, baseline risks, and vulnerability risks, together with a remediation plan. We instantiate this task across 10 cyber ranges, each constructed from a distinct compromised cloud host, spanning 4 entry-point types, 21 ATT&CK techniques, and 5 operating systems. We evaluate 23 frontier LLMs on the OpenCode agent harness. Experimental results show that although current agents can reliably uncover the problems exposed by alerts, they struggle to proactively investigate the disk for silent intrusions and to produce comprehensive, verified remediation plans, with no model achieving complete detection and remediation on any single range. This reveals a fundamental bottleneck in building agents for real-world incident response. The benchmark is publicly available at https://github.com/Alibaba-NLP/qqr/tree/main/data/secrespond.",
+      "url": "https://arxiv.org/abs/2607.26791v1",
+      "arxiv_id": "2607.26791",
+      "version": "v1",
+      "date": "2026-07-29",
+      "year": 2026,
+      "kind": "paper",
+      "facets": {
+        "kind": [
+          "paper"
+        ],
+        "year": [
+          "2026"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "benchmark"
+        ]
+      },
+      "artifact_url": "https://github.com/Alibaba-NLP/qqr/tree/main/data/secrespond",
+      "preview_file": null
+    },
+    {
+      "id": "post:cloudflare:build-your-own-vulnerability-harness",
+      "title": "Build your own vulnerability harness",
+      "url": "https://blog.cloudflare.com/build-your-own-vulnerability-harness/",
+      "abstract": "Cloudflare describes how its engineering team expanded a single audit skill into a scanner that resumes work, separates finding from judging, and deduplicates reports across repositories.",
+      "date": "2026-06-18",
+      "year": 2026,
+      "authors": [
+        "Dan Jones",
+        "Alexandra Godoi",
+        "Grant Bourzikas"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": "https://github.com/cloudflare/security-audit-skill"
+    },
+    {
+      "id": "post:cloudflare:cyber-frontier-models",
+      "title": "Project Glasswing: what Mythos showed us",
+      "url": "https://blog.cloudflare.com/cyber-frontier-models/",
+      "abstract": "Cloudflare reports what happened when it tested frontier models on its own repositories and how engineers validated the resulting security findings.",
+      "date": "2026-05-18",
+      "year": 2026,
+      "authors": [
+        "Grant Bourzikas"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:cloudflare:frontier-model-defense",
+      "title": "Defend against frontier cyber models: Cloudflare's architecture as customer zero",
+      "url": "https://blog.cloudflare.com/frontier-model-defense/",
+      "abstract": "Cloudflare describes how it uses layered detection, positive security controls, and containment to defend applications against rapidly developed exploits.",
+      "date": "2026-06-09",
+      "year": 2026,
+      "authors": [
+        "Rohit Chenna Reddy",
+        "Chase Catelli",
+        "Dan Jones"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "web",
+          "networks"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:google:chrome-stronger-with-every-update",
+      "title": "Stronger with every update: How we’re making Chrome and the web safer in the AI Era",
+      "url": "https://blog.google/security/chrome-stronger-with-every-update/",
+      "abstract": "The Chrome Security Team describes using agents in vulnerability discovery, triage and patching, and how fixes reach users through the browser release process.",
+      "date": "2026-07-30",
+      "year": 2026,
+      "authors": [
+        "Chrome Security Team"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis",
+          "repair"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:shopify:river-vulnerability-remediation",
+      "title": "How River takes security work from a fix to merge",
+      "url": "https://shopify.engineering/river-vulnerability-remediation",
+      "abstract": "Shopify describes River, a Slack-based agent that takes a finding through patch generation, ownership review and merge.",
+      "date": "2026-09-02",
+      "year": 2026,
+      "authors": [
+        "Erin Son",
+        "Kaiyi Li"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "repair"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:trail-of-bits:auditing-in-the-age-of-good-enough-ai",
+      "title": "Auditing in the age of (good enough) AI",
+      "url": "https://blog.trailofbits.com/2026/09/18/auditing-in-the-age-of-good-enough-ai/",
+      "abstract": "Trail of Bits describes building audit-specific tools and validating findings during a security review of the Miden zero-knowledge virtual machine.",
+      "date": "2026-09-18",
+      "year": 2026,
+      "authors": [
+        "Fredrik Dahlgren"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:ramp:100-vulnerabilities-patched-with-0-humans",
+      "title": "We proactively fixed ~100 security issues in 6 days with 0 humans",
+      "url": "https://engineering.ramp.com/post/100-vulnerabilities-patched-with-0-humans",
+      "abstract": "Ramp describes its finder, validation and patching agents and how engineers measured the resulting security fixes.",
+      "date": "2026-02-20",
+      "year": 2026,
+      "authors": [
+        "Eli Block"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis",
+          "repair"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:accomplish:beltdown-escaping-the-claude-code-sandbox",
+      "title": "Beltdown: Escaping the Claude Code sandbox",
+      "url": "https://accomplish.ai/blog/beltdown-escaping-the-claude-code-sandbox/",
+      "abstract": "An investigation of how a coding agent invoked Git outside its sandbox and how a nested repository could use that execution path.",
+      "date": "2026-09-11",
+      "year": 2026,
+      "authors": [
+        "Oren Yomtov"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "ai-system-security",
+          "exploit-development"
+        ],
+        "target": [
+          "ai-systems"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:anthropic:multiagent-systems",
+      "title": "Patterns and problems in emerging multiagent systems",
+      "url": "https://www.anthropic.com/research/multiagent-systems",
+      "abstract": "Anthropic studies coordination failures in multiagent systems, including a vulnerability-discovery experiment on open-source projects.",
+      "date": "2026-08-13",
+      "year": 2026,
+      "authors": [
+        "Frontier Red Team"
+      ],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis",
+          "ai-system-security"
+        ],
+        "target": [
+          "ai-systems",
+          "source-code"
+        ],
+        "contribution": [
+          "study"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:booz-allen:cyber-weapon-index",
+      "title": "Booz Allen Cyber Weapon Index",
+      "url": "https://www.boozallen.com/insights/cyber/cyber-weapon-index.html",
+      "abstract": "Booz Allen evaluates autonomous cyber operations in an enterprise network and measures attack progress against network telemetry.",
+      "date": "2026-09-01",
+      "year": 2026,
+      "authors": [],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "penetration-testing",
+          "exploit-development"
+        ],
+        "target": [
+          "networks"
+        ],
+        "contribution": [
+          "benchmark"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "post:openai:defense-factory",
+      "title": "The Defense Factory",
+      "url": "https://openai.com/the-defense-factory/",
+      "abstract": "OpenAI describes a continuous security workflow for finding vulnerabilities, verifying exploitability, assigning fixes and checking remediation.",
+      "date": null,
+      "year": 2026,
+      "authors": [],
+      "kind": "post",
+      "facets": {
+        "kind": [
+          "post"
+        ],
+        "topic": [
+          "vulnerability-analysis",
+          "repair"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": null
+    },
+    {
+      "id": "repo:cloudflare/security-audit-skill",
+      "title": "cloudflare/security-audit-skill",
+      "url": "https://github.com/cloudflare/security-audit-skill",
+      "abstract": "A coding-agent skill for auditing source, collecting evidence and verifying findings.",
+      "date": "2026-06-18",
+      "year": 2026,
+      "authors": [],
+      "kind": "repository",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [
+          "vulnerability-analysis"
+        ],
+        "target": [
+          "source-code"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": "https://github.com/cloudflare/security-audit-skill"
+    },
+    {
+      "id": "repo:chainreactors/cyber-harness",
+      "title": "chainreactors/cyber-harness",
+      "url": "https://github.com/chainreactors/cyber-harness",
+      "abstract": "A single-binary security agent that orchestrates tools for penetration testing and bug bounty workflows.",
+      "date": "2026-05-07",
+      "year": 2026,
+      "authors": [],
+      "kind": "repository",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [
+          "penetration-testing",
+          "exploit-development"
+        ],
+        "target": [
+          "networks",
+          "web"
+        ],
+        "contribution": [
+          "system"
+        ],
+        "year": [
+          "2026"
+        ]
+      },
+      "artifact_url": "https://github.com/chainreactors/cyber-harness"
+    }
+  ]
+}

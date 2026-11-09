@@ -1,6 +1,6 @@
 import React from "react";
 
-import { assetUrl } from "@/lib/apiUrl";
+import { assetUrl, isDiscoveryCatalog } from "@/lib/apiUrl";
 import {
   authorsLine,
   venueLine,
@@ -34,7 +34,7 @@ const PaperThumb: React.FC<{
 
   React.useEffect(() => setErrored(false), [resolvedUrl]);
 
-  if (!resolvedUrl || errored) return <FauxPaperThumb seed={seed} />;
+  if (!resolvedUrl || errored) return isDiscoveryCatalog() ? null : <FauxPaperThumb seed={seed} />;
   return (
     <div className="paper-preview-thumb paper-preview-thumb-real">
       <img

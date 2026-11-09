@@ -1056,3 +1056,5 @@
   cursor: pointer;
   transition: background 0.15s;
 }
+
+.detail-hero:not(:has(> .detail-hero-thumb)) { grid-template-columns: minmax(0, 1fr); }

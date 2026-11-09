@@ -185,6 +185,8 @@ export interface Paper {
   /** Up to 100 stored Hub links per kind; returned with include_resources. */
   linked_hf_artifacts?: LinkedHfArtifacts | null;
   tasks?: Task[];
+  catalog_kind?: string | null;
+  catalog_contributions?: string[] | null;
   methods?: Method[];
   introduced_benchmarks?: BenchmarkSummary[];
   introduced_frameworks?: FrameworkSummary[];

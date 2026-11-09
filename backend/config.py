@@ -28,6 +28,7 @@ class Settings(BaseSettings, ChatSettings):
 
     model_config = SettingsConfigDict(env_file=["keys.env"], env_prefix="PWC_")
 
+    discovery_catalog: bool = False
     research_email_enabled: bool = False
     resend_api_key: str = ""
     resend_from: str = ""

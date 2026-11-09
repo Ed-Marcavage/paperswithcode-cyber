@@ -1,3 +1,4 @@
+import { paperLinkHandlers } from "@/lib/catalogAnalytics";
 import ResearchFollowButton from "@/components/ResearchFollowButton";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -381,6 +382,7 @@ const BenchmarkDetailView: React.FC = () => {
             {sourcePaperRouteId ? (
               <Link
                 to={`/paper/${sourcePaperRouteId}`}
+                {...(introducingPaper?.title ? paperLinkHandlers(String(introducingPaper.id || sourcePaperRouteId), introducingPaper.title, "title", "benchmark") : {})}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="method-source-link"
@@ -459,7 +461,7 @@ const BenchmarkDetailView: React.FC = () => {
                     </>
                   ) : null}
                   {paperRouteId ? (
-                    <Link to={`/paper/${paperRouteId}`}>
+                    <Link to={`/paper/${paperRouteId}`} {...(highlightedEval.paper_title ? paperLinkHandlers(String(highlightedEval.paper_id || paperRouteId), highlightedEval.paper_title, "title", "benchmark") : {})}>
                       {renderBenchmarkPaperTitle(highlightedEval.paper_title, paperLabel)}
                     </Link>
                   ) : (

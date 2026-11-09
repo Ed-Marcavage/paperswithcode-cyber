@@ -1,6 +1,7 @@
+import { taxonomySelected } from "@/lib/catalogAnalytics";
 import FollowingIntro from "@/components/FollowingIntro";
 import TopicDialog from "@/components/TopicDialog";
-import { isAuthDisabled } from "@/lib/apiUrl";
+import { isAuthDisabled, isDiscoveryCatalog } from "@/lib/apiUrl";
 import { clearPendingTopic, readPendingFollows, readPendingTopic, useResearchFollows, useSaveFollows, useSaveTopic } from "@/lib/researchTopic";
 import { useOptionalAuth } from "@/lib/authContext";
 import { researchApi, type FollowKind } from "@/lib/api/research";
@@ -41,6 +42,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   readHomepagePaperDateRange,
+  readPaperDateRange,
   withHomepagePaperDateRange,
 } from "@/lib/paperDateRange";
 
@@ -330,7 +332,10 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Following defaults to its 30-day match window and trending on X to a month;
   // the trending tab defaults to a week.
-  const dateRange = readHomepagePaperDateRange(searchParams, undefined, mode === "trending" ? "week" : "month");
+  const localCatalog = isDiscoveryCatalog() && mode === "trending";
+  const dateRange = localCatalog
+    ? readPaperDateRange(searchParams)
+    : readHomepagePaperDateRange(searchParams, undefined, mode === "trending" ? "week" : "month");
 
   // The home feed only offers trending, following and trending on X; newest
   // and most cited stay on the other paper feeds.
@@ -465,7 +470,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           <h1 className="feed-title">
             Trending <em>Research</em>
           </h1>
-          <div className="feed-subtitle">{mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
+          <div className="feed-subtitle">{localCatalog
+            ? "Cyberintel collection · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+            : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
         </div>
       </div>
 
@@ -526,7 +533,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
                 )}
                 <div className="sidebar-links">
                   {topTasks.data?.map((task) => (
-                    <Link key={task.id} to={`/tasks/${task.slug}`} className="sidebar-link">
+                    <Link key={task.id} to={`/tasks/${task.slug}`} onClick={() => taxonomySelected("domain", task.slug, "top_domains")} className="sidebar-link">
                       {displayTaskName(task.name, task.slug)}
                       {task.paper_count != null && <span className="count">{task.paper_count}</span>}
                     </Link>
@@ -578,8 +585,10 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
               <div className="paper-feed-toolbar-controls">
                 <div className="sort-options">
                   <button className={`sort-btn ${mode === "trending" ? "active" : ""}`} onClick={() => showTab("/")}>trending</button>
+                  {!localCatalog && <>
                   <button className={`sort-btn ${mode === "x" ? "active" : ""}`} onClick={() => showTab("/x-trending")}>trending (X)</button>
                   <button className={`sort-btn ${following ? "active" : ""}`} onClick={() => showTab("/following")}>following</button>
+                  </>}
                 </div>
               </div>
               <PaperDateFilter

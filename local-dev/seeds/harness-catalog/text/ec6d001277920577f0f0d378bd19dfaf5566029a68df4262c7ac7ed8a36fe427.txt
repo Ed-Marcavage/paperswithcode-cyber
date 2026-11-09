@@ -1,0 +1,512 @@
+> Capture the Flags: Family-Based Evaluation of Agentic LLMs via Semantics-Preserving Transformations — Shahin Honarvar, Amber Gorzynski, James Lee-Jones, Harry Coppock, Marek Rei, Joseph Ryan, Alastair F. Donaldson. [Original](https://arxiv.org/html/2602.05523v2) · [License](https://creativecommons.org/licenses/by/4.0/). Converted from arXiv HTML to Markdown; consult the original for figures and layout.
+
+# Capture the Flags: Family-Based Evaluation of Agentic LLMs via Semantics-Preserving Transformations
+
+Conference: Some conference; 2026; To be announced Shahin Honarvar Affiliation: Department of Computing, Imperial College London, UK email: <anon@anon.anon> , Amber Gorzynski Affiliation: Department of Computing, Imperial College London, UK , James Lee-Jones Affiliation: Department of Computing, Imperial College London, UK , Harry Coppock Affiliation: AI Security Institute, UK Affiliation: Department of Computing, Imperial College London, UK , Marek Rei Affiliation: Department of Computing, Imperial College London, UK email: <anon@anon.anon> , Joseph Ryan Affiliation: Royal Grammar School Guildford, UK and Alastair F. Donaldson Affiliation: Department of Computing, Imperial College London, UK
+
+###### Abstract.
+
+Agentic large language models (LLMs) are increasingly evaluated on cybersecurity tasks using capture-the-flag (CTF) benchmarks, yet existing pointwise benchmarks offer limited insight into agent robustness and generalisation across alternative versions of the source code. We introduce *CTF challenge families*, whereby a single CTF is used to generate a family of semantically-equivalent challenges via semantics-preserving program transformations, enabling controlled evaluation of robustness while keeping the underlying exploit strategy fixed. We present Evolve-CTF, a tool that generates CTF families from Python challenges using a range of transformations. Using Evolve-CTF to derive families from Cybench and Intercode challenges, we evaluate 13 agentic LLM configurations with tool access. We find that models are remarkably robust to renaming and code insertion, but that composed transformations and deeper obfuscation degrade performance by requiring more sophisticated tool use. Enabling explicit reasoning has little effect on success rates. Our work contributes a technique and tool for future LLM evaluations, and a large dataset characterising the capabilities of current state-of-the-art models in this domain.
+
+## 1. Introduction
+
+Agentic LLMs are increasingly deployed in cybersecurity settings, ranging from vulnerability discovery and exploit generation to automated penetration testing and defensive analysis ([Ferrag et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib14); [Zhang et al., 2025a](https://arxiv.org/html/2602.05523v2#bib.bib45)). As these systems gain autonomy and access to external tools, evaluating their tool-based cyber-capabilities (rather than isolated coding or reasoning skills) is increasingly important. Recent work has converged on *capture-the-flag challenges* (CTFs) as a natural testbed for this purpose ([Chapman et al., 2014](https://arxiv.org/html/2602.05523v2#bib.bib7); [Svábenský et al., 2021](https://arxiv.org/html/2602.05523v2#bib.bib33); [Yang et al., 2023b](https://arxiv.org/html/2602.05523v2#bib.bib41); [Zou et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib46); [Debenedetti et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib10); [Zhang et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib43); [Ji et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib20); [Bakker and Hastings, 2025](https://arxiv.org/html/2602.05523v2#bib.bib5)). A CTF is a program, binary, or system containing a deliberately-introduced vulnerability that can be exploited to recover a secret value, known as a *flag*. Solving a CTF typically requires a combination of code comprehension, modification and tool use.
+
+Existing CTF-based benchmarks for LLMs, such as Cybench ([Zhang et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib43)) and Intercode ([Yang et al., 2023a](https://arxiv.org/html/2602.05523v2#bib.bib40)), provide a valuable starting point by standardising evaluation on curated collections of CTFs. However, the challenges in these benchmarks are all independent tasks. As a result, evaluation outcomes are *pointwise*: they reveal how a model performs on a fixed set of heterogeneous tasks, but offer limited insight into robustness against input perturbations, or the ability of models to *generalise*. Since CTF benchmarks are often public, or drawn from public competitions, their use in evaluations may suffer from dataset contamination, similar to effects observed when applying LLMs to mathematical problems ([Zhang et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib44)).
+
+We propose a complementary approach to evaluation based on *CTF challenge families*. Given an original CTF we apply semantics-preserving but obfuscating program transformations to generate a family of related challenges. All challenges in a family (henceforth called *instances*) share the vulnerability associated with the original challenge, thus all are ultimately solvable via the same underlying exploit strategy. However, instances vary widely in syntactic structure, control flow, meaningfulness of variable/function/class names and degree of obfuscation. Unlike fixed benchmarks, CTF families enable systematic evaluation of agentic LLM performance across structured spaces of related challenges, helping disentangle genuine reasoning ability from pattern matching. CTF families make it easier to investigate whether an LLM really understands a given challenge and can solve it even after superficial modifications, rather than relying on confounding cues and memorisation.
+
+We emphasise that CTF families do not aim to test new cybersecurity competencies. Rather, they test whether an agent that can solve a CTF truly possesses the underlying code reasoning and tool-use capability, or whether its success depends on surface-level cues such as recognisable identifier names or familiar code structure.
+
+We put the idea of CTF families into practice through a new tool, Evolve-CTF. Given a Python-based CTF, Evolve-CTF automatically generates a CTF family by applying a range of transformations (detailed in [Section 3](https://arxiv.org/html/2602.05523v2#S3)). We present a large-scale evaluation over CTF families generated from 16 Python challenges from Cybench and Intercode, evaluating 13 LLM configurations spanning 9 base models, with agentic capabilities enabled through the Inspect framework ([AI Security Institute, UK, 2024](https://arxiv.org/html/2602.05523v2#bib.bib2)). Our key findings are:
+
+LLMs are highly robust to identifier renaming and isolated source code transformations Across all evaluated models, performance is largely unchanged by identifier renaming or injecting a single class of redundant code (e.g., extraneous loops or unused functions). In contrast, robustness degrades sharply when transformations are *composed*.
+
+Composite transformations lead to increased tool use When challenges involve composed transformations, models make substantially more tool calls. Transcript analysis reveals strategic tool use such as searching for security-relevant keywords and iteratively inspecting surrounding code regions.
+
+LLMs are hindered by deeper, tool-based obfuscation Models rarely solve challenges obfuscated with PyObfuscator, a third-party code obfuscator. Transcript analysis shows that models sometimes attempt, with limited success, to write Python scripts that partially reverse the obfuscation, occasionally enabling them to then solve the challenge.
+
+Explicit reasoning has little impact For models that support toggling explicit reasoning, we find that setting reasoning to high vs. using default minimal reasoning settings has little impact on the model’s ability to solve CTF families.
+
+Some benchmark CTFs lack discriminative power Three CTFs from the Intercode suite are so simple that nearly all evaluated models solve *all* instances of CTF families generated from them. These challenges thus provide little signal for distinguishing state-of-the-art agentic LLMs. This highlights an additional use case for Evolve-CTF: assessing the difficulty and discriminative value of existing benchmarks.
+
+Overall, CTF families provide a new way to evaluate the performance of agentic LLMs on cybersecurity tasks that goes beyond single-instance benchmarks, offering a principled way to probe robustness, generalisation and tool usage.
+
+## 2. Background
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/dynastic_Orig_cropped.svg)
+
+Figure 1. Excerpt from the *Dynastic* CTF from Cybench
+
+CTF challenges Capture-the-flag challenges (CTFs) are a class of security-oriented tasks in which participants must analyze a system or artifact to recover a hidden secret, known as the flag. [Figure 1](https://arxiv.org/html/2602.05523v2#S2.F1) presents a simple example, *Dynastic*, drawn from Cybench ([Zhang et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib43)). In this challenge, the participant is given the code used to encrypt a message ([Figure 1](https://arxiv.org/html/2602.05523v2#S2.F1)) and an encrypted message containing the flag (omitted for brevity). The goal is to determine how to invert the encryption procedure, thereby recovering the original message and revealing the flag. Two suites of CTFs that are widely-used for LLM-based evaluations, and which we use in this work, are Intercode ([Yang et al., 2023a](https://arxiv.org/html/2602.05523v2#bib.bib40)) and Cybench ([Zhang et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib43)).
+
+The Inspect framework Inspect ([AI Security Institute, UK, 2024](https://arxiv.org/html/2602.05523v2#bib.bib2)) is an open-source framework for standardised evaluation of agentic LLMs, supporting configurable tasks and models and recording detailed evaluation logs. We base our evaluation on Inspect as it already incorporates the Cybench and Intercode suites and integrates with a wide range of model APIs.
+
+## 3. Transformations Supported by Evolve-CTF
+
+A CTF family comprises many *instances*: the original CTF plus follow-on challenges derived via transformations. Our tool, Evolve-CTF, generates such families from Python challenges, confirming (via each challenge’s golden solution) that generated instances remain solvable. We focus on Python because it is widely used ([Cass, 2024](https://arxiv.org/html/2602.05523v2#bib.bib6)), LLMs perform well on it ([Twist et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib36)), and many existing CTFs use Python. Conceptually, our approach is language-agnostic and could support other languages with sufficient engineering. We integrate Evolve-CTF with Inspect so a wide range of models can be applied to generated instances.
+
+We now describe the transformations supported by Evolve-CTF. All transformations are *semantics-preserving*, so the exploit strategy for the original challenge applies to every instance in a family. Source code manipulation performed in $R$ and $T_{1}$—$T_{5}$ is performed using LibCST, a concrete syntax tree library for Python that preserves formatting and comments ([Instragram, 2026](https://arxiv.org/html/2602.05523v2#bib.bib18)).
+
+The transformations probe LLM robustness across a spectrum, from coarse obfuscation to more sophisticated semantics-preserving rewrites inspired by compiler-testing techniques ([Donaldson et al., 2017](https://arxiv.org/html/2602.05523v2#bib.bib12); [Le et al., 2014](https://arxiv.org/html/2602.05523v2#bib.bib24)). The modular design of Evolve-CTF also facilitates integrating additional transformations in future work.
+
+$R$: Rename identifiers replaces the names of all variables, functions and classes with randomly-chosen alternatives drawn from two sources: coding-related vocabulary (concatenated programming terms from a curated word list) and multilingual random strings generated across various natural languages including mixed-language combinations. In the case where replacement identifiers are instead randomly-generated, randomisation is used to determine both the length of replacement identifiers (sampled from a configurable range) and their composition.
+
+$T_{1}$: Insert loops introduces redundant nested loops at randomly-sampled eligible program locations. At each location, a nesting depth up to a configurable maximum is chosen, with each level selecting a for or while loop uniformly at random. By construction, the conditions and iteration ranges of outermost loops are guaranteed to evaluate to false and be empty, respectively, ensuring no semantic impact. However, the expressions used for conditions and ranges can be complex, so that these guarantees are far from evident without careful analysis. Variables for for loops are generated using either multilingual random strings, with lengths sampled from a configurable range, or are drawn from coding-related vocabulary (similar to fresh identifiers used by $R$). In the case of inner loops, variable names are also sampled, with a configurable probability, from names occurring in the original challenge code. Reusing original program names inside loop nests has the potential to make the transformed code more confusing from the model’s point of view, without risking semantic change since such inner loops are dynamically unreachable. Loop body statements are generated in a randomised fashion, and may include e.g. bitwise operations, arithmetic, string manipulations, and nested comprehensions.
+
+$T_{2}$: Insert conditionals introduces redundant control-flow constructs at randomly sampled eligible locations (as in $T_{1}$). At each location, either a nested if statement with a provably false outer condition and random assignments is inserted, or the existing code is wrapped in a (possibly nested) try-except block. Similar to the case of loop insertion the guards of outer-most conditionals are guaranteed to evaluate to false, while nested conditionals (being unreachable) are unrestricted and can make use of identifiers from the original challenge as well as randomly-generated multilingual identifiers. As with loops, nested conditionals may refer to variable names from the original challenge.
+
+$T_{3}$: Insert functions introduces redundant callable definitions at randomly sampled eligible locations (as in $T_{1}$). Each location probabilistically receives either a nested def or lambda assignment, with nesting depth and parameter lists sampled at random up to configurable maxima. Newly-introduced functions can have randomly-generated names or names deliberately chosen to be similar to names in the enclosing context. Names are chosen to avoid clashes, using fresh identifiers at outer levels while safely reusing in-scope names (including those from the original challenge) at inner levels. Function and lambda parameter names may also be drawn from names used elsewhere in the challenge.
+
+$T_{4}$: Insert code comments adds synthetic comments at randomly sampled eligible locations (as in $T_{1}$), preserving indentation. Comment content is chosen probabilistically: with configurable probability from a curated pool of natural English programming statements, otherwise as meaningless multilingual strings of random lengths.
+
+$T_{5}$: Combine $T_{1}$–$T_{4}$ applies the four sub-transformations sequentially—loops ($T_{1}$), conditionals ($T_{2}$), functions ($T_{3}$), and comments ($T_{4}$)—allowing later transformations to operate on code introduced earlier. Each transformation receives an equal fixed insertion budget based on the original eligible locations, limiting code growth and keeping overall size comparable to applying a single $T_{i}$ in isolation. Comments are inserted last, while the ordering of the other transformations is arbitrary but sensible, enabling, for example, functions within added loops or conditionals without incurring a combinatorial explosion of orderings.
+
+$O$: Apply PyObfuscator applies more aggressive obfuscation using the PyObfuscator tool ([Lambert, 2025](https://arxiv.org/html/2602.05523v2#bib.bib23)). We use a medium obfuscation level that renames all identifiers, removes docstrings, encrypts string literals, and compresses the resulting code with gzip.
+
+Although both $R$ and $O$ rename identifiers, their purposes are distinct: $R$ performs only renaming, enabling isolated measurement of sensitivity to identifiers, while $O$ applies renaming as part of a much more aggressive transformation pipeline that also encrypts strings and compresses code.
+
+CTF families From a given CTF, we generate a family of variants by applying any of $T_{1}$–$T_{5}$, optionally preceded by identifier renaming ($R$) and optionally followed by obfuscation ($O$); $R$ and $O$ may also be applied in isolation or directly composed. Renaming applies only to identifiers in the original challenge, as renaming those introduced by transformations is uninformative, while $O$ is applied last since PyObfuscator compresses code and precludes further transformations. Overall, an Evolve-CTF family comprises 24 instances (including the original), forming a tree ([Figure 2](https://arxiv.org/html/2602.05523v2#S3.F2)) in which each node is derived by applying a transformation to an existing instance (e.g., ‘$R;T_{5};O$’ from ‘$R;T_{5}$’). Since $T_{5}$ combines the effects of $T_{1}$–$T_{4}$, compositions such as $T_{3};T_{1};T_{2}$ do not appear in [Figure 2](https://arxiv.org/html/2602.05523v2#S3.F2). The tree structure serves two purposes: it controls combinatorial explosion (all possible combinations of $R$, $T_{1}$–$T_{5}$ and $O$ would yield hundreds of variants per CTF), and it enables *compositional analysis*—by comparing a node with its parent, we can isolate the marginal effect of each transformation applied on top of prior transformations.
+
+[View original diagram](https://arxiv.org/html/2602.05523v2#S3.F2.pic1)
+
+Figure 2. Transforming an original CTF (Orig) leads to a CTF family, based on our five kinds of transformation ($T_{1}$–$T_{5}$), optionally preceded by renaming ($R$) and/or followed by obfuscation ($O$)
+
+## 4. Experimental Design
+
+In [Section 5](https://arxiv.org/html/2602.05523v2#S5) we report a large-scale evaluation using CTF families generated by Evolve-CTF, assessing 13 LLM configurations via the Inspect agentic framework. Here, we describe our selection of CTFs ([Section 4.1](https://arxiv.org/html/2602.05523v2#S4.SS1)), models ([Section 4.2](https://arxiv.org/html/2602.05523v2#S4.SS2)) and evaluation protocol ([Section 4.3](https://arxiv.org/html/2602.05523v2#S4.SS3)).
+
+### 4.1. CTFs Used for Family Generation
+
+Focusing on the widely used Cybench and Intercode suites (already integrated into Inspect), we selected the CTFs summarised in [Table 1](https://arxiv.org/html/2602.05523v2#S4.T1) for evaluation (using the process detailed below). We group these CTFs into three categories: *Decrypt* (writing and executing non-trivial decryption code), *Modify* (modifying and executing provided code artifacts), and *Exec* (executing provided scripts and interpreting results). This coarse-grained categorisation is intended only to aid visualisation of results in [Section 5](https://arxiv.org/html/2602.05523v2#S5).
+
+We selected these from the available Cybench and Intercode Python CTFs as follows.
+
+We studied the Cybench and Intercode CTFs, determining that they contained 18 and 20 challenges with a Python-based solution, respectively. Because Evolve-CTF *increases* the source code complexity of challenges, to meaningfully assess LLM robustness it was important to select challenges that state-of-the-art models *could* already solve (we would learn little from applying our transformations to already intractable challenges).
+
+To make this selection, we applied three state-of-the-art models at time of CTF selection—Claude Sonnet 3.7, Claude Sonnet 4, o4 mini and o3, and found that 2 of the Cybench challenges and 19 of the Intercode challenges could be reliably solved by these models within three repeat runs with a per-run token limit of 200,000. The division of challenges was stark: the solvable challenges could solved by all models well within this token limit, while the remaining Python-based challenges were almost never solved within these resource constraints by any of these models.
+
+We had to further remove a number of Intercode challenges, either because their files contained intentional syntax errors that prevented parsing and mutation by Evolve-CTF, or due to problems with their provided golden solutions. These problems (in one case a solution bug, which we reported to the Intercode maintainers, in the other case the lack of programmatic solutions) made it impossible to automatically confirm whether the transformations applied by Evolve-CTF preserved the underlying exploit.
+
+We note that recent work has shown high solve rates on Intercode with plain agents ([Turtayev et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib35)), consistent with our own finding ([Section 5](https://arxiv.org/html/2602.05523v2#S5)) that several Intercode challenges lack discriminative power. We retain these challenges precisely because our family-based evaluation can diagnose *which* challenges and transformations remain informative.
+
+Table 1. The Python CTFs used in our evaluation. The Cybench (‘C’) *Dynastic* and *Primary Knowledge* challenges are denoted ‘D’ and ‘PK’, respectively, while Intercode (‘I’) challenges are numbered as per the Intercode benchmark.
+
+|  |  |  |
+|----|----|----|
+| Challenge | Category | Solution Description |
+| C-D | Decrypt | Reverse basic encryption algorithm |
+| C-PK | Decrypt | Perform RSA decryption given RSA parameters $n$, $e$, and $c$ |
+| I-79 | Decrypt | Perform RSA decryption thrice given $e$, $c$ and modulus keys $n_{1}$, $n_{2}$, $n_{3}$ |
+| I-00 | Modify | Replace a call to exec with a call to print |
+| I-13 | Modify | Derive a missing portion of the flag from a static check in the source file |
+| I-25 | Modify | Execute a script which yields a decimal; provide its binary representation to obtain the flag |
+| I-\[30–34\] | Modify | Derive a password from hardcoded check or remove the check |
+| I-36 | Modify | Modify the provided file to call the function print_flag |
+| I-78 | Modify | Comment out a sys.exit call |
+| I-05 | Exec | Use a given script to decrypt flag |
+| I-06 | Exec | Apply a script to a given flag text file and enter a password when prompted |
+| I-24 | Exec | Execute a provided Python file |
+
+### 4.2. LLMs Under Evaluation
+
+[Table 2](https://arxiv.org/html/2602.05523v2#S4.T2) summarises the LLMs we evaluate: recent models spanning multiple providers and parameter scales (where disclosed). We henceforth refer to each model by its short name.
+
+Motivated by prior work showing that increased reasoning can degrade performance on tasks with distracting information ([Gema et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib15)), we additionally evaluate high-reasoning configurations of Gem, GPT, Kimi, and Qwen. These configurations are denoted by the ‘-R’ suffix in short names (e.g., GPT vs. GPT-R). We collected results for DS with high reasoning, but a tool-calling bug ([xixiameng, 2025](https://arxiv.org/html/2602.05523v2#bib.bib38)) rendered them invalid; we thus exclude this configuration. Claude supports reasoning via a configurable token budget rather than discrete modes. Due to the absence of a provider-endorsed notion of high reasoning, as well as financial constraints, we do not evaluate reasoning variants of Claude. The remaining models (Mag, Grok, Mini) do not expose reasoning controls and are evaluated in their default configurations. This leads to 13 model configurations overall. All models are evaluated at their default temperature settings. Although analysing robustness across CTF families under varying temperatures would be informative, it would substantially increase the scale of an already large evaluation (16 CTF families $\times$ 24 instances $\times$ 13 model configurations), exceeding our available resources.
+
+Table 2. The LLMs we evaluate, ordered by release date
+
+| Short  | Model                     | Params     | Released |
+|--------|---------------------------|------------|----------|
+| DS     | DeepSeek V3.2             | 685B       | 2025/12  |
+| Mini   | MiniMax M2.1              | 229B       | 2025/12  |
+| Claude | Anthropic Claude Opus 4.5 | Not public | 2025/11  |
+| Gem    | Google Gemini 3 Pro       | Not public | 2025/11  |
+| GPT    | OpenAI GPT-5.1            | Not public | 2025/11  |
+| Qwen   | Qwen 3 Max                | Not public | 2025/09  |
+| Kimi   | Moonshot AI Kimi K2       | 1T         | 2025/07  |
+| Grok   | xAI Grok 4                | Not public | 2025/07  |
+| Mag    | Mistral Magistral Med. 3  | Not public | 2025/06  |
+
+### 4.3. Evaluation Protocol
+
+To account for the stochastic nature of LLMs, while keeping our evaluation affordable, we perform 5 repeat runs for each CTF family instance and every model configuration. During a single repeat run, a model is allowed up to three attempts to submit the correct flag (as per the Cybench and Intercode default settings). A single repeat run has a budget of 200,000 tokens. This is chosen to be substantially higher than the number of tokens models typically require to solve the original challenges, while ensuring a feasible upper bound on the cost of our evaluation. We now provide further details on and justification for these settings.
+
+Each challenge in Cybench and Intercode includes an initial prompt provided to the model containing information about the task. Cybench includes two difficulty levels—*easy* and *hard*—that vary the amount of information included in this prompt. Initial experiments performed during CTF selection indicated that the *easy* variant was already sufficiently difficult, thus we use the *easy* prompt variants on the 2 Cybench challenges used in our evaluation.
+
+For both Cybench and Intercode, we use the default success criteria, failure criteria and agent settings present in their Inspect implementations: both use a ReAct agent-based ([Yao et al., 2023](https://arxiv.org/html/2602.05523v2#bib.bib42)) solver with access to bash for running shell commands, python for executing Python scripts, and a submit tool for submitting a flag; the agent is given three attempts to submit the correct flag before being deemed as failing to solve the challenge; Intercode has an additional maximum message limit of 50, while Cybench has no limit.
+
+As well as the default failure criteria, we impose a total token limit of 200,000 per evaluation run on a CTF instance. This limit is born both out of practicality and based on our initial selection experiment. The chosen limit is substantially higher than the number of tokens taken to solve the original challenges, while preserving a feasible token usage upper bound (see [Section 4.2](https://arxiv.org/html/2602.05523v2#S4.SS2)).
+
+## 5. Results and Discussion
+
+Table 3. Full ranking of transformations according to difficulty with 90% confidence intervals.
+
+| Rank | Transformation | Score          | 90% CI         |
+|------|----------------|----------------|----------------|
+| 1    | $T_{2};O$  | $22.9\%$  | $[17.5\%,28.3\%]$  |
+| 2    | $R;T_{3};O$  | $23.6\%$  | $[18.1\%,29.0\%]$  |
+| 3    | $R;T_{5};O$  | $24.2\%$  | $[18.7\%,29.8\%]$  |
+| 4    | $T_{3};O$  | $24.4\%$  | $[18.9\%,29.9\%]$  |
+| 5    | $R;T_{2};O$  | $24.5\%$  | $[19.0\%,30.0\%]$  |
+| 6    | $T_{1};O$  | $24.6\%$  | $[19.2\%,30.1\%]$  |
+| 7    | $T_{5};O$  | $24.7\%$  | $[19.3\%,30.2\%]$  |
+| 8    | $R;T_{1};O$  | $25.1\%$  | $[19.5\%,30.6\%]$  |
+| 9    | $R;O$  | $27.1\%$  | $[21.7\%,32.6\%]$  |
+| 10   | $R;T_{4};O$  | $27.4\%$  | $[21.9\%,32.9\%]$  |
+| 11   | $O$  | $28.4\%$  | $[22.8\%,33.9\%]$  |
+| 12   | $T_{4};O$  | $28.8\%$  | $[23.3\%,34.4\%]$  |
+| 13   | $R;T_{5}$  | $55.7\%$  | $[50.3\%,61.1\%]$  |
+| 14   | $T_{5}$  | $64.0\%$  | $[58.9\%,69.2\%]$  |
+| 15   | $R;T_{1}$  | $81.2\%$  | $[76.9\%,85.4\%]$ |
+| 16   | $T_{1}$ | $88.5\%$ | $[85.4\%,91.5\%]$ |
+| 17   | $R;T_{3}$ | $89.4\%$ | $[86.2\%,92.7\%]$ |
+| 18   | $R;T_{2}$ | $91.0\%$ | $[88.0\%,93.9\%]$ |
+| 19   | $T_{3}$ | $94.3\%$ | $[91.9\%,96.8\%]$ |
+| 20   | $T_{2}$ | $95.1\%$ | $[93.0\%,97.2\%]$ |
+| 21   | $R;T_{4}$ | $96.1\%$ | $[94.1\%,98.1\%]$ |
+| 22   | $T_{4}$ | $97.0\%$ | $[95.1\%,98.9\%]$ |
+| 23   | $R$ | $97.3\%$ | $[95.8\%,98.9\%]$ |
+| 24   | Orig           | $98.0\%$ | $[96.7\%,99.3\%]$ |
+
+Table 4. Models ranked by pairwise solving performance, with 90% confidence intervals.
+
+| Rank | Model  | Score          | 90% CI                               |
+|------|--------|----------------|--------------------------------------|
+| 1    | Gem    | $60.4\%$ | $[$58.5% , $62.2\%]$ |
+| 2    | Gem-R  | $56.1\%$ | $[$54.4% , $57.8\%]$ |
+| 3    | Claude | $54.6\%$ | $[$52.8% , $56.4\%]$ |
+| 4    | GPT-R  | $52.4\%$ | $[$50.7% , $54.0\%]$ |
+| 5    | DS     | $50.2\%$ | $[$48.6% , $51.9\%]$ |
+| 6    | Grok   | $50.1\%$ | $[$48.4% , $51.9\%]$ |
+| 7    | Qwen   | $48.9\%$ | $[$47.2% , $50.5\%]$ |
+| 8    | Kimi-R | $48.8\%$ | $[$47.3% , $50.4\%]$ |
+| 9    | Kimi   | $48.4\%$ | $[$46.8% , $50.1\%]$ |
+| 10   | Qwen-R | $47.6\%$ | $[$45.9% , $49.3\%]$ |
+| 11   | Mini   | $46.5\%$ | $[$45.0% , $48.0\%]$ |
+| 12   | GPT    | $46.4\%$ | $[$44.5% , $48.3\%]$ |
+| 13   | Mag    | $39.5\%$ | $[$37.6% , $41.4\%]$ |
+
+### 5.1. Difficulty of CTF Families Across Models
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_mean_solvability_over_models.svg)
+
+Figure 3. Heatmap showing mean solvability score across models for CTF family instances
+
+The heatmap of [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) provides an overview of how effectively the model configurations solve our CTF families on aggregate. Each column represents a CTF family; the $x$ axis shows the associated challenge name, organised by category (c.f. [Table 1](https://arxiv.org/html/2602.05523v2#S4.T1)). Each cell represents an instance; the $y$ axis indicates the transformations that have been applied (c.f. [Figure 2](https://arxiv.org/html/2602.05523v2#S3.F2)). The value in a cell (reflected by its colour; higher $\Rightarrow$ darker) is the *mean solvability score* for the instance across all repeat runs for all model variants, where an individual run of a model against an instance scores 0 (not solved) or 1 (solved). Variance associated with the data of [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) is plotted in [Figure 9](https://arxiv.org/html/2602.05523v2#A1.F9).
+
+[Table 3](https://arxiv.org/html/2602.05523v2#S5.T3) ranks the our transformations by difficulty according to the percentage of instances involving each transformation that were solved successfully across our whole experiment (with 16 families, 13 model configurations and 5 repeats, an individual transformation is subject to 1040 solution attempts in total). There is significant overlap between confidence intervals for ranks 1–12, all of which involve $O$. Then there is a drop in difficulty for ranks 13-14, which involve $T_{5}$ but not $O$ (no confidence interval overlap with higher ranks), and another drop in difficulty between rank 14 and ranks 15 and lower, which do not involve $T_{5}$ (no confidence interval overlap between rank 14 and lower ranks).
+
+[Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) and [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3) lead to the following observations:
+
+The *Exec* CTF families are trivial to solve [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) shows that the model configurations have no difficulty solving CTF families in the *Exec* category (I-05, I-06 and I-24) regardless of the extent to which these CTFs are transformed. For these challenges, simply running the provided Python script, possibly with some arguments or input, will return the flag, and the prompts associated with these challenges even hint or instruct the model to run the provided file. Since the transformations applied by Evolve-CTF are semantics preserving this advice still applies and the challenges remain simple. Analysis of the logs shows that in many cases models do nothing to attempt reversal of any obfuscation applied to these challenges. Given the capabilities of recent models there is a compelling case for these benchmarks to be excluded from LLM evaluations, and helping to identify such triviality is an interesting use case for Evolve-CTF.
+
+Models see through renaming and misleading comments Comparing rows $[\text{Orig},T_{1},\dots,T_{5}]$ (no renaming) with $[R,T_{1};R,\dots,$ $T_{5};R]$ (renaming applied first) in [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) shows that $R$, which renames all identifiers, has little effect on aggregate solvability. This is confirmed by [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3), where $R$ has a difficulty score nearly identical to Orig. Contrary to the hypothesis that meaningful variable, function, and class names aid code reasoning, our results show that LLMs are highly robust to disrupted names.
+
+We also observe that $T_{4}$, which injects misleading comments barely affects solvability: $T_{4}$ and $R;T_{4}$ are among the easiest transformations according to [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3), and the $O$, $T_{4}$ and $R;T_{4}$ rows of [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) show very similar results.
+
+Models are highly robust to code insertion transformations, but PyObfuscator significantly impacts solvability The top half of [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) shows that, overall, the models are able to reason effectively about CTF family instances that involve $T_{1}$–$T_{4}$ when obfuscation is not applied (we discuss $T_{5}$ below). This is remarkable given the aggressive nature of these transformations. However, with the exception of the *Exec* category, mean solvability is low (always below 0.5, often below 0.1) for instances that involve $O$ (obfuscation via PyObfuscator). This tallies with the fact that *Decrypt* and *Modify* challenges require analysis of the CTF source code, which will be impractical for a model unless it manages to use tools to reverse the obfuscations that have been applied. The difficulty of transformations involving $O$ is borne out by the ranking of [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3): the 12 most difficult transformations are those that involve $O$ (see [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3) for the full ranking). We discuss the strategies models use to overcome PyObfuscator-based obfuscation in [Section 5.3](https://arxiv.org/html/2602.05523v2#S5.SS3).
+
+The effect of $T_{5}$ is greater than the sum of its parts Recall that $T_{5}$ involves a combination of inserting loops, conditionals, functions and comments, but each in a limited fashion to avoid overly-lengthy $T_{5}$-transformed source code. While the rows of [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3) involving $T_{1}$–$T_{4}$ (without $O$) show that these transformations have a modest impact on solvability when applied individually, rows $T_{5}$ and $R;T_{5}$ show that the *composition* of these transformations has a bigger impact. This is reflected in the ranking of [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3): there is a step-change in transformation difficulty between ranks 14 and 15—$R;T_{5}$ and $T_{5}$ are significantly harder than the transformations ranked 15 and lower, none of which feature $T_{5}$ (the confidence intervals for rank 14 do not overlap with those of lower ranks; see [Table 3](https://arxiv.org/html/2602.05523v2#S5.T3)). In [Section 5.3](https://arxiv.org/html/2602.05523v2#S5.SS3) we discuss the manner in which models make intricate use of tools to overcome the difficulty of $T_{5}$.
+
+Crucially, $T_{5}$ and $R;T_{5}$ produce substantial degradation using only Evolve-CTF’s own transformations—without any external obfuscation tool. The gap between $R;T_{5}$ (55.7%) and the next-easiest non-$O$ transformation is statistically significant (non-overlapping 90% CIs; see [Table 4](https://arxiv.org/html/2602.05523v2#S5.T4)). This demonstrates that the composition of semantics-preserving rewrites is sufficient to challenge current frontier models, independently of heavy-duty obfuscation.
+
+### 5.2. Per-Model Solvability and Impact of Reasoning
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_mean_solvability_over_challenges.svg)
+
+Figure 4. Heatmap showing mean solvability per model for all instances featuring a particular transformation
+
+[Table 4](https://arxiv.org/html/2602.05523v2#S5.T4) ranks the model configurations according to their overall performance in our experiment. The table ranks the model configurations according to their performance relative to one another. The score tells us the percentage of models that the given model is expected to out-perform on a given challenge-node. Scores close to 100% indicate that a model almost always out-performs all other models. Scores close to 0% indicate that a model often performs worse than all other models. Scores close to 50% indicate that the model typically scores similarly to other models for a given challenge. The scores are calculated based on a pair-wise comparison of model performance for individual challenge-node experiments, as follows. For each model configuration (written “model” in what follows, for brevity), we compute a relative performance score that reflects how often the model outperforms other models across experiments. Each experiment corresponds to a specific challenge-transformation combination and is repeated 5 times per model. For a given experiment, we first compute the average performance of each model across its five repeats, yielding a single per-experiment performance estimate per model. We then compute a pairwise relative score for each model within each experiment by comparing it against every other model. When comparing a model $M$ to another model, $M$ scores 1 if its average performance exceeds that of the other model, 0 if it is lower, and 0.5 if they are equal. A model’s per-experiment relative score is the average of these pairwise comparison scores across all other models. The overall model score is obtained by averaging the per-experiment relative scores across all experiments, and can be interpreted as the expected probability that the model outperforms a randomly-selected competing model on a randomly-selected experiment, with ties counted as half-wins.
+
+[Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) presents the performance of each model configuration with respect to all instances involving a particular transformation; e.g. row $R;T_{4}$ presents the mean solvability score for each model over all instances derived via the $R;T_{4}$ sequence (across all families). Each cell is thus the mean of 80 {0,1} outcomes, arising from 5 repeat runs for the associated transformation combination being applied to each of the 16 CTFs. The columns are ordered according to the ranking of [Table 4](https://arxiv.org/html/2602.05523v2#S5.T4). Variance associated with the data of [Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) is plotted in [Figure 10](https://arxiv.org/html/2602.05523v2#A1.F10), and [Figure 10](https://arxiv.org/html/2602.05523v2#A1.F10) presents plots showing individual model performance.
+
+[Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) and [Table 4](https://arxiv.org/html/2602.05523v2#S5.T4) lead to the following observations:
+
+Performance is broadly similar across configurations While Gem is a clear front-runner (90% CIs do not overlap with those of lower-ranked model configurations) and Mag brings up the rear (90% CIs do not overlap with those of higher-ranked configurations), the overall performance spread is not that large, and there are pairwise CI overlaps between all models ranked 2–12. It is interesting to see that the performance of a relatively small model (Mini) is competitive with that of a substantially larger model (Kimi). The pattern of [Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) reflects the trend observed in [Figure 3](https://arxiv.org/html/2602.05523v2#S5.F3), with most models performing poorly (and none perfectly) when the $O$ transformation is in play. No score in [Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) is zero due to the easily-solvable *Exec* challenges, discussed above. Notice from [Figure 4](https://arxiv.org/html/2602.05523v2#S5.F4) that Gem and Gem-R perform visibly better on various challenges that do involve the $O$ transformation; e.g. Gem does better than other models for instances transformed using $T_{4};O$. Gem also fares better than other models on instances transformed using $T_{5}$ and $R;T_{5}$, which as noted above are challenging overall.
+
+The impact of reasoning is not pronounced The ranking of [Table 4](https://arxiv.org/html/2602.05523v2#S5.T4) indicates that reasoning slightly *hurts* Gem and Qwen, somewhat *helps* GPT, and has barely any impact on Kimi. To illustrate this, [Figure 5](https://arxiv.org/html/2602.05523v2#S5.F5) presents a subtraction plots showcasing the impact of reasoning on GPT. The figure shows (a) a heatmap showing how well the model performed when reasoning *is not* explicitly set to high, (b) a heatmap showing how well the model performed when reasoning *is* explicitly set to high, and (c) a subtraction plot showing the difference between (a) and (b), where blue shades indicate that performance is better *with* reasoning and orange/red shades indicate that performance is better *without* reasoning. The plot showcases that reasoning occasionally improves performance (e.g. reasoning helps GPT-R substantially on the I-25 family), but typically makes little-to-no difference. Subtraction plots for the other reasoning models (not shown) tell a broadly similar story. Therefore our findings do not appear to confirm past findings that increased reasoning can degrade performance with distracting information ([Gema et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib15)).
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/subtraction_plot_0.svg)
+
+Figure 5. Subtraction plot showing the impact of reasoning on solvability of CTF challenges for GPT. Blue shades indicate that performance is better with reasoning; orange/red shades indicate that performance is better without reasoning.
+
+### 5.3. Solution Strategies and Use of Tools
+
+Table 5. Top 10 most-used tools with usage counts (and total tool usage counts) for original, $R$ and $T_{5}$ instances
+
+<table>
+<thead>
+<tr>
+<th colspan="2">Orig</th>
+<th colspan="2">$R$</th>
+<th colspan="2">$T_{5}$</th></tr>
+</thead>
+<tbody>
+<tr>
+<td>python3:</td>
+<td>1,873</td>
+<td>python3:</td>
+<td>1,953</td>
+<td>python3:</td>
+<td>2,882</td></tr>
+<tr>
+<td>cat:</td>
+<td>1,138</td>
+<td>cat:</td>
+<td>1,148</td>
+<td>grep:</td>
+<td>1,786</td></tr>
+<tr>
+<td>ls:</td>
+<td>901</td>
+<td>ls:</td>
+<td>896</td>
+<td>cat:</td>
+<td>1,129</td></tr>
+<tr>
+<td>echo:</td>
+<td>188</td>
+<td>echo:</td>
+<td>190</td>
+<td>sed:</td>
+<td>943</td></tr>
+<tr>
+<td>sed:</td>
+<td>124</td>
+<td>sed:</td>
+<td>103</td>
+<td>ls:</td>
+<td>922</td></tr>
+<tr>
+<td>xxd:</td>
+<td>71</td>
+<td>xxd:</td>
+<td>87</td>
+<td>echo:</td>
+<td>528</td></tr>
+<tr>
+<td>pip:</td>
+<td>49</td>
+<td>hexdump:</td>
+<td>47</td>
+<td>head:</td>
+<td>190</td></tr>
+<tr>
+<td>head:</td>
+<td>38</td>
+<td>pip:</td>
+<td>42</td>
+<td>tail:</td>
+<td>164</td></tr>
+<tr>
+<td>hexdump:</td>
+<td>32</td>
+<td>head:</td>
+<td>40</td>
+<td>xxd:</td>
+<td>118</td></tr>
+<tr>
+<td>sudo:</td>
+<td>26</td>
+<td>wc:</td>
+<td>29</td>
+<td>hexdump:</td>
+<td>114</td></tr>
+<tr>
+<td>All tools:</td>
+<td>4,440</td>
+<td>All tools:</td>
+<td>4,535</td>
+<td>All tools:</td>
+<td>8,776</td></tr>
+</tbody>
+</table>
+
+A key strength of agentic frameworks is that they equip models with access to tools. We examine the extent to which the models change their use of tools to solve challenging instances; notably instances involving $T_{5}$ (composed transformations), and $O$ (obfuscation via PyObfuscator).
+
+Coping with $T_{5}$ via clever use of tools [Table 5](https://arxiv.org/html/2602.05523v2#S5.T5) shows the top 10 tools that are used (across all models) when solving original challenges (Orig), renamed challenges ($R$), and challenges to which $T_{5}$ has been applied in isolation ($T_{5}$). [Figure 6](https://arxiv.org/html/2602.05523v2#S5.F6) shows the mean number of tool calls made, across all models and repeat runs, for each CTF family instance. The plot reinforces our finding that the $T_{5}$ and $R;T_{5}$ transformations cause models to make intricate use of tools to deal with increased source code complexity. The minimal use of tools on all instances derived from CTFs in the *Exec* category is in line with our finding that these CTFs are rather trivial. [Figure 7](https://arxiv.org/html/2602.05523v2#S5.F7) shows the mean number of tool calls per model for all instances featuring a particular transformation. Again, high numbers for $T_{5}$ and $R;T_{5}$ reinforce our finding that these transformations lead to increased tool usage. The plot also demonstrates considerable variability in tool usage per model, with Kimi being the most frequent user of tools.
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_avg_tool_calls_per_challenge_node.svg)
+
+Figure 6. Heatmap showing the mean number of tool calls across models for CTF family instances (regardless of whether solution attempts were ultimately successful).
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_avg_tool_calls_per_model_node.svg)
+
+Figure 7. Heatmap showing the mean number of tool calls per model for all instances featuring a particular transformation.
+
+For original challenges, python3 dominates as the primary tool for executing agent-written code, followed by cat (for inspecting challenge files) and ls (for identifying available files). Other tools are used far less. The $R$ column is similar, reflecting our finding that models see through renaming and can reason directly about renamed code. In contrast, overall use of tools nearly doubles for $T_{5}$, with substantially more use of python3 and vastly-increased use of grep, sed, head and tail, as models rely on tools to locate key code fragments amid greater code complexity.
+
+To investigate this further we studied a transcript for DS solving an instance derived from the Cybench C-PK challenge via $R;T_{5}$. The transcript illustrates a number of clever tool calls, e.g. invoking:
+
+grep -n "bytes_to_long\\long_to_bytes\\int.from_bytes" /root/source.py
+
+to look for uses of specific conversion functions, and:
+
+sed -n ’115,125p’ /root/source.py
+
+to look at surrounding context for identified lines.
+
+Solution strategies for $O$ We did not observe a marked increase in tool usage for instances transformed with $O$. However, manual log inspection shows that successful solutions typically recognise that the PyObfuscator-transformed code is gzip-compressed and then write a Python script to decompress it. We studied transcripts for a successful and an unsuccessful DeepSeek attempt on C-PK after applying $O$. In both cases, the model quickly identifies the code as compressed and writes a decompression script. In the *successful* attempt, decompression succeeds and the model solves the challenge with relative ease. In the *unsuccessful* attempt, a syntax error causes decompression to fail, leading the model to try several ineffective approaches before eventually producing a correct script. This false start exhausts much of the token budget, preventing the model from completing the challenge.
+
+### 5.4. Token Usage and Reasons for Failure
+
+[Figure 8](https://arxiv.org/html/2602.05523v2#S5.F8) summarises token usage across successful solution attempts, with each cell showing the mean token usage for a given instance across all successful runs. Means are computed over sets of varying sizes, reflecting how often each instance was solved. The figure reinforces our earlier observations: $O$ and $T_{5}$ pose substantial difficulties, while renaming ($R$) and comment injection ($T_{4}$) are comparatively easy to bypass. It also shows that combining obfuscation with other transformations can shift an instance from occasionally solved to never solved (e.g. I-33 under $O$ vs. $X;O$ for any $X$).
+
+Recall from [Section 4.3](https://arxiv.org/html/2602.05523v2#S4.SS3) that a model may fail by (a) reaching the 200,000 token limit, (b) submitting an incorrect flag three times, or (c) for Intercode challenges, hitting the 50-message limit. Logs show 97.9% of failures were due to the token limit, 1.1% due to repeated incorrect flags, and 1% due to the message limit. This indicates that our transformations do not typically cause models to make logical reasoning errors that lead to erroneous flag submissions. Rather, they cause models to *work harder* in their attempts to capture the flag, preventing them from gaining the confidence required to submit a flag, and often requiring so much additional effort (via tool calls and bespoke scripts) that even a generous token budget is exceeded. It would be interesting to examine these trends through experiments with even larger token budgets, but this would come at substantial computational and financial cost.
+
+![Refer to caption](https://arxiv.org/html/2602.05523v2/token_heatmap.png)
+
+Figure 8. Mean token usage across successful solution attempts (grey indicate that an instance was never solved)
+
+## 6. Related Work
+
+Evaluating the cybersecurity capabilities of LLMs There is a growing body of research evaluating the cybersecurity capabilities of LLMs ([Liu, 2023](https://arxiv.org/html/2602.05523v2#bib.bib26); [Ji et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib19); [Tihanyi et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib34); [Wan et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib37); [Elzemity et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib13); [Divakaran and Peddinti, 2025](https://arxiv.org/html/2602.05523v2#bib.bib11); [Zhang et al., 2025a](https://arxiv.org/html/2602.05523v2#bib.bib45); [Ferrag et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib14); [Atlam, 2025](https://arxiv.org/html/2602.05523v2#bib.bib4); [Kasri et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib21)). Capture-the-flag challenge benchmark suites ([Zhang et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib43); [Shao et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib32); [Yang et al., 2023a](https://arxiv.org/html/2602.05523v2#bib.bib40)) offer one way to assess cybersecurity skill by challenging LLMs to exploit a provided, vulnerable system to obtain a flag. The challenges in these benchmarks are often taken from previous public CTF competitions, which ensures that challenges are high quality but risks the same training data contamination that has been found in other benchmark suites ([Zhang et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib44)).
+
+Our approach, implemented in Evolve-CTF, is complementary to existing CTF benchmark suites that make use of valuable but scarce expert-written challenges. Existing benchmark suites are small with few variations on the same style of challenge, meaning they offer little insight into the robustness of models to changes in challenge formulation. Evolve-CTF allows extra information, such as model robustness, to be extracted from existing benchmarks via the generation of a family of related challenges.
+
+Applications of metamorphic testing to LLMs Our approach of validating LLMs using families of semantically-equivalent problems is an instance of metamorphic testing, a software testing technique that allows new test cases to be generated from existing ones by mutating test inputs in ways that have a known effect on test outputs ([Chen et al., 2020](https://arxiv.org/html/2602.05523v2#bib.bib8); [Segura et al., 2016](https://arxiv.org/html/2602.05523v2#bib.bib31)). Metamorphic testing is increasingly being used to test the ability of LLMs in the domains of programming ([Asgari et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib3); [Nguyen et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib29)), mathematics ([Mirzadeh et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib27)), and logical reasoning ([Li et al., 2024](https://arxiv.org/html/2602.05523v2#bib.bib25); [Yang et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib39)). Although transformations similar to those applied by Evolve-CTF have been used in prior work ([Asgari et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib3)) (and are related to metamorphic transformations used in compiler testing ([Donaldson et al., 2017](https://arxiv.org/html/2602.05523v2#bib.bib12); [Le et al., 2014](https://arxiv.org/html/2602.05523v2#bib.bib24))), to our knowledge Evolve-CTF is the first application of metamorphic testing in the context of CTFs. Our approach of representing families of transformed programs as a tree (see [Figure 2](https://arxiv.org/html/2602.05523v2#S3.F2)) shares similarities with ideas in work on adversarial attacks against machine learning systems ([Quiring et al., 2019](https://arxiv.org/html/2602.05523v2#bib.bib30)), but the context is different—find transformations that reduce accuracy of a classifier vs. studying the effects of transformations on the code reasoning capabilities of LLMs.
+
+Systematic evaluation of LLMs via neighbourhoods of problems Our approach shares similarities with the Turbulence methods for benchmarking LLMs on neighbourhoods of related coding problems ([Honarvar et al., 2025b](https://arxiv.org/html/2602.05523v2#bib.bib17); [Honarvar et al., 2025a](https://arxiv.org/html/2602.05523v2#bib.bib16)). A key conceptual distinction between our work and Turbulence is that Turbulence involves creating many problem instances that are similar in difficulty but require semantically *different* solutions, while Evolve-CTF is concerned with creating families of semantically *equivalent* CTFs that differ dramatically in how easily they can be solved.
+
+Procedural and dynamic CTF generation Several works have explored automated generation of CTF challenges for training or evaluation purposes ([Muzsai et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib28); [Chetwyn and Erdodi, 2022](https://arxiv.org/html/2602.05523v2#bib.bib9); [Kerr et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib22)). These approaches generate *new* challenges, often for reinforcement-learning-based agent training. Our work is complementary: rather than generating novel challenges, Evolve-CTF produces semantically equivalent variants of *existing* challenges, enabling controlled measurement of robustness while holding the underlying vulnerability fixed.
+
+## 7. Limitations and Threats to Validity
+
+Language scope Evolve-CTF currently targets Python-based CTFs; while our approach is conceptually language-agnostic, the implementation of transformations is necessarily Python-specific. We consider this a reasonable starting point: Python is one of the most widely used programming languages ([Cass, 2024](https://arxiv.org/html/2602.05523v2#bib.bib6)), is well-supported by LLMs ([Twist et al., 2025](https://arxiv.org/html/2602.05523v2#bib.bib36)), and underpins many existing CTF challenges. Extending to languages such as C, C++ and Rust is a natural direction for future work.
+
+Model coverage Our evaluation spans a substantial cross-section of current frontier models, but cannot cover the full and rapidly evolving landscape of agentic LLMs. Results may not generalise to models released after our evaluation window or run under different quantisation or inference settings.
+
+Transformation design space The space of possible semantics-preserving transformations is vast; our implementation commits to six transformation types and their compositions. Alternative designs—such as control-flow restructuring or refactoring of the vulnerability itself—could yield further insights into model robustness. Our principal contribution is the *conceptual approach* of family-based evaluation via semantics-preserving transformations; the particular transformations in Evolve-CTF represent one concrete instantiation, and its modular architecture is designed to accommodate additional transformations in future.
+
+Token budget Each run is capped at 200,000 tokens to keep our large-scale evaluation tractable. As noted in [Section 5.4](https://arxiv.org/html/2602.05523v2#S5.SS4), the majority of failures result from exceeding this budget rather than from incorrect flag submissions, confirming that transformations cause models to work substantially harder. A larger budget might allow some currently-failing runs to succeed, but would not change the finding that composed and obfuscation-based transformations impose significant additional effort.
+
+## 8. Conclusion and Future Work
+
+We have introduced *CTF challenge families* for the systematic evaluation of agentic LLMs in cybersecurity settings, implemented via a new tool, Evolve-CTF. By generating structured families of semantically equivalent but syntactically diverse CTF instances, we used Evolve-CTF to evaluate 13 LLM configurations. Our results show that current models are highly resilient to variable renaming and isolated code injection, but their performance degrades under composed and tool-based obfuscations, which require more sophisticated tool use. Our approach also reveals cases where existing benchmarks lack discriminative power, highlighting the value of Evolve-CTF for both model evaluation and benchmark analysis.
+
+Avenues for future work include deeper qualitative analysis of agent logs to better characterise tool-use strategies and failure modes; extending Evolve-CTF with a broader range of transformations; applying the method to CTFs in languages such as C++ and Rust, or to challenges involving multiple languages, to assess cross-language robustness and generalisation; and transferring the notion of task families to other LLM-assisted code reasoning tasks, including bug finding and automated repair.
+
+## References
+
+- AI Security Institute, UK (2024) AI Security Institute, UK. 2024. Inspect AI. <https://github.com/UKGovernmentBEIS/inspect_ai> Accessed: 2026-01-27.
+- Asgari et al. (2025) Ali Asgari, Milan de Koning, Pouria Derakhshanfar, and Annibale Panichella. 2025. Metamorphic Testing of Deep Code Models: A Systematic Literature Review. *ACM Trans. Softw. Eng. Methodol.* (2025). <https://dl.acm.org/doi/10.1145/3766552> Just Accepted.
+- Atlam (2025) Hany F. Atlam. 2025. LLMs in Cyber Security: Bridging Practice and Education. *Big Data and Cognitive Computing* 9, 7 (2025). <https://www.mdpi.com/2504-2289/9/7/184>
+- Bakker and Hastings (2025) Isabelle Bakker and John Hastings. 2025. Autonomous Penetration Testing: Solving Capture-the-Flag Challenges with LLMs. *CoRR* abs/2508.01054 (2025). <https://doi.org/10.48550/arXiv.2508.01054>
+- Cass (2024) Stephen Cass. 2024. The Top Programming Languages 2025. *IEEE Spectrum* (Aug. 2024). <https://spectrum.ieee.org/top-programming-languages-2025>.
+- Chapman et al. (2014) Peter Chapman, Jonathan Burket, and David Brumley. 2014. PicoCTF: A Game-Based Computer Security Competition for High School Students. In *2014 USENIX Summit on Gaming, Games, and Gamification in Security Education, 3GSE ’14, San Diego, CA, USA, August 18, 2014*. USENIX Association. <https://www.usenix.org/conference/3gse14/summit-program/presentation/chapman>
+- Chen et al. (2020) Tsong Yueh Chen, Shing-Chi Cheung, and Siu-Ming Yiu. 2020. Metamorphic Testing: A New Approach for Generating Next Test Cases. *CoRR* abs/2002.12543 (2020). arXiv:2002.12543 <https://arxiv.org/abs/2002.12543>
+- Chetwyn and Erdodi (2022) Robert Andrew Chetwyn and László Erdodi. 2022. Towards Dynamic Capture-The-Flag Training Environments For Reinforcement Learning Offensive Security Agents. In *IEEE International Conference on Big Data, Big Data 2022, Osaka, Japan, December 17-20, 2022*, Shusaku Tsumoto, Yukio Ohsawa, Lei Chen, Dirk Van den Poel, Xiaohua Hu, Yoichi Motomura, Takuya Takagi, Lingfei Wu, Ying Xie, Akihiro Abe, and Vijay Raghavan (Eds.). IEEE, 2585–2594. <https://doi.org/10.1109/BIGDATA55660.2022.10020389>
+- Debenedetti et al. (2024) Edoardo Debenedetti, Javier Rando, Daniel Paleka, Silaghi Fineas Florin, Dragos Albastroiu, Niv Cohen, Yuval Lemberg, Reshmi Ghosh, Rui Wen, Ahmed Salem, Giovanni Cherubin, Santiago Zanella-Béguelin, Robin Schmid, Victor Klemm, Takahiro Miki, Chenhao Li, Stefan Kraft, Mario Fritz, Florian Tramèr, Sahar Abdelnabi, and Lea Schönherr. 2024. Dataset and Lessons Learned from the 2024 SaTML LLM Capture-the-Flag Competition. In *Advances in Neural Information Processing Systems 38: Annual Conference on Neural Information Processing Systems 2024, NeurIPS 2024, Vancouver, BC, Canada, December 10 - 15, 2024*. <http://papers.nips.cc/paper_files/paper/2024/hash/411c44e6f285310822f39f76a58798c7-Abstract-Datasets_and_Benchmarks_Track.html>
+- Divakaran and Peddinti (2025) Dinil Mon Divakaran and Sai Teja Peddinti. 2025. Large Language Models for Cybersecurity: New Opportunities. *IEEE Secur. Priv.* 23, 5 (2025), 38–45. <https://doi.org/10.1109/MSEC.2024.3504512>
+- Donaldson et al. (2017) Alastair F. Donaldson, Hugues Evrard, Andrei Lascu, and Paul Thomson. 2017. Automated testing of graphics shader compilers. *Proc. ACM Program. Lang.* 1, OOPSLA (2017), 93:1–93:29. <https://doi.org/10.1145/3133917>
+- Elzemity et al. (2025) Adel Elzemity, Budi Arief, and Shujun Li. 2025. CyberLLMInstruct: A Pseudo-Malicious Dataset Revealing Safety-Performance Trade-offs in Cyber Security LLM Fine-tuning. In *Proceedings of the 18th ACM Workshop on Artificial Intelligence and Security, Taipei,Taiwan, October 13-17, 2025*. ACM, 77–88. <https://doi.org/10.1145/3733799.3762968>
+- Ferrag et al. (2025) Mohamed Amine Ferrag, Fatima Alwahedi, Ammar Battah, Bilel Cherif, Abdechakour Mechri, Norbert Tihanyi, Tamas Bisztray, and Merouane Debbah. 2025. Generative AI in cybersecurity: A comprehensive review of LLM applications and vulnerabilities. *Internet of Things and Cyber-Physical Systems* 5 (2025), 1–46. <https://www.sciencedirect.com/science/article/pii/S2667345225000082>
+- Gema et al. (2025) Aryo Pradipta Gema, Alexander Hägele, Runjin Chen, Andy Arditi, Jacob Goldman-Wetzler, Kit Fraser-Taliente, Henry Sleight, Linda Petrini, Julian Michael, Beatrice Alex, Pasquale Minervini, Yanda Chen, Joe Benton, and Ethan Perez. 2025. Inverse Scaling in Test-Time Compute. *CoRR* abs/2507.14417 (2025). <https://doi.org/10.48550/arXiv.2507.14417>
+- Honarvar et al. (2025a) Shahin Honarvar, Marek Rei, and Alastair F. Donaldson. 2025a. The "Question Neighbourhood" Approach for Systematic Evaluation of Code-Generating LLMs. *IEEE Trans. Software Eng.* 51, 11 (2025), 3138–3167. <https://doi.org/10.1109/TSE.2025.3612251>
+- Honarvar et al. (2025b) Shahin Honarvar, Mark van der Wilk, and Alastair F. Donaldson. 2025b. Turbulence: Systematically and Automatically Testing Instruction-Tuned Large Language Models for Code. In *IEEE Conference on Software Testing, Verification and Validation, ICST 2025, Napoli, Italy, March 31 - April 4, 2025*. IEEE, 80–91. <https://doi.org/10.1109/ICST62969.2025.10989005>
+- Instragram (2026) Instragram. 2026. libCST: A Concrete Syntax Tree (CST) parser and serializer library for Python. <https://github.com/Instagram/LibCST> Accessed: 2026-01-26.
+- Ji et al. (2024) Hangyuan Ji, Jian Yang, Linzheng Chai, Chaoren Wei, Liqun Yang, Yunlong Duan, Yunli Wang, Tianzhen Sun, Hongcheng Guo, Tongliang Li, Changyu Ren, and Zhoujun Li. 2024. SEvenLLM: Benchmarking, Eliciting, and Enhancing Abilities of Large Language Models in Cyber Threat Intelligence. *CoRR* abs/2405.03446 (2024). arXiv:2405.03446 <https://doi.org/10.48550/arXiv.2405.03446>
+- Ji et al. (2025) Zimo Ji, Daoyuan Wu, Wenyuan Jiang, Pingchuan Ma, Zongjie Li, and Shuai Wang. 2025. Measuring and Augmenting Large Language Models for Solving Capture-the-Flag Challenges. In *Proceedings of the 2025 ACM SIGSAC Conference on Computer and Communications Security, CCS 2025, Taipei, Taiwan, October 13-17, 2025*. ACM, 603–617. <https://doi.org/10.1145/3719027.3744855>
+- Kasri et al. (2025) Wafaa Kasri, Yassine Himeur, Hamzah Ali Alkhazaleh, Saed Tarapiah, Shadi Atalla, Wathiq Mansoor, and Hussain Al-Ahmad. 2025. From Vulnerability to Defense: The Role of Large Language Models in Enhancing Cybersecurity. *Computation* 13, 2 (2025). <https://www.mdpi.com/2079-3197/13/2/30>
+- Kerr et al. (2025) Ryan Kerr, Adrian Taylor, Madeena Sultana, and Jean-Pierre S. El Rami. 2025. ICARuS: Intercode-CTF Auto-Randomization System. In *IEEE Conference on Artificial Intelligence, CAI 2025, Santa Clara, CA, USA, May 5-7, 2025*. IEEE, 1150–1155. <https://doi.org/10.1109/CAI64502.2025.00200>
+- Lambert (2025) Maurice Lambert. 2025. PyObfuscator: Python Code Obfuscation Module. <https://mauricelambert.github.io/info/python/security/PyObfuscator.html> Accessed: 2026-01-24.
+- Le et al. (2014) Vu Le, Mehrdad Afshari, and Zhendong Su. 2014. Compiler validation via equivalence modulo inputs. In *ACM SIGPLAN Conference on Programming Language Design and Implementation, PLDI ’14, Edinburgh, United Kingdom - June 09 - 11, 2014*. ACM, 216–226. <https://doi.org/10.1145/2594291.2594334>
+- Li et al. (2024) Ningke Li, Yuekang Li, Yi Liu, Ling Shi, Kailong Wang, and Haoyu Wang. 2024. Drowzee: Metamorphic Testing for Fact-Conflicting Hallucination Detection in Large Language Models. *Proc. ACM Program. Lang.* 8, OOPSLA2 (2024), 1843–1872. <https://doi.org/10.1145/3689776>
+- Liu (2023) Zefang Liu. 2023. SecQA: A Concise Question-Answering Dataset for Evaluating Large Language Models in Computer Security. *CoRR* abs/2312.15838 (2023). arXiv:2312.15838 <https://doi.org/10.48550/arXiv.2312.15838>
+- Mirzadeh et al. (2025) Iman Mirzadeh, Keivan Alizadeh, Hooman Shahrokhi, Oncel Tuzel, Samy Bengio, and Mehrdad Farajtabar. 2025. GSM-Symbolic: Understanding the Limitations of Mathematical Reasoning in Large Language Models. In *The Thirteenth International Conference on Learning Representations, ICLR 2025, Singapore, April 24-28, 2025*. OpenReview.net. <https://openreview.net/forum?id=AjXkRZIvjB>
+- Muzsai et al. (2025) Lajos Muzsai, David Imolai, and András Lukács. 2025. Improving LLM Agents with Reinforcement Learning on Cryptographic CTF Challenges. *CoRR* abs/2506.02048 (2025). <https://doi.org/10.48550/ARXIV.2506.02048> arXiv:2506.02048
+- Nguyen et al. (2025) Thu-Trang Nguyen, Thanh Trong Vu, Hieu Dinh Vo, and Son Nguyen. 2025. An empirical study on capability of Large Language Models in understanding code semantics. *Inf. Softw. Technol.* 185 (2025), 107780. <https://doi.org/10.1016/j.infsof.2025.107780>
+- Quiring et al. (2019) Erwin Quiring, Alwin Maier, and Konrad Rieck. 2019. Misleading Authorship Attribution of Source Code using Adversarial Learning. In *28th USENIX Security Symposium, USENIX Security 2019, Santa Clara, CA, USA, August 14-16, 2019*. USENIX Association, 479–496. <https://www.usenix.org/conference/usenixsecurity19/presentation/quiring>
+- Segura et al. (2016) Sergio Segura, Gordon Fraser, Ana Belén Sánchez, and Antonio Ruiz Cortés. 2016. A Survey on Metamorphic Testing. *IEEE Trans. Software Eng.* 42, 9 (2016), 805–824. <https://doi.org/10.1109/TSE.2016.2532875>
+- Shao et al. (2024) Minghao Shao, Sofija Jancheska, Meet Udeshi, Brendan Dolan-Gavitt, Haoran Xi, Kimberly Milner, Boyuan Chen, Max Yin, Siddharth Garg, Prashanth Krishnamurthy, Farshad Khorrami, Ramesh Karri, and Muhammad Shafique. 2024. NYU CTF Bench: A Scalable Open-Source Benchmark Dataset for Evaluating LLMs in Offensive Security. In *Advances in Neural Information Processing Systems 38: Annual Conference on Neural Information Processing Systems 2024, NeurIPS 2024, Vancouver, BC, Canada, December 10 - 15, 2024*. <http://papers.nips.cc/paper_files/paper/2024/hash/69d97a6493fbf016fff0a751f253ad18-Abstract-Datasets_and_Benchmarks_Track.html>
+- Svábenský et al. (2021) Valdemar Svábenský, Pavel Celeda, Jan Vykopal, and Silvia Brisáková. 2021. Cybersecurity knowledge and skills taught in capture the flag challenges. *Comput. Secur.* 102 (2021), 102154. <https://doi.org/10.1016/j.cose.2020.102154>
+- Tihanyi et al. (2024) Norbert Tihanyi, Mohamed Amine Ferrag, Ridhi Jain, Tamás Bisztray, and Mérouane Debbah. 2024. CyberMetric: A Benchmark Dataset based on Retrieval-Augmented Generation for Evaluating LLMs in Cybersecurity Knowledge. In *IEEE International Conference on Cyber Security and Resilience, CSR 2024, London, UK, September 2-4, 2024*. IEEE, 296–302. <https://doi.org/10.1109/CSR61664.2024.10679494>
+- Turtayev et al. (2024) Rustem Turtayev, Artem Petrov, Dmitrii Volkov, and Denis Volk. 2024. Hacking CTFs with Plain Agents. *CoRR* abs/2412.02776 (2024). <https://doi.org/10.48550/ARXIV.2412.02776> arXiv:2412.02776
+- Twist et al. (2025) Lukas Twist, Jie M. Zhang, Mark Harman, Don Syme, Joost Noppen, and Detlef D. Nauck. 2025. LLMs Love Python: A Study of LLMs’ Bias for Programming Languages and Libraries. *CoRR* abs/2503.17181 (2025). arXiv:2503.17181 <https://doi.org/10.48550/arXiv.2503.17181>
+- Wan et al. (2024) Shengye Wan, Cyrus Nikolaidis, Daniel Song, David Molnar, James Crnkovich, Jayson Grace, Manish Bhatt, Sahana Chennabasappa, Spencer Whitman, Stephanie Ding, Vlad Ionescu, Yue Li, and Joshua Saxe. 2024. CYBERSECEVAL 3: Advancing the Evaluation of Cybersecurity Risks and Capabilities in Large Language Models. *CoRR* abs/2408.01605 (2024). arXiv:2408.01605 <https://doi.org/10.48550/arXiv.2408.01605>
+- xixiameng (2025) xixiameng. 2025. \[Bug\]DeepSeek V3.2 fails to call tools when interleaved thinking is enabled. <https://github.com/lobehub/lobe-chat/issues/10534> Accessed: 2026-01-27.
+- Yang et al. (2025) Borui Yang, Md Afif Al Mamun, Jie M. Zhang, and Gias Uddin. 2025. Hallucination Detection in Large Language Models with Metamorphic Relations. *Proc. ACM Softw. Eng.* 2, FSE (2025), 425–445. <https://doi.org/10.1145/3715735>
+- Yang et al. (2023a) John Yang, Akshara Prabhakar, Karthik Narasimhan, and Shunyu Yao. 2023a. InterCode: Standardizing and Benchmarking Interactive Coding with Execution Feedback. In *Advances in Neural Information Processing Systems 36: Annual Conference on Neural Information Processing Systems 2023, NeurIPS 2023, New Orleans, LA, USA, December 10 - 16, 2023*. <http://papers.nips.cc/paper_files/paper/2023/hash/4b175d846fb008d540d233c188379ff9-Abstract-Datasets_and_Benchmarks.html>
+- Yang et al. (2023b) John Yang, Akshara Prabhakar, Shunyu Yao, Kexin Pei, and Karthik R Narasimhan. 2023b. Language Agents as Hackers: Evaluating Cybersecurity Skills with Capture the Flag. In *Multi-Agent Security Workshop @ NeurIPS’23*. <https://openreview.net/forum?id=KOZwk7BFc3>
+- Yao et al. (2023) Shunyu Yao, Jeffrey Zhao, Dian Yu, Nan Du, Izhak Shafran, Karthik R. Narasimhan, and Yuan Cao. 2023. ReAct: Synergizing Reasoning and Acting in Language Models. In *The Eleventh International Conference on Learning Representations, ICLR 2023, Kigali, Rwanda, May 1-5, 2023*. OpenReview.net. <https://openreview.net/forum?id=WE_vluYUL-X>
+- Zhang et al. (2025b) Andy K. Zhang, Neil Perry, Riya Dulepet, Joey Ji, Celeste Menders, Justin W. Lin, Eliot Jones, Gashon Hussein, Samantha Liu, Donovan Julian Jasper, Pura Peetathawatchai, Ari Glenn, Vikram Sivashankar, Daniel Zamoshchin, Leo Glikbarg, Derek Askaryar, Haoxiang Yang, Aolin Zhang, Rishi Alluri, Nathan Tran, and et al. 2025b. Cybench: A Framework for Evaluating Cybersecurity Capabilities and Risks of Language Models. In *The Thirteenth International Conference on Learning Representations, ICLR 2025, Singapore, April 24-28, 2025*. OpenReview.net. <https://openreview.net/forum?id=tc90LV0yRL>
+- Zhang et al. (2024) Hugh Zhang, Jeff Da, Dean Lee, Vaughn Robinson, Catherine Wu, William Song, Tiffany Zhao, Pranav Raja, Charlotte Zhuang, Dylan Slack, Qin Lyu, Sean Hendryx, Russell Kaplan, Michele Lunati, and Summer Yue. 2024. A Careful Examination of Large Language Model Performance on Grade School Arithmetic. In *Advances in Neural Information Processing Systems 38: Annual Conference on Neural Information Processing Systems 2024, NeurIPS 2024, Vancouver, BC, Canada, December 10 - 15, 2024*. <http://papers.nips.cc/paper_files/paper/2024/hash/53384f2090c6a5cac952c598fd67992f-Abstract-Datasets_and_Benchmarks_Track.html>
+- Zhang et al. (2025a) Jie Zhang, Haoyu Bu, Hui Wen, Yongji Liu, Haiqiang Fei, Rongrong Xi, Lun Li, Yun Yang, Hongsong Zhu, and Dan Meng. 2025a. When LLMs meet cybersecurity: A systematic literature review. *Cybersecur.* 8, 1 (2025), 55. <https://doi.org/10.1186/s42400-025-00361-w>
+- Zou et al. (2024) Yuwen Zou, Yang Hong, Jingyi Xu, Lekun Liu, and Wenjun Fan. 2024. Leveraging Large Language Models for Challenge Solving in Capture-the-Flag. In *23rd IEEE International Conference on Trust, Security and Privacy in Computing and Communications, TrustCom 2024, Sanya, China, December 17-21, 2024*. IEEE, 1541–1550. <https://doi.org/10.1109/TrustCom63139.2024.00213>
+
+## Appendix A Supplementary Plots
+
+[Figure 9](https://arxiv.org/html/2602.05523v2#A1.F9) shows standard deviation associated with the mean solvability data of Figure 3 in the main paper. Higher standard deviations are associated with challenges for which there was more variation in the ability of different models to solve them. For example, the Execute family of transformations have very low standard deviations because most models solved all challenges, and many transformations involving PyObfuscator have low standard deviation because most models could not solve them. Challenges transformed by $T_{5}$ and $R;T_{5}$ are associated with more variability in model performance: some models could solve these challenges, while others struggled.
+
+[Figure 10](https://arxiv.org/html/2602.05523v2#A1.F10) shows standard deviation associated with the mean solvability data of Figure 4 in the main paper. It shows the variability in model performance across challenges. The standard deviation for challenges involving $O$ is high because models were typically able to solve the “Exec” family of challenges, while models typically could not solve other challenges transformed by $O$. The standard deviation is lower for most transformations in the top half of the heatmap because performance was typically strong across all challenges.
+
+[Figure 11](https://arxiv.org/html/2602.05523v2#A1.F11) (split across four separate figures) presents heatmaps for individual models. Each cell of a heatmap represents an instance of a CTF family. The colour of the cell represents the number of times (out of 5 repeat runs) that the model successfully solved the instance. Darker colours indicate more successful solves, while white indicates no successful solves.
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_std_solvability_over_models.svg)
+
+Figure 9. Standard deviation associated with the mean solvability heatmap (Figure 3 in the main paper)
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/heatmap_std_solvability_over_challenges.svg)
+
+Figure 10. Standard deviation associated with the per-model solvability heatmap (Figure 4 in the main paper)
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/claude_opus_4_5_heatmap.svg)
+
+\(a\) Claude
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/deepseek-chat_heatmap.svg)
+
+\(b\) DS
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/gemini-3-pro-low_heatmap.svg)
+
+\(c\) Gem
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/gemini-3-pro-high_heatmap.svg)
+
+\(d\) Gem-R
+
+Figure 11. Heatmaps showing the performance of individual models across CTF family instances. Models are referred to by the short names of Table 2 in the main paper. (Continued in next figure)
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/gpt_5_1_no_reasoning_heatmap.svg)
+
+\(a\) GPT
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/gpt_5_1_high_reasoning_heatmap.svg)
+
+\(b\) GPT-R
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/kimi-k2_heatmap.svg)
+
+\(c\) Kimi
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/kimi-k2-reasoning_heatmap.svg)
+
+\(d\) Kimi-R
+
+Figure 12. (Continued from previous figure.) Heatmaps showing the performance of individual models across CTF family instances. Models are referred to by the short names of Table 2 in the main paper. (Continued in next figure)
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/qwen3-max_heatmap.svg)
+
+\(a\) Qwen
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/qwen3-max-reasoning_heatmap.svg)
+
+\(b\) Qwen-R
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/grok_4_heatmap.svg)
+
+\(c\) Grok
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/magistral-medium-reasoning_heatmap.svg)
+
+\(d\) Mag
+
+Figure 13. (Continued from previous figure.) Heatmaps showing the performance of individual models across CTF family instances. Models are referred to by the short names of Table 2 in the main paper. (Continued in next figure)
+
+[Figure asset](https://arxiv.org/html/2602.05523v2/minimax-m2.1-reasoning_heatmap.svg)
+
+\(a\) Mini
+
+Figure 14. (Continued from previous figure.) Heatmaps showing the performance of individual models across CTF family instances. Models are referred to by the short names of Table 2 in the main paper.

@@ -1,3 +1,4 @@
+import { taxonomySelected } from "@/lib/catalogAnalytics";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 
@@ -18,7 +19,7 @@ import { isNotFound } from "@/lib/apiErrors";
 import { formatStarCount } from "@/lib/frameworks";
 import { paperQueryKeys } from "@/lib/paperQueryKeys";
 import { queryCenteredExcerpt } from "@/lib/paperSearchPresentation";
-import { isChatEnabled } from "@/lib/apiUrl";
+import { isChatEnabled, isDiscoveryCatalog } from "@/lib/apiUrl";
 import { catalogQueryKeys, TEN_MINUTES } from "@/lib/api/queryKeys";
 
 const SEARCH_SORTS = [
@@ -90,7 +91,7 @@ const PapersListView: React.FC = () => {
   };
   const searchInfinite = usePaperFeedQuery(
     [...paperQueryKeys.feeds.search, searchFilters],
-    (page) => papersApi.searchFeed({ ...searchFilters, page, page_size: 20, mode: "hybrid" }),
+    (page) => papersApi.searchFeed({ ...searchFilters, page, page_size: 20, mode: isDiscoveryCatalog() ? "keyword" : "hybrid" }),
     { enabled: isSearchMode && searchFilters.q.length > 0 },
   );
   const infinite = isSearchMode ? searchInfinite : regularInfinite;
@@ -223,7 +224,7 @@ const PapersListView: React.FC = () => {
             )}
             <div className="sidebar-links">
               {topTasks.data?.map((task) => (
-                <Link key={task.id} to={`/tasks/${task.slug}`} className="sidebar-link">
+                <Link key={task.id} to={`/tasks/${task.slug}`} onClick={() => taxonomySelected("domain", task.slug, "top_domains")} className="sidebar-link">
                   {displayTaskName(task.name, task.slug)}
                   {task.paper_count != null && <span className="count">{task.paper_count}</span>}
                 </Link>

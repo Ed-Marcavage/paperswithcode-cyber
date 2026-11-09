@@ -1,3 +1,4 @@
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import ResearchFollowButton from "@/components/ResearchFollowButton";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
@@ -28,6 +29,7 @@ export const OrganizationPaperFeed: React.FC<{
   taskSlug?: string;
 }> = ({ organizationSlug, taskSlug }) => {
   const navigate = useNavigate();
+  const discovery = isDiscoveryCatalog();
   const feed = usePaperFeedParams();
   const { searchParams } = feed;
   const [logoFailed, setLogoFailed] = useState(false);
@@ -100,7 +102,7 @@ export const OrganizationPaperFeed: React.FC<{
         value: task.slug,
         label: task.label,
         description: `${task.paper_count.toLocaleString()} ${
-          task.paper_count === 1 ? "paper" : "papers"
+          discovery ? (task.paper_count === 1 ? "entry" : "entries") : (task.paper_count === 1 ? "paper" : "papers")
         }`,
       }));
   };
@@ -164,10 +166,11 @@ export const OrganizationPaperFeed: React.FC<{
               <Skeleton className="h-12 w-64" />
             )}
           </h1>
-          {organization && <ResearchFollowButton kind="organization" entityId={organization.id} />}
+          {organization && !discovery && <ResearchFollowButton kind="organization" entityId={organization.id} />}
           {organization && (
             <div className="feed-subtitle">
               {organization.paper_count?.toLocaleString() ?? 0} papers
+              {discovery && <> · {organization.post_count ?? 0} {organization.post_count === 1 ? "post" : "posts"} · {organization.repository_count ?? 0} {organization.repository_count === 1 ? "repository entry" : "repository entries"}{organization.catalog_stars != null && <> · ★ {organization.catalog_stars.toLocaleString()} across cataloged repos</>}</>}
               {(organization.organization_trending_score ?? 0) > 0 &&
                 organization.trending_rank && (
                   <> · #{organization.trending_rank} trending this month</>
@@ -225,20 +228,20 @@ export const OrganizationPaperFeed: React.FC<{
               placeholder="All tasks"
               searchPlaceholder="Search organization tasks..."
               emptyMessage="No matching tasks."
-              ariaLabel="Filter papers by task"
+              ariaLabel={discovery ? "Filter entries by task" : "Filter papers by task"}
               selectedOption={
                 activeTask
                   ? {
                       value: activeTask.slug,
                       label: activeTask.label,
                       description: `${activeTask.paper_count.toLocaleString()} ${
-                        activeTask.paper_count === 1 ? "paper" : "papers"
+                        discovery ? (activeTask.paper_count === 1 ? "entry" : "entries") : (activeTask.paper_count === 1 ? "paper" : "papers")
                       }`,
                     }
                   : {
                       value: "__all__",
                       label: "All tasks",
-                      description: `${organization?.paper_count?.toLocaleString() ?? 0} papers`,
+                      description: discovery ? undefined : `${organization?.paper_count?.toLocaleString() ?? 0} papers`,
                     }
               }
               queryKey={["organization-task-options", organizationSlug]}
@@ -246,7 +249,7 @@ export const OrganizationPaperFeed: React.FC<{
                 {
                   value: "__all__",
                   label: "All tasks",
-                  description: `${organization?.paper_count?.toLocaleString() ?? 0} papers`,
+                  description: discovery ? undefined : `${organization?.paper_count?.toLocaleString() ?? 0} papers`,
                 },
                 ...taskOptions(query),
               ]}
@@ -256,7 +259,7 @@ export const OrganizationPaperFeed: React.FC<{
           </div>
         }
       >
-        <div className="results-count">{totalCount.toLocaleString()} papers</div>
+        <div className="results-count">{totalCount.toLocaleString()} {discovery ? "catalog entries" : "papers"}</div>
       </PaperFeedToolbar>
 
       <PaperFeedList
@@ -264,7 +267,7 @@ export const OrganizationPaperFeed: React.FC<{
         cards={cards}
         showInstitution={false}
         empty={
-          organization?.paper_count === 0
+          discovery ? "No catalog entries for this selection." : organization?.paper_count === 0
             ? "No papers indexed yet"
             : "No papers found for this selection."
         }

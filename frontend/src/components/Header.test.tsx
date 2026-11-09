@@ -9,6 +9,7 @@ const buildFlags = vi.hoisted(() => ({ authDisabled: false, chatEnabled: true })
 
 vi.mock("@/lib/apiUrl", () => ({
   CANONICAL_CHAT_URL: "https://paperswithcode.co/chat",
+  isDiscoveryCatalog: () => false,
   isAuthDisabled: () => buildFlags.authDisabled,
   isChatEnabled: () => buildFlags.chatEnabled,
   isChatMirror: () => buildFlags.authDisabled && !buildFlags.chatEnabled,

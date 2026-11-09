@@ -28,6 +28,8 @@ export interface PaperCardProps {
   authorHfProfiles?: ({ username: string; avatarUrl: string | null } | null)[];
   /** paper.tasks[*].slug, used by TagChip */
   tags: string[];
+  catalogKind?: string | null;
+  isBenchmark?: boolean;
   /** paper.methods[*] reduced to the fields MethodChip needs */
   methods: { id?: string; name: string; slug?: string }[];
   /** Organizations displayed as compact linked logos beside the paper title. */
@@ -103,7 +105,7 @@ export function summarizeRepos(repos: Repository[] | undefined): {
   const pool = official.length > 0 ? official : repos;
   const top = [...pool].sort((a, b) => (b.num_stars || 0) - (a.num_stars || 0))[0];
   return {
-    github: top && top.num_stars > 0 ? top.num_stars : null,
+    github: top?.num_stars ?? null,
     githubUrl: top?.url || null,
     velocity24h: top?.trending_score ?? null,
   };
@@ -176,6 +178,8 @@ export function transformPaperForCard(paper: Paper): PaperCardProps {
       link.hf_username ? { username: link.hf_username, avatarUrl: link.hf_avatar_url ?? null } : null,
     ),
     tags,
+    catalogKind: paper.catalog_kind,
+    isBenchmark: paper.catalog_contributions?.includes("benchmark"),
     methods,
     organizations: (paper.organizations || []).map((organization) => ({
       name: organization.name,
@@ -223,7 +227,9 @@ const TASK_DISPLAY_NAMES = new Map([
 ]);
 
 export function displayTaskName(name?: string, slug?: string): string {
-  const label = name || humanizeSlug(slug || "");
+  const label = slug?.startsWith("cyberintel-")
+    ? (name || humanizeSlug(slug)).replace(/^Cyberintel\s+/i, "")
+    : name || humanizeSlug(slug || "");
   const displayOverride = TASK_DISPLAY_NAMES.get(slug?.toLowerCase() || taskKey(label));
   if (displayOverride) return displayOverride;
 

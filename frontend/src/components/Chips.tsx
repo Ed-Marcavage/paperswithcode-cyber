@@ -1,5 +1,5 @@
 import React from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import type { Method } from "@/lib/api/catalog.types";
 import { chipColors, hueFromSlug } from "@/lib/colors";
@@ -33,6 +33,15 @@ export const TagChip: React.FC<TagChipProps> = ({ slug, label, onClick }) => {
     </span>
   );
 };
+
+export function BenchmarkChip() {
+  const colors = chipColors(280);
+  return (
+    <Link to="/catalog?contribution=benchmark" className="tag-chip" style={{ background: colors.bg, color: colors.text }}>
+      <span className="dot" style={{ background: colors.dot }} />Benchmark
+    </Link>
+  );
+}
 
 // Method chip — link to /methods/:slug
 

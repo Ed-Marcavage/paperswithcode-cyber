@@ -38,6 +38,10 @@ class Organization(BaseModel):
     paper_count: Optional[int] = Field(
         0, description="Number of papers linked to this organization"
     )
+    post_count: Optional[int] = None
+    repository_count: Optional[int] = None
+    owned_repository_count: Optional[int] = None
+    catalog_stars: Optional[int] = None
     is_featured: bool = False
     display_order: Optional[int] = None
     organization_trending_score: Optional[float] = None

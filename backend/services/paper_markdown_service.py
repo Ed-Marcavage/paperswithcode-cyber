@@ -638,6 +638,11 @@ def _read_unversioned_markdown_chunk(
                 raw = raw[: error.start]
     # Anything beyond the bound is not served, so the document ends there and
     # the version hashes exactly the bytes a reader can reach.
+    return chunk_text_bytes(raw, offset, limit, content_version)
+
+
+def chunk_text_bytes(raw: bytes, offset: int, limit: int,
+                     content_version: str | None) -> PaperMarkdownChunk:
     version = hashlib.sha256(raw).hexdigest()
     if content_version is not None and content_version != version:
         raise PaperMarkdownVersionMismatchError(

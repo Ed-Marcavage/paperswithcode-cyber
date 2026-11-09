@@ -1,7 +1,7 @@
 import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import fs from "fs";
+import { loadPersonalAgentArtwork } from "./personalAgentArtwork";
 
 // Prod dev server runs on :8080; staging runs on :8081.
 // For DNS-backed staging, set VITE_HMR_HOST / VITE_HMR_PROTOCOL / VITE_HMR_CLIENT_PORT.
@@ -9,9 +9,15 @@ import fs from "fs";
 // previews like http://<origin-ip>:8081 from reconnecting to the wrong HMR host.
 // Extra dev/preview hostnames (origin IP, tailnet names) come from the
 // comma-separated VITE_ALLOWED_HOSTS env var rather than being committed here.
-export default defineConfig(({ mode }) => {
+export default defineConfig(async ({ mode }) => {
   const isStaging = mode === "staging";
   const env = loadEnv(mode, process.cwd(), "");
+  const discovery = ["1", "true", "yes"].includes(
+    String(process.env.VITE_LOCAL_CATALOG ?? env.VITE_LOCAL_CATALOG ?? "").trim().toLowerCase(),
+  );
+  const personalAgentIcons = discovery
+    ? await loadPersonalAgentArtwork(path.join(__dirname, ".personal-agent-icons"))
+    : {};
   const extraAllowedHosts = String(
     process.env.VITE_ALLOWED_HOSTS ?? env.VITE_ALLOWED_HOSTS ?? "",
   )
@@ -79,7 +85,10 @@ export default defineConfig(({ mode }) => {
   };
 
   return {
-    define: { "import.meta.env.VITE_CHAT_MCP_APPS_HOST_ENABLED": JSON.stringify(mcpAppsHostEnabled ? "true" : "false") },
+    define: {
+      "import.meta.env.PWC_PERSONAL_AGENT_ICONS": JSON.stringify(personalAgentIcons),
+      "import.meta.env.VITE_CHAT_MCP_APPS_HOST_ENABLED": JSON.stringify(mcpAppsHostEnabled ? "true" : "false"),
+    },
     build: {
       rollupOptions: {
         output: {
@@ -118,18 +127,15 @@ export default defineConfig(({ mode }) => {
       react(),
       {
         name: "pwc-feature-manifest",
-        writeBundle() {
-          fs.writeFileSync(
-            path.resolve(__dirname, "dist/features.json"),
-            `${JSON.stringify({
+        generateBundle() {
+          this.emitFile({ type: "asset", fileName: "features.json", source: `${JSON.stringify({
               chat: chatEnabled,
               native_pdf_reader: nativePdfReaderEnabled,
               paper_reader_chat: paperReaderChatEnabled,
               paper_reader_selection: paperReaderSelectionEnabled,
               codex_add_evals: codexAddEvalsEnabled,
               codex_enrich_paper: codexEnrichPaperEnabled,
-            }, null, 2)}\n`,
-          );
+            }, null, 2)}\n` });
         },
       },
     ],

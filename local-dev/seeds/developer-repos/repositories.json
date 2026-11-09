@@ -1,0 +1,411 @@
+{
+  "repositories": [
+    {
+      "full_name": "0x4m4/hexstrike-ai",
+      "url": "https://github.com/0x4m4/hexstrike-ai",
+      "stars": 13447,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:20.708420+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/0x4m4/hexstrike-ai",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/0x4m4/hexstrike-ai"
+        }
+      ]
+    },
+    {
+      "full_name": "albertan017/LLM4Decompile",
+      "url": "https://github.com/albertan017/LLM4Decompile",
+      "stars": 7270,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:20.708576+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/albertan017/LLM4Decompile",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/albertan017/LLM4Decompile"
+        }
+      ]
+    },
+    {
+      "full_name": "andyzorigin/cybench",
+      "url": "https://github.com/andyzorigin/cybench",
+      "stars": 355,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:20.748209+00:00",
+      "links": [
+        {
+          "paper_url": "https://arxiv.org/abs/2408.08926",
+          "arxiv_id": null,
+          "evidence_note": "Project README identifies this paper and its implementation.",
+          "is_official": true,
+          "evidence_url": "https://github.com/andyzorigin/cybench"
+        }
+      ]
+    },
+    {
+      "full_name": "AntAISecurityLab/Creation",
+      "url": "https://github.com/AntAISecurityLab/Creation",
+      "stars": 3,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:20.748256+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/AntAISecurityLab/Creation",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/AntAISecurityLab/Creation"
+        }
+      ]
+    },
+    {
+      "full_name": "ChatAFLndss/ChatAFL",
+      "url": "https://github.com/ChatAFLndss/ChatAFL",
+      "stars": 399,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.051696+00:00",
+      "links": [
+        {
+          "paper_url": "https://doi.org/10.14722/ndss.2024.24556",
+          "arxiv_id": null,
+          "evidence_note": "Project README identifies this paper and its implementation.",
+          "is_official": true,
+          "evidence_url": "https://github.com/ChatAFLndss/ChatAFL"
+        }
+      ]
+    },
+    {
+      "full_name": "cyberkaida/reverse-engineering-assistant",
+      "url": "https://github.com/cyberkaida/reverse-engineering-assistant",
+      "stars": 952,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.051748+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/cyberkaida/reverse-engineering-assistant",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/cyberkaida/reverse-engineering-assistant"
+        }
+      ]
+    },
+    {
+      "full_name": "evilsocket/audit",
+      "url": "https://github.com/evilsocket/audit",
+      "stars": 886,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.051756+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/evilsocket/audit",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/evilsocket/audit"
+        }
+      ]
+    },
+    {
+      "full_name": "gadievron/raptor",
+      "url": "https://github.com/gadievron/raptor",
+      "stars": 3985,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.056727+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/gadievron/raptor",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/gadievron/raptor"
+        }
+      ]
+    },
+    {
+      "full_name": "GH05TCREW/pentestagent",
+      "url": "https://github.com/GH05TCREW/pentestagent",
+      "stars": 3263,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.285986+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/GH05TCREW/pentestagent",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/GH05TCREW/pentestagent"
+        }
+      ]
+    },
+    {
+      "full_name": "JameZUK/Arkana",
+      "url": "https://github.com/JameZUK/Arkana",
+      "stars": 258,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.394798+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/JameZUK/Arkana",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/JameZUK/Arkana"
+        }
+      ]
+    },
+    {
+      "full_name": "JordyZomer/lemmalog",
+      "url": "https://github.com/JordyZomer/lemmalog",
+      "stars": 347,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.394814+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/JordyZomer/lemmalog",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/JordyZomer/lemmalog"
+        }
+      ]
+    },
+    {
+      "full_name": "JusticeRage/Gepetto",
+      "url": "https://github.com/JusticeRage/Gepetto",
+      "stars": 3485,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.394838+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/JusticeRage/Gepetto",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/JusticeRage/Gepetto"
+        }
+      ]
+    },
+    {
+      "full_name": "mahaloz/DAILA",
+      "url": "https://github.com/mahaloz/DAILA",
+      "stars": 710,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.648263+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/mahaloz/DAILA",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/mahaloz/DAILA"
+        }
+      ]
+    },
+    {
+      "full_name": "Masriyan/Claude-Code-CyberSecurity-Skill",
+      "url": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill",
+      "stars": 558,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.718581+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill"
+        }
+      ]
+    },
+    {
+      "full_name": "morluto/rea",
+      "url": "https://github.com/morluto/rea",
+      "stars": 444010,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.718603+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/morluto/rea",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/morluto/rea"
+        }
+      ]
+    },
+    {
+      "full_name": "mrexodia/ida-pro-mcp",
+      "url": "https://github.com/mrexodia/ida-pro-mcp",
+      "stars": 13413,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.718613+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/mrexodia/ida-pro-mcp",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/mrexodia/ida-pro-mcp"
+        }
+      ]
+    },
+    {
+      "full_name": "mrphrazer/binary-ninja-headless-mcp",
+      "url": "https://github.com/mrphrazer/binary-ninja-headless-mcp",
+      "stars": 263,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.975563+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/mrphrazer/binary-ninja-headless-mcp",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/mrphrazer/binary-ninja-headless-mcp"
+        }
+      ]
+    },
+    {
+      "full_name": "mukul975/Anthropic-Cybersecurity-Skills",
+      "url": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills",
+      "stars": 35798,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:21.996181+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills"
+        }
+      ]
+    },
+    {
+      "full_name": "n132/ARVO",
+      "url": "https://github.com/n132/ARVO",
+      "stars": 114,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.111846+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/n132/ARVO",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/n132/ARVO"
+        }
+      ]
+    },
+    {
+      "full_name": "s0ld13rr/pentestcode",
+      "url": "https://github.com/s0ld13rr/pentestcode",
+      "stars": 937,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.111865+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/s0ld13rr/pentestcode",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/s0ld13rr/pentestcode"
+        }
+      ]
+    },
+    {
+      "full_name": "samugit83/redamon",
+      "url": "https://github.com/samugit83/redamon",
+      "stars": 3335,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.315064+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/samugit83/redamon",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/samugit83/redamon"
+        }
+      ]
+    },
+    {
+      "full_name": "SanMuzZzZz/LuaN1aoAgent",
+      "url": "https://github.com/SanMuzZzZz/LuaN1aoAgent",
+      "stars": 1465,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.322770+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/SanMuzZzZz/LuaN1aoAgent",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/SanMuzZzZz/LuaN1aoAgent"
+        }
+      ]
+    },
+    {
+      "full_name": "scadastrangelove/rust-in-peace",
+      "url": "https://github.com/scadastrangelove/rust-in-peace",
+      "stars": 25,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.339348+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/scadastrangelove/rust-in-peace",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/scadastrangelove/rust-in-peace"
+        }
+      ]
+    },
+    {
+      "full_name": "Vasco0x4/AIDA",
+      "url": "https://github.com/Vasco0x4/AIDA",
+      "stars": 509,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.502041+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/Vasco0x4/AIDA",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/Vasco0x4/AIDA"
+        }
+      ]
+    },
+    {
+      "full_name": "yhy0/CHYing-agent",
+      "url": "https://github.com/yhy0/CHYing-agent",
+      "stars": 595,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.617024+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/yhy0/CHYing-agent",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/yhy0/CHYing-agent"
+        }
+      ]
+    },
+    {
+      "full_name": "yohannesgk/blacksmith",
+      "url": "https://github.com/yohannesgk/blacksmith",
+      "stars": 268,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.711711+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/yohannesgk/blacksmith",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/yohannesgk/blacksmith"
+        }
+      ]
+    },
+    {
+      "full_name": "zhaoxuya520/reverse-skill",
+      "url": "https://github.com/zhaoxuya520/reverse-skill",
+      "stars": 44325,
+      "archived": false,
+      "observed_at": "2026-11-09T02:23:22.711846+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/zhaoxuya520/reverse-skill",
+          "evidence_note": "The curated repository is the catalog work itself.",
+          "is_official": true,
+          "evidence_url": "https://github.com/zhaoxuya520/reverse-skill"
+        }
+      ]
+    }
+  ]
+}

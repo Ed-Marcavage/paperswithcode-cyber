@@ -74,7 +74,7 @@ image = (
     )
     .run_commands(
         "mkdir -p /opt/pwc",
-        "git init /opt/pwc/cli-source && git -C /opt/pwc/cli-source remote add origin https://github.com/huggingface/pwc-cli.git",
+        "git init /opt/pwc/cli-source && git -C /opt/pwc/cli-source remote add origin https://github.com/Ed-Marcavage/pwc-cli.git",
         f"git -C /opt/pwc/cli-source fetch --depth 1 origin {PWC_CLI_SOURCE_COMMIT} && git -C /opt/pwc/cli-source checkout --detach FETCH_HEAD",
         f'test "$(git -C /opt/pwc/cli-source rev-parse HEAD)" = "{PWC_CLI_SOURCE_COMMIT}"',
         # Python is already installed; avoid unpacking a bundled interpreter on

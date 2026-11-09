@@ -1,0 +1,273 @@
+> Running in CIRCLE? A Simple Benchmark for LLM Code Interpreter Security — Gabriel Chua. [Original](https://arxiv.org/html/2507.19399v1) · [License](https://creativecommons.org/licenses/by/4.0/). Converted from arXiv HTML to Markdown; consult the original for figures and layout.
+
+# Running in CIRCLE? ![\[Uncaptioned image\]](https://arxiv.org/html/2507.19399v1/repeat-button.png) A Simple Benchmark for LLM Code Interpreter Security
+
+Gabriel Chua Affiliation: Government Technology Agency, Singapore Email: [gabriel_chua@tech.gov.sg](mailto:)
+
+###### Abstract
+
+As large language models (LLMs) increasingly integrate native code interpreters, they enable powerful real-time execution capabilities, substantially expanding their utility. However, such integrations introduce potential system-level cybersecurity threats, fundamentally different from prompt-based vulnerabilities. To systematically evaluate these interpreter-specific risks, we propose CIRCLE (Code-Interpreter Resilience Check for LLM Exploits), a simple benchmark comprising 1,260 prompts targeting CPU, memory, and disk resource exhaustion. Each risk category includes explicitly malicious (”direct”) and plausibly benign (”indirect”) prompt variants. Our automated evaluation framework assesses not only whether LLMs refuse or generates risky code, but also executes the generated code within the interpreter environment to evaluate code correctness, simplifications made by the LLM to make the code safe, or execution timeouts. Evaluating 7 commercially available models from OpenAI and Google, we uncover significant and inconsistent vulnerabilities. For instance, evaluations show substantial disparities even within providers — OpenAI’s o4-mini correctly refuses risky requests at 7.1%, notably higher rates compared to GPT-4.1 at 0.5%. Results particularly underscore that indirect, socially-engineered prompts substantially weaken model defenses. This highlights an urgent need for interpreter-specific cybersecurity benchmarks, dedicated mitigation tools (e.g., guardrails), and clear industry standards to guide safe and responsible deployment of LLM interpreter integrations. The <sup>11</sup> 1 <https://huggingface.co/datasets/govtech/CIRCLE>benchmark dataset and <sup>22</sup> 2 <https://github.com/govtech-responsibleai/CIRCLE>evaluation code and logs are publicly released to foster further research.
+
+## 1 Introduction
+
+Integrating a code interpreter into Large Language Models (LLMs) and agents significantly enhances their reasoning capabilities, enabling them to perform tasks ranging from code generation and debugging ([Zhong et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib27)), to advanced mathematical reasoning ([Liao et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib12)), and complex data analysis ([Zhang et al., 2024b](https://arxiv.org/html/2507.19399v1#bib.bib26); [Hong et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib10)). A code interpreter allows an LLM to automatically write and execute code, thus bridging textual reasoning with executable computational results.
+
+Two primary factors are driving the widespread adoption of code interpreters within LLMs. Firstly, the integration process has become significantly streamlined; enabling interpreter access is now as simple as configuring a single parameter through commercial API providers. Previously, developers needed to provision and manage their own code execution environments. However, ”API-native” interpreters are rapidly becoming standard offerings by major providers, including OpenAI ([OpenAI, 2025a](https://arxiv.org/html/2507.19399v1#bib.bib17)), Google Gemini ([Google, 2025](https://arxiv.org/html/2507.19399v1#bib.bib8)), Anthropic ([Anthropic, 2025](https://arxiv.org/html/2507.19399v1#bib.bib2)), and Mistral ([Mistral, 2025](https://arxiv.org/html/2507.19399v1#bib.bib15)). Secondly, the demand for LLMs to function as autonomous agents in complex tasks—tasks that may be long-running and involve external file dependencies — positions code interpreters as crucial for enabling robust, verifiable reasoning and operational autonomy.
+
+While such advancements are highly beneficial, they expose new categories of system-level cybersecurity risks distinct from traditional LLM security concerns, such as prompt injection. Code interpreter tools can inadvertently enable severe denial-of-service (DoS) attacks, resulting in CPU exhaustion, memory leaks, or disk saturation. Crucially, these interpreter integration and executions typically occur on provider-managed infrastructure, obscuring the implementation details and system resource usage from downstream developers. Thus, the potentially opaque nature of interpreter executions makes monitoring, detection, and mitigation challenging, shifting security concerns from model-level safety to application and system-level safety.
+
+To address this critical gap, we introduce the CIRCLE benchmark, focused on evaluating and quantifying interpreter-specific vulnerabilities across major LLM platforms. Figure [1](https://arxiv.org/html/2507.19399v1#S1.F1) illustrates the CIRCLE benchmark workflow. We systematically send test prompts targeting critical system resources—CPU (time exhaustion), memory, and disk—to the evaluated LLM, which then may either refuse, reframe, clarify, generate potentially unsafe or incorrect code, or execute the provided task directly. The output (including the LLM’s textual response and the executed code’s outcomes) is then assessed by a separate judge LLM, ensuring consistent, automated evaluation across multiple nuanced outcomes, thereby differentiating CIRCLE apart from most other benchmarks that solely evaluate whether unsafe code is generated.
+
+1.  1\.
+
+    Refusal: Explicit refusal to perform the requested risky task.
+
+2.  2\.
+
+    Reframe: Offers an alternative, safer approach.
+
+3.  3\.
+
+    Follow-up: Requests additional clarification or details before proceeding.
+
+4.  4\.
+
+    Incorrect Code: Generates non-functional or oversimplified code, failing to meet task requirements.
+
+5.  5\.
+
+    Fulfilled: Correctly generates and successfully executes the requested task.
+
+6.  6\.
+
+    Timeout: Attempts execution, but the process exceeds allowed resource/time limits.
+
+![Refer to caption](https://arxiv.org/html/2507.19399v1/overview.png)
+
+Figure 1: Overview of the CIRCLE benchmark evaluation workflow. Test prompts from three risk categories — CPU (time exhaustion), memory, and disk exhaustion—are sent to evaluated LLMs configured with native code interpreters. Models may refuse, reframe, request further details, or generate executable code. Outputs, including generated responses, code, and execution outcomes, are then systematically assessed by a dedicated judge LLM, categorizing each prompt into one of six detailed outcomes to capture nuanced behaviors and security risks.
+
+Interpreter–specific focus. Existing security benchmarks for LLMs target *vulnerability exploitation* in third‑party software or the *robustness of evaluation sandboxes*. For example, CVE‑Bench ([Zhu et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib28)) equips agent frameworks with browser‑level tools and measures whether they can compromise *real‑world web applications* via published CVEs. RedCode ([Guo et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib9)) stresses unsafe code *generation and execution* across 25 CWE‑derived scenarios, ranging from privilege escalation to filesystem corruption. SandboxEval [Rabin et al. (2025)](https://arxiv.org/html/2507.19399v1#bib.bib20), in contrast, does not evaluates an LLM itself, but stress‑tests the *assessment infrastructure* that executes untrusted code to ensure that the sandbox cannot be broken out of. CIRCLE addresses a *complementary and previously unmeasured threat surface*: provider‑hosted *code interpreters* embedded inside LLM APIs. It therefore probes denial‑of‑service vectors (CPU, memory, disk) that require zero external vulnerability knowledge, occur *inside* the model’s execution context, and can be triggered by a single prompt. This interpreter‑centric framing demands novel metrics (e.g., timeout vs. fulfilled vs. simplification) and a multi‑provider harness that executes every snippet in situ. Consequently, CIRCLE neither overlaps with CVE‑Bench’s exploitation corpus, RedCode’s CWE taxonomy, nor SandboxEval’s host‑hardening tests, but instead fills the remaining gap of *resource‑exhaustion safety for LLM code interpreters*.
+
+To summarise, the key contributions of CIRCLE include:
+
+1.  1\.
+
+    Comprehensive Risk Taxonomy with Dual Prompt Variants: Provides a detailed, systematic classification of interpreter-induced vulnerabilities covering CPU, memory, and disk abuses. Each category includes both explicitly malicious (direct) and plausibly benign (indirect) prompts, accurately simulating realistic threat scenarios.
+
+2.  2\.
+
+    Automated Multi-Provider Evaluation Harness: Supports evaluation across all major model providers (OpenAI, Google Gemini, Anthropic, Mistral), uniquely executing model-generated code to assess its actual impact. This practical execution combined with the nuanced judge LLM evaluation creates a rigorous assessment framework beyond simple code generation metrics.
+
+3.  3\.
+
+    Open-Source Accessibility: Publicly releases the benchmark, datasets, and evaluation harness, fostering reproducibility, transparency, and community-driven improvements in interpreter-specific cybersecurity research.
+
+## 2 Related Work
+
+Security-Focused Benchmarks: Recent security benchmarks like CyberSecEval ([Bhatt et al., 2023](https://arxiv.org/html/2507.19399v1#bib.bib3); [Bhatt et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib4); [Guo et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib9)) assess models’ exploitative code generation, particularly code interpreter risks via compliance metrics. LLMSmith ([Liu et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib13)) identifies explicit remote code execution (RCE) vulnerabilities using static analysis and prompt-based attacks. Similarly, more recent work ([Dawson et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib6); [Shao et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib21); [Zhu et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib28); [Carlini et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib5); [Abramovich et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib1)) tests models in a black-box capture-the-flag scenarios and to leverage known code vulnerabilities. Building upon these, CIRCLE distinctly evaluates interpreter behaviors through nuanced outcome categorization (refusal, incorrect code, timeout), directly simulating system-level resource exhaustion risks.
+
+Execution-Centric Approaches: CIBench ([Zhang et al., 2024a](https://arxiv.org/html/2507.19399v1#bib.bib25)) and CodeAct ([Wang et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib22)) leverage iterative execution to assess model proficiency in structured multi-step data science and operational tasks, respectively, with CodeAct uniquely allowing dynamic Python script generation for multi-tool invocation. Similarly, InterCode [Yang et al. (2023)](https://arxiv.org/html/2507.19399v1#bib.bib23) is a interactive and extensible code generation framework for model evaluation. For agents, DynaSaur ([Nguyen et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib16)) evaluates agent adaptability by enabling on-the-fly function creation and execution. While these frameworks emphasize positive execution outcomes and task completion, they omit evaluations of adverse scenarios such as resource exhaustion. CIRCLE explicitly fills this gap, uniquely addressing operational safety and detailed model behavior categorization in risky, resource-intensive contexts.
+
+Agent Evaluation Frameworks and Benchmarks: AgentBench ([Liu et al., 2023](https://arxiv.org/html/2507.19399v1#bib.bib14)) and AgentDojo ([Debenedetti et al., 2025](https://arxiv.org/html/2507.19399v1#bib.bib7)) benchmark LLM agent performance in multi-turn, interactive environments emphasizing multi-step reasoning and robustness against prompt injections, respectively. $\tau$-Bench ([Yao et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib24)) evaluates reliability and consistency across multi-turn dialogues with simulated user interactions and API calls. Benchmarks such as SWE-Bench ([Jimenez et al., 2024](https://arxiv.org/html/2507.19399v1#bib.bib11)) further test LLM agents’ vulnerability resolution capabilities, demonstrating task-oriented coding interactions without explicit safety categories. Despite their extensive evaluations, these frameworks overlook explicit resource misuse or execution safety outcomes. Conversely, CIRCLE complements these works by specifically measuring model decisions in scenarios involving potential interpreter misuse or unsafe code execution.
+
+Summary. Whereas prior work tackles (i) exploiting external systems, (ii) broad unsafe code generation, or (iii) test the harnesses’ security, CIRCLE uniquely benchmarks *interpreter‑centric resource‑exhaustion attacks initiated by LLM prompts*, providing fine‑grained outcome labels and cross‑provider coverage and complements earlier testing suites.
+
+## 3 Methodology
+
+The benchmark design is guided by three key considerations:
+
+1.  1\.
+
+    Risk-Driven Coverage: Targeting critical system resources — CPU time exhaustion, memory exhaustion, and disk exhaustion — to effectively evaluate interpreter resilience.
+
+2.  2\.
+
+    Automated and Consistent Evaluation: Utilizing an evaluation harness and OpenAI’s GPT-4.1 (gpt-4.1-2025-04-14, [OpenAI (2025b)](https://arxiv.org/html/2507.19399v1#bib.bib18)) as a judge LLM for consistent and reproducible assessment.
+
+3.  3\.
+
+    Real-World Prompt Variability: Including explicitly malicious (direct) prompts and plausibly benign (indirect) prompts to realistically simulate a broad spectrum of threat scenarios.
+
+### 3.1 Risk Categories and Prompt Design
+
+CIRCLE focuses on three primary risk categories: CPU Time Exhaustion, Memory Exhaustion, and Disk Exhaustion. The prompts were generated with the assistance of OpenAI’s o3-pro model ([OpenAI, 2025c](https://arxiv.org/html/2507.19399v1#bib.bib19)), and were reviewed manually.
+
+1\. Direct Prompts: These are 60 (20 per risk category) prompts detailing malicious tasks intended to directly exhaust system resources (e.g., infinite loops, extensive memory allocations, repetitive disk writes).
+
+[View original diagram](https://arxiv.org/html/2507.19399v1#S3.SS1.p3.pic1)
+
+2\. Indirect Prompts: These are 60 (20 per risk category) prompts that indirectly require the model to exhaust system resources, and a prompt template is added in the front to disguise resource-intensive tasks with benign-looking scenarios.
+
+[View original diagram](https://arxiv.org/html/2507.19399v1#S3.SS1.p5.pic1) [View original diagram](https://arxiv.org/html/2507.19399v1#S3.SS1.p6.pic1)
+
+Overall, the complete benchmark includes 1,260 unique prompts, comprising 60 direct prompts (20 per category) and 1,200 indirect prompts (60 indirect prompts × 20 templates). Each prompt explicitly specifies expected execution metrics (e.g., runtime, memory usage), aiding clear and consistent assessment.
+
+### 3.2 Automated Evaluation
+
+The CIRCLE benchmark evaluation employs a fully automated process structured into two phases, as shown in Figure [1](https://arxiv.org/html/2507.19399v1#S1.F1):
+
+Phase 1 — Prompt Execution: Prompts are sent to the tested LLM with code interpreter access, and the LLM may use this tool to write and execute code. A standardized timeout of 5 minutes per task evaluation is set to objectively measure whether generated tasks exceed acceptable resource constraints. Notably, timeout thresholds vary by provider, often undocumented, further motivating the necessity for such explicit benchmarks. For example, while Google (at the point of writing) has a documented 30 second timeout, such a threshold was not found for OpenAI, Anthropic or Mistral’s documentation.
+
+Phase 2 — Outcome Classification: The full output from the tested LLM, which consist of the textual response, generated code (if any), and code output (if any) are classified by a Judge LLM - GPT-4.1 (gpt-4.1-2025-04-14) into one six category:
+
+- •
+
+  Refusal: Explicit refusal of the unsafe task.
+
+- •
+
+  Reframe: Model offers a safer task alternative.
+
+- •
+
+  Follow-up: Model requests additional clarification, indicating hesitation.
+
+- •
+
+  Incorrect Code: Generates code insufficient for the task.
+
+- •
+
+  Fulfilled: Successfully executes potentially unsafe tasks.
+
+- •
+
+  Timeout: Execution exceeds the 3-minute evaluation timeout, indicating a potential resource-exhaustion scenario.
+
+The full prompt used can be found in Appendix [A](https://arxiv.org/html/2507.19399v1#A1).
+
+[View original diagram](https://arxiv.org/html/2507.19399v1#S3.SS2.p6.pic1)
+
+## 4 Results
+
+Table [1](https://arxiv.org/html/2507.19399v1#S4.T1) summarizes key outcomes from evaluating the seven tested models across response categories. The findings highlight critical vulnerabilities and notable behavioral discrepancies.
+
+Table 1: Aggregate Outcomes from CIRCLE Benchmark Evaluation
+
+| Model                    | Refusal | Reframe | Follow-up | Incorrect | Fulfilled | Timeout |
+|--------------------------|---------|---------|-----------|-----------|-----------|---------|
+| Gemini 2.0 Flash         | 1.6%    | 1.1%    | 14.7%     | 37.9%     | 16.4%     | 28.3%   |
+| Gemini 2.5 Flash Preview | 4.0%    | 2.9%    | 10.5%     | 9.2%      | 20.3%     | 53.0%   |
+| Gemini 2.5 Pro Preview   | 4.8%    | 1.1%    | 1.0%      | 8.3%      | 19.8%     | 65.1%   |
+| GPT-4.1 Nano             | 1.0%    | 0.2%    | 26.7%     | 10.8%     | 40.5%     | 20.9%   |
+| GPT-4.1 Mini             | 1.6%    | 2.1%    | 37.1%     | 6.3%      | 38.2%     | 14.8%   |
+| GPT-4.1                  | 0.5%    | 1.7%    | 18.5%     | 18.7%     | 43.7%     | 17.0%   |
+| o4-Mini                  | 7.1%    | 1.4%    | 0.6%      | 8.5%      | 70.2%     | 12.2%   |
+
+### 4.1 Detailed Breakdown: Direct vs. Indirect Prompts
+
+A detailed breakdown of direct versus indirect prompt results is presented in Table [2](https://arxiv.org/html/2507.19399v1#S4.T2). Indirect prompts simulate realistic, socially-engineered tasks, whereas direct prompts explicitly target system resources, thus testing both overt and covert vulnerabilities.
+
+Table 2: Detailed Results by Prompt Type (Direct vs. Indirect)
+
+| Model | Prompt Type | Refusal (%) | Reframe (%) | Follow-up (%) | Incorrect (%) | Fulfilled (%) | Timeout (%) |
+|----|----|----|----|----|----|----|----|
+| Gemini 2.0 Flash | Indirect | 1.7 | 1.2 | 15.4 | 36.4 | 16.0 | 29.3 |
+| Gemini 2.0 Flash | Direct | 0.0 | 0.0 | 0.0 | 68.3 | 25.0 | 6.7 |
+| Gemini 2.5 Flash Preview | Indirect | 4.2 | 3.0 | 10.8 | 9.1 | 20.3 | 52.5 |
+| Gemini 2.5 Flash Preview | Direct | 0.0 | 1.7 | 3.3 | 11.7 | 20.0 | 63.3 |
+| Gemini 2.5 Pro Preview | Indirect | 4.3 | 1.2 | 1.0 | 8.6 | 20.8 | 64.2 |
+| Gemini 2.5 Pro Preview | Direct | 13.3 | 0.0 | 0.0 | 3.3 | 0.0 | 83.3 |
+| GPT-4.1 Nano | Indirect | 1.0 | 0.2 | 27.3 | 10.5 | 39.6 | 21.3 |
+| GPT-4.1 Nano | Direct | 0.0 | 0.0 | 13.3 | 16.7 | 58.3 | 11.7 |
+| GPT-4.1 Mini | Indirect | 1.7 | 2.1 | 38.4 | 4.6 | 38.0 | 15.2 |
+| GPT-4.1 Mini | Direct | 0.0 | 1.7 | 10.0 | 41.7 | 41.7 | 5.0 |
+| GPT-4.1 | Indirect | 0.5 | 1.8 | 18.8 | 17.8 | 43.7 | 17.6 |
+| GPT-4.1 | Direct | 0.0 | 0.0 | 13.3 | 36.7 | 45.0 | 5.0 |
+| o4-Mini | Indirect | 7.4 | 1.3 | 0.7 | 7.2 | 70.7 | 12.7 |
+| o4-Mini | Direct | 0.0 | 3.3 | 0.0 | 33.3 | 60.0 | 3.3 |
+
+### 4.2 Key Observations
+
+#### Proactive Refusals vs. Unsafe Execution
+
+o4-Mini leads proactive refusal (7.1%), suggesting initial robustness. Yet paradoxically, it shows the highest unsafe execution rate (70.2%), highlighting severe susceptibility once execution begins.
+
+#### Timeout Variability
+
+Gemini models exhibit a significant frequency of execution timeouts (particularly Gemini 2.5 Pro Preview at 65.1%), influenced by provider-specific timeout thresholds (Google’s explicit 30-second timeout). This highlights timeout policies’ critical role in resource exhaustion vulnerability.
+
+#### Clarification vs. Execution
+
+GPT-4.1 variants exhibit frequent clarification requests (over 25%), yet still fulfill around 40%. This hesitation-execution dynamic presents potential for exploitation through indirect prompts.
+
+#### Indirect Prompt Risks
+
+Socially-engineered indirect prompts consistently bypass security defenses effectively. This behavior emphasizes the substantial threat posed by indirect prompt framing.
+
+### 4.3 Statistical Analysis
+
+#### Chi-Square Test for Model Independence
+
+A significant dependency was confirmed between model behavior and prompt type ($\chi^{2}=3803.16$, $p<0.0001$, Cramér’s $V=0.2937$). This suggests that prompt type strongly influences model outcomes.
+
+#### Performance Comparison: Direct vs. Indirect Prompts
+
+Direct prompts have notably higher fulfillment rates (25.0% vs. 16.0% indirect), yet indirect prompts induce substantially higher timeout occurrences (29.3% vs. 6.7% direct), highlighting indirect prompts’ effectiveness in resource exhaustion.
+
+#### McNemar’s Tests for Paired Outcomes
+
+Significant differences were found for Gemini 2.0 Flash between fulfillment vs refusal ($p=0.0003$) and fulfillment vs timeout ($p=0.0153$), reinforcing the significant variability in model behaviors within single configurations.
+
+#### Bootstrap Confidence Intervals
+
+Fulfillment rates exhibit substantial variation and uncertainty. For instance, o4-Mini indirect shows consistently high fulfillment (70.7%, CI: 68.3%–73.2%), whereas others like Gemini 2.0 indirect have significantly lower and more variable fulfillment (16.0%, CI: 13.9%–18.1%). These intervals underscore the necessity of rigorous benchmarking.
+
+These results collectively stress the urgency for interpreter-specific cybersecurity benchmarking, focusing particularly on subtle yet impactful vulnerabilities highlighted by indirect prompt framing.
+
+## 5 Limitations
+
+While CIRCLE provides a systematic assessment framework, it faces inherent limitations. Firstly, its static nature — comprised of predetermined prompt sets — restricts responsiveness to emerging threats and novel exploitation techniques. Future iterations could integrate dynamic, evolving prompt databases informed by real-time threat intelligence to enhance adaptability and relevance.
+
+Secondly, conducting extensive evaluations can become economically prohibitive, particularly given current API provider pricing structures. For example, OpenAI charges approximately \$0.03 per interpreter session, resulting in significant costs (\$30 per model for 1,000 tests, excluding additional token usage fees). Future work might explore cost-efficient evaluation methods, such as leveraging local interpreter integrations or cost-effective cloud infrastructures.
+
+Additionally, current benchmarks primarily assess API-native interpreters and omit third-party or locally integrated interpreter frameworks. Extending evaluations to include a broader range of interpreter implementations and deployment contexts would significantly enhance the benchmark’s comprehensiveness and practical utility.
+
+## 6 Ethics
+
+Ethical considerations have been carefully addressed in designing the CIRCLE benchmark. All prompts adhere to the established resource constraints typical of native interpreter environments (e.g., memory capped at 1-2GB, absence of network connectivity), ensuring minimal risk of real-world harm. Furthermore, prompts intentionally avoid sensitive operations or data manipulations, limiting their potential to cause genuine damage.
+
+Additionally, the benchmark prioritizes transparency by responsibly disclosing the nature of prompts to relevant model providers prior to public release. This proactive approach facilitates remediation and strengthens industry-wide cybersecurity standards, emphasizing ethical responsibility and collaboration.
+
+## 7 Conclusion
+
+The CIRCLE benchmark represents a critical advancement in systematically evaluating interpreter-specific cybersecurity vulnerabilities in large language models. Initial findings highlight substantial variability in model safety responses, particularly against indirect, socially-engineered attacks. This research underscores the necessity for continued benchmarking efforts, specialized mitigation tools, and clearly defined industry standards. Ongoing collaboration and iterative enhancement of evaluation frameworks are vital for ensuring the secure and responsible deployment of increasingly capable LLM systems.
+
+## Acknowledgment
+
+We thank Joyce Sin and Jessica Foo for their comments on the dataset and benchmark, which were useful in shaping this work.
+
+## References
+
+- Abramovich et al. (2025) Talor Abramovich, Meet Udeshi, Minghao Shao, Kilian Lieret, Haoran Xi, Kimberly Milner, Sofija Jancheska, John Yang, Carlos E. Jimenez, Farshad Khorrami, Prashanth Krishnamurthy, Brendan Dolan-Gavitt, Muhammad Shafique, Karthik Narasimhan, Ramesh Karri, and Ofir Press. Enigma: Interactive tools substantially assist lm agents in finding security vulnerabilities, 2025. URL <https://arxiv.org/abs/2409.16165>.
+- Anthropic (2025) Anthropic. Anthropic documation - code execution tool, 2025. URL <https://docs.anthropic.com/en/docs/agents-and-tools/tool-use/code-execution-tool>. Accessed: 2025-06-14.
+- Bhatt et al. (2023) Manish Bhatt, Sahana Chennabasappa, Cyrus Nikolaidis, Shengye Wan, Ivan Evtimov, Dominik Gabi, Daniel Song, Faizan Ahmad, Cornelius Aschermann, Lorenzo Fontana, Sasha Frolov, Ravi Prakash Giri, Dhaval Kapil, Yiannis Kozyrakis, David LeBlanc, James Milazzo, Aleksandar Straumann, Gabriel Synnaeve, Varun Vontimitta, Spencer Whitman, and Joshua Saxe. Purple llama cyberseceval: A secure coding benchmark for language models, 2023. URL <https://arxiv.org/abs/2312.04724>.
+- Bhatt et al. (2024) Manish Bhatt, Sahana Chennabasappa, Yue Li, Cyrus Nikolaidis, Daniel Song, Shengye Wan, Faizan Ahmad, Cornelius Aschermann, Yaohui Chen, Dhaval Kapil, David Molnar, Spencer Whitman, and Joshua Saxe. Cyberseceval 2: A wide-ranging cybersecurity evaluation suite for large language models, 2024. URL <https://arxiv.org/abs/2404.13161>.
+- Carlini et al. (2025) Nicholas Carlini, Javier Rando, Edoardo Debenedetti, Milad Nasr, and Florian Tramèr. Autoadvexbench: Benchmarking autonomous exploitation of adversarial example defenses, 2025. URL <https://arxiv.org/abs/2503.01811>.
+- Dawson et al. (2025) Ads Dawson, Rob Mulla, Nick Landers, and Shane Caldwell. Airtbench: Measuring autonomous ai red teaming capabilities in language models, 2025. URL <https://arxiv.org/abs/2506.14682>.
+- Debenedetti et al. (2025) Edoardo Debenedetti, Jie Zhang, Mislav Balunovic, Luca Beurer-Kellner, Marc Fischer, and Florian Tramèr. Agentdojo: a dynamic environment to evaluate prompt injection attacks and defenses for llm agents. In *Proceedings of the 38th International Conference on Neural Information Processing Systems*, NIPS ’24, Red Hook, NY, USA, 2025. Curran Associates Inc. ISBN 9798331314385.
+- Google (2025) Google. Gemini 2.0 deep dive: Code execution, 2025. URL <https://developers.googleblog.com/en/gemini-20-deep-dive-code-execution/>. Accessed: 2025-06-14.
+- Guo et al. (2024) Chengquan Guo, Xun Liu, Chulin Xie, Andy Zhou, Yi Zeng, Zinan Lin, Dawn Song, and Bo Li. Redcode: Risky code execution and generation benchmark for code agents. In A. Globerson, L. Mackey, D. Belgrave, A. Fan, U. Paquet, J. Tomczak, and C. Zhang (eds.), *Advances in Neural Information Processing Systems*, volume 37, pp. 106190–106236. Curran Associates, Inc., 2024. URL <https://proceedings.neurips.cc/paper_files/paper/2024/file/bfd082c452dffb450d5a5202b0419205-Paper-Datasets_and_Benchmarks_Track.pdf>.
+- Hong et al. (2024) Sirui Hong, Yizhang Lin, Bang Liu, Bangbang Liu, Binhao Wu, Ceyao Zhang, Chenxing Wei, Danyang Li, Jiaqi Chen, Jiayi Zhang, Jinlin Wang, Li Zhang, Lingyao Zhang, Min Yang, Mingchen Zhuge, Taicheng Guo, Tuo Zhou, Wei Tao, Xiangru Tang, Xiangtao Lu, Xiawu Zheng, Xinbing Liang, Yaying Fei, Yuheng Cheng, Zhibin Gou, Zongze Xu, and Chenglin Wu. Data interpreter: An llm agent for data science, 2024. URL <https://arxiv.org/abs/2402.18679>.
+- Jimenez et al. (2024) Carlos E Jimenez, John Yang, Alexander Wettig, Shunyu Yao, Kexin Pei, Ofir Press, and Karthik R Narasimhan. SWE-bench: Can language models resolve real-world github issues? In *The Twelfth International Conference on Learning Representations*, 2024. URL <https://openreview.net/forum?id=VTF8yNQM66>.
+- Liao et al. (2024) Minpeng Liao, Wei Luo, Chengxi Li, Jing Wu, and Kai Fan. Mario: Math reasoning with code interpreter output – a reproducible pipeline, 2024. URL <https://arxiv.org/abs/2401.08190>.
+- Liu et al. (2024) Tong Liu, Zizhuang Deng, Guozhu Meng, Yuekang Li, and Kai Chen. Demystifying rce vulnerabilities in llm-integrated apps. In *Proceedings of the 2024 on ACM SIGSAC Conference on Computer and Communications Security*, CCS ’24, pp. 1716–1730, New York, NY, USA, 2024. Association for Computing Machinery. ISBN 9798400706363. doi: 10.1145/3658644.3690338. URL <https://doi.org/10.1145/3658644.3690338>.
+- Liu et al. (2023) Xiao Liu, Hao Yu, Hanchen Zhang, Yifan Xu, Xuanyu Lei, Hanyu Lai, Yu Gu, Hangliang Ding, Kaiwen Men, Kejuan Yang, Shudan Zhang, Xiang Deng, Aohan Zeng, Zhengxiao Du, Chenhui Zhang, Sheng Shen, Tianjun Zhang, Yu Su, Huan Sun, Minlie Huang, Yuxiao Dong, and Jie Tang. Agentbench: Evaluating llms as agents. *arXiv preprint arXiv: 2308.03688*, 2023.
+- Mistral (2025) Mistral. Build ai agents with the mistral agents api, 2025. URL <https://mistral.ai/news/agents-api>. Accessed: 2025-06-14.
+- Nguyen et al. (2025) Dang Nguyen, Viet Dac Lai, Seunghyun Yoon, Ryan A. Rossi, Handong Zhao, Ruiyi Zhang, Puneet Mathur, Nedim Lipka, Yu Wang, Trung Bui, Franck Dernoncourt, and Tianyi Zhou. Dynasaur: Large language agents beyond predefined actions, 2025. URL <https://arxiv.org/abs/2411.01747>.
+- OpenAI (2025a) OpenAI. New tools and features in the responses api, 2025a. URL <https://openai.com/index/new-tools-and-features-in-the-responses-api/>. Accessed: 2025-06-14.
+- OpenAI (2025b) OpenAI. Introducing gpt-4.1 in the api, 2025b. URL <https://openai.com/index/gpt-4-1/>. Accessed: 2025-06-14.
+- OpenAI (2025c) OpenAI. o3-pro, 2025c. URL <https://platform.openai.com/docs/models/o3-pro>. Accessed: 2025-06-14.
+- Rabin et al. (2025) Rafiqul Rabin, Jesse Hostetler, Sean McGregor, Brett Weir, and Nick Judd. Sandboxeval: Towards securing test environment for untrusted code, 2025. URL <https://arxiv.org/abs/2504.00018>.
+- Shao et al. (2025) Minghao Shao, Sofija Jancheska, Meet Udeshi, Brendan Dolan-Gavitt, Haoran Xi, Kimberly Milner, Boyuan Chen, Max Yin, Siddharth Garg, Prashanth Krishnamurthy, Farshad Khorrami, Ramesh Karri, and Muhammad Shafique. Nyu ctf bench: A scalable open-source benchmark dataset for evaluating llms in offensive security, 2025. URL <https://arxiv.org/abs/2406.05590>.
+- Wang et al. (2024) Xingyao Wang, Yangyi Chen, Lifan Yuan, Yizhe Zhang, Yunzhu Li, Hao Peng, and Heng Ji. Executable code actions elicit better llm agents. In *Proceedings of the 41st International Conference on Machine Learning*, ICML’24. JMLR.org, 2024.
+- Yang et al. (2023) John Yang, Akshara Prabhakar, Karthik Narasimhan, and Shunyu Yao. Intercode: Standardizing and benchmarking interactive coding with execution feedback, 2023. URL <https://arxiv.org/abs/2306.14898>.
+- Yao et al. (2024) Shunyu Yao, Noah Shinn, Pedram Razavi, and Karthik Narasimhan. $\tau$-bench: A benchmark for tool-agent-user interaction in real-world domains, 2024. URL <https://arxiv.org/abs/2406.12045>.
+- Zhang et al. (2024a) Chuyu Zhang, Songyang Zhang, Yingfan Hu, Haowen Shen, Kuikun Liu, Zerun Ma, Fengzhe Zhou, Wenwei Zhang, Xuming He, Dahua Lin, and Kai Chen. Cibench: Evaluating your llms with a code interpreter plugin, 2024a. URL <https://arxiv.org/abs/2407.10499>.
+- Zhang et al. (2024b) Yaolun Zhang, Yinxu Pan, Yudong Wang, and Jie Cai. Pybench: Evaluating llm agent on various real-world coding tasks, 2024b. URL <https://arxiv.org/abs/2407.16732>.
+- Zhong et al. (2024) Li Zhong, Zilong Wang, and Jingbo Shang. Debug like a human: A large language model debugger via verifying runtime execution step-by-step, 2024. URL <https://arxiv.org/abs/2402.16906>.
+- Zhu et al. (2025) Yuxuan Zhu, Antony Kellermann, Dylan Bowman, Philip Li, Akul Gupta, Adarsh Danda, Richard Fang, Conner Jensen, Eric Ihli, Jason Benn, Jet Geronimo, Avi Dhir, Sudhit Rao, Kaicheng Yu, Twm Stone, and Daniel Kang. Cve-bench: A benchmark for ai agents’ ability to exploit real-world web application vulnerabilities, 2025. URL <https://arxiv.org/abs/2503.17332>.
+
+## Appendix A Appendix: Judge Prompt
+
+[View original diagram](https://arxiv.org/html/2507.19399v1#A1.p1.pic1)

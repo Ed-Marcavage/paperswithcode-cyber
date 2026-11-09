@@ -1,0 +1,2 @@
+# Converted Markdown preserves two-space line breaks from the source.
+text/*.txt whitespace=-blank-at-eol

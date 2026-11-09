@@ -1,16 +1,19 @@
+import { paperLinkHandlers, resourceClicked } from "@/lib/catalogAnalytics";
 import React from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { MethodChip, TagChip } from "@/components/Chips";
+import { BenchmarkChip, MethodChip, TagChip } from "@/components/Chips";
 import { Icon } from "@/components/Icon";
 import LatexTitle, { LatexText } from "@/components/LatexTitle";
 import { PaperPreview } from "@/components/PaperPreview";
 import { SotaBadges } from "@/components/SotaBadges";
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { papersApi } from "@/lib/api/papers";
 import { paperQueryKeys } from "@/lib/paperQueryKeys";
 import { safeExternalHref } from "@/lib/safeExternalHref";
+import { formatStarCount } from "@/lib/frameworks";
 import type { PaperCardProps } from "@/lib/transform";
 import { TEN_MINUTES } from "@/lib/api/queryKeys";
 
@@ -114,6 +117,8 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   followReasons,
 }) => {
   const queryClient = useQueryClient();
+  const topics = paper.tags.filter(t => t.startsWith("cyberintel-")).map(t => t.slice("cyberintel-".length));
+  const clickFacets = topics.length ? {topic: topics} : undefined;
   const paperHref = `/paper/${paper.id}`;
   const prefetchPaper = React.useCallback(() => {
     queryClient.prefetchQuery({
@@ -139,14 +144,15 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   const visibleMethods = visibleFeedMethods(paper);
   return (
     <article className="paper-card">
-      <Link
+      {(!isDiscoveryCatalog() || paper.thumbnailUrl) && <Link
         to={paperHref}
+        {...paperLinkHandlers(paper.dbId, paper.title, "thumbnail", undefined, clickFacets)}
         className="paper-thumb-wrap"
         onFocus={prefetchPaper}
         onMouseEnter={prefetchPaper}
       >
         <PaperPreview paperId={paper.id} title={paper.title} thumbnailUrl={paper.thumbnailUrl} priority={priority} />
-      </Link>
+      </Link>}
       <div className="paper-body">
         <div className="paper-body-main">
           {followReasons && followReasons.length > 0 && (
@@ -155,7 +161,7 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
             </div>
           )}
           <h3 className="paper-title">
-            <Link to={paperHref} onFocus={prefetchPaper} onMouseEnter={prefetchPaper}>
+            <Link to={paperHref} {...paperLinkHandlers(paper.dbId, paper.title, "title", undefined, clickFacets)} onFocus={prefetchPaper} onMouseEnter={prefetchPaper}>
               <LatexTitle title={paper.title} highlight={highlightQuery} />
             </Link>
             {showInstitution && paper.organizations.length > 0 && (
@@ -167,6 +173,10 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
             )}
           </h3>
           <div className="paper-authors">
+            {(paper.catalogKind === "post" || paper.catalogKind === "repository") && <>
+              <Link to={`/catalog?kind=${paper.catalogKind}`}>{paper.catalogKind === "post" ? "Engineering post" : "Repository"}</Link>
+              {(totalAuthors > 0 || paper.date) && " · "}
+            </>}
             {visibleAuthors}
             {totalAuthors > 3 && (
               <span>
@@ -192,8 +202,9 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
             </p>
           )}
           {paper.sotaRanks.length > 0 && <SotaBadges ranks={paper.sotaRanks} paperHref={paperHref} />}
-          {(paper.tags.length > 0 || visibleMethods.length > 0) && (
+          {(paper.tags.length > 0 || visibleMethods.length > 0 || paper.isBenchmark) && (
             <div className="paper-tags paper-tags--clamped">
+              {paper.isBenchmark && <BenchmarkChip />}
               {paper.tags.map((slug) => (
                 <TagChip key={slug} slug={slug} />
               ))}
@@ -212,18 +223,23 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Open GitHub repository"
-                onClick={(e) => e.stopPropagation()}
+                onClick={(e) => { e.stopPropagation(); resourceClicked(paper.dbId, "code", "feed"); }}
               >
                 <Icon name="github" size={20} />
-                {paper.velocity24h != null && paper.velocity24h > 0 && (
+                {paper.velocity24h != null && paper.velocity24h > 0 ? (
                   <span className="resource-stat">
                     <span className="resource-value">
                       <span className="gh-rate-arrow">↑</span>
-                      {paper.velocity24h.toFixed(1)}
+                      {paper.velocity24h < 0.1 ? "<0.1" : paper.velocity24h.toFixed(1)}
                     </span>
                     <span className="resource-label">stars / hr</span>
                   </span>
-                )}
+                ) : isDiscoveryCatalog() && paper.github != null ? (
+                  <span className="resource-stat" title={`${paper.github.toLocaleString()} total GitHub stars`}>
+                    <span className="resource-value">{formatStarCount(paper.github)}</span>
+                    <span className="resource-label">total stars</span>
+                  </span>
+                ) : null}
               </a>
             )}
             {safeExternalHref(paper.hfUrl) && paper.hfKind && (

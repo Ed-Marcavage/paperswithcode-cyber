@@ -1,3 +1,4 @@
+import { paperLinkHandlers } from "@/lib/catalogAnalytics";
 import { paperQueryKeys } from "@/lib/paperQueryKeys";
 /**
  * Global ⌘K search overlay.
@@ -7,13 +8,13 @@ import { paperQueryKeys } from "@/lib/paperQueryKeys";
  */
 
 import React, { useEffect, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 
 import LatexTitle from "@/components/LatexTitle";
 import { catalogApi } from "@/lib/api/catalog";
 import { papersApi } from "@/lib/api/papers";
-import { isChatEnabled } from "@/lib/apiUrl";
+import { isChatEnabled, isDiscoveryCatalog } from "@/lib/apiUrl";
 import { useDebounce } from "@/hooks/useDebounce";
 import { chipColors, hueFromSlug } from "@/lib/colors";
 import { displayTaskName } from "@/lib/transform";
@@ -156,6 +157,9 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
             if (chatEnabled && e.key === "Enter") {
               e.preventDefault();
               askAssistant();
+            } else if (isDiscoveryCatalog() && e.key === "Enter" && trimmedQuery) {
+              e.preventDefault();
+              go(`/papers?search=${encodeURIComponent(trimmedQuery)}`);
             }
           }}
         />
@@ -169,7 +173,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
           )}
           {!debouncedQuery && (
             <div className="search-empty">
-              Try “diffusion”, “object detection”, or an arXiv id.
+              {isDiscoveryCatalog() ? "Try a paper title, a cybersecurity topic, or an arXiv ID." : "Try “diffusion”, “object detection”, or an arXiv id."}
               {chatEnabled && (
                 <span className="search-empty-sub">Press Enter to ask the assistant</span>
               )}
@@ -277,7 +281,11 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
             <>
               <div className="search-section-label">Papers · {matchedPapers.length}</div>
               {matchedPapers.map((p) => (
-                <div key={p.id} className="search-result" onClick={() => go(`/paper/${p.arxiv_id || p.id}`)}>
+                <Link key={p.id} className="search-result" to={`/paper/${p.arxiv_id || p.id}`}
+                  {...paperLinkHandlers(String(p.id), p.title, "title", "search")}
+                  onClickCapture={e => {
+                    if (!(e.ctrlKey || e.metaKey || e.altKey || e.shiftKey)) onClose();
+                  }}>
                   <div className="search-result-title">
                     <LatexTitle title={p.title} />
                   </div>
@@ -296,7 +304,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
                       </>
                     )}
                   </div>
-                </div>
+                </Link>
               ))}
             </>
           )}

@@ -146,7 +146,7 @@
   align-items: center;
   gap: 18px;
   flex: 0 0 auto;
-  width: 92px;
+  width: 96px;
   border-left: 1px solid var(--hairline);
   padding-left: 20px;
 }
@@ -195,6 +195,7 @@ a.paper-resource.is-link:focus-visible {
   font-family: var(--mono);
   font-size: 10px;
   letter-spacing: 0.06em;
+  white-space: nowrap;
   text-transform: uppercase;
   color: var(--ink-faint);
 }
@@ -902,3 +903,6 @@ a.paper-resource.is-link:focus-visible {
   letter-spacing: 0.08em;
   margin-bottom: 8px;
 }
+
+article.paper-card:not(:has(> .paper-thumb-wrap)) { grid-template-columns: minmax(0, 1fr); }
+.paper-preview-unavailable { font-size: .8rem; color: var(--ink-soft); }

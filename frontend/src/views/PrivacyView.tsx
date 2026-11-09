@@ -1,3 +1,4 @@
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import React from "react";
 
 import { formatPageTitle } from "@/lib/latexPlainText";
@@ -5,6 +6,13 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 
 const PrivacyView: React.FC = () => {
   useDocumentTitle(formatPageTitle("Privacy Policy"));
+
+  if (isDiscoveryCatalog()) return <article className="page legal-page">
+    <h1>Catalog privacy</h1>
+    <p>This read-only research catalog uses PostHog to count visits, catalog and domain selections, paper opens and links to research resources. A random identifier in browser storage lets us estimate weekly visitors. We do not send search text, full URLs, link destinations or session recordings.</p>
+    <p>To skip browser analytics, enable Do Not Track or Global Privacy Control in your browser. Clearing site storage resets the browser identifier.</p>
+    <p>MCP usage is counted separately by tool name. Analytics does not include tool arguments, results, or client identifiers.</p>
+  </article>;
 
   return (
     <article className="page legal-page">

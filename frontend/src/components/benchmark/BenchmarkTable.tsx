@@ -1,3 +1,4 @@
+import { paperLinkHandlers } from "@/lib/catalogAnalytics";
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import {
@@ -245,6 +246,7 @@ export default function BenchmarkTable({
                   {paperRouteId ? (
                     <Link
                       to={`/paper/${paperRouteId}`}
+                      {...(e.paper_title ? paperLinkHandlers(String(e.paper_id || paperRouteId), e.paper_title, "title", "benchmark") : {})}
                       title={e.paper_title || paperLabel || undefined}
                     >
                       {renderBenchmarkPaperTitle(e.paper_title, paperLabel)}

@@ -16,7 +16,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { authApi, type AuthUser } from "./api/auth";
 import { authQueryKeys } from "./api/queryKeys";
-import { authUrl } from "./apiUrl";
+import { authUrl, isDiscoveryCatalog } from "./apiUrl";
 
 export type { AuthUser } from "./api/auth";
 
@@ -73,7 +73,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [queryClient]);
 
   React.useEffect(() => {
-    if (!import.meta.env.VITE_POSTHOG_PROJECT_TOKEN) return;
+    if (isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN) return;
     if (!user) {
       posthog.reset();
       return;

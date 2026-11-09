@@ -1,9 +1,11 @@
+import { pwcCliRepository, pwcCliRepositoryUrl } from "@/lib/pwcCliRepository";
 import React from "react";
 import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, Check, Copy, ExternalLink, Github } from "lucide-react";
 
 import { formatPageTitle } from "@/lib/latexPlainText";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { mcpEndpoint, mcpHealthQueryOptions } from "@/lib/mcp";
 
 import "@/views/McpView.css";
@@ -116,6 +118,12 @@ const CopyControl = ({ value, label }: { value: string; label: string }) => {
 
 const McpView: React.FC = () => {
   const endpoint = mcpEndpoint();
+  const tools = isDiscoveryCatalog() ? [...TOOLS,
+    ["catalog_filters", "Look up the topic, target, and contribution labels used by the catalog."],
+    ["browse_catalog", "Find matching works and count available filter choices."],
+    ["list_developers", "Find developers by GitHub username, repository, or catalog filters. See matching repo and developer counts."],
+    ["get_developer", "Look up a GitHub ID to see which tracked repos the account owns or contributed to."],
+  ] : TOOLS;
   const health = useQuery(mcpHealthQueryOptions());
   const [client, setClient] = React.useState<ClientKey>("chatgpt");
   const selected = CLIENTS.find((item) => item.key === client) ?? CLIENTS[0];
@@ -126,13 +134,13 @@ const McpView: React.FC = () => {
     <article className="page mcp-page">
       <a
         className="mcp-repo-banner"
-        href="https://github.com/huggingface/pwc-cli"
+        href={pwcCliRepositoryUrl}
         target="_blank"
         rel="noreferrer"
       >
         <Github size={20} aria-hidden />
         <span>
-          <strong>huggingface/pwc-cli</strong>
+          <strong>{pwcCliRepository}</strong>
           <span>Open-source MCP server and <code>pwc</code> command-line client</span>
         </span>
         <span className="mcp-repo-cta">
@@ -218,10 +226,10 @@ const McpView: React.FC = () => {
       <section className="mcp-section" aria-labelledby="mcp-tools">
         <div className="mcp-section-heading">
           <p className="sidebar-label">Catalogue</p>
-          <h2 id="mcp-tools">Twenty-one focused, read-only tools</h2>
+          <h2 id="mcp-tools">{tools.length} read-only tools</h2>
         </div>
         <div className="mcp-tool-grid">
-          {TOOLS.map(([name, description]) => (
+          {tools.map(([name, description]) => (
             <div className="mcp-tool" key={name}>
               <code>{name}</code>
               <p>{description}</p>
@@ -240,7 +248,10 @@ const McpView: React.FC = () => {
           <h2 id="mcp-prompts">Prompts that start useful research</h2>
         </div>
         <div className="mcp-prompt-list">
-          {EXAMPLES.map((prompt) => (
+          {(isDiscoveryCatalog() ? [
+            "Find three developers who worked on penetration-testing benchmarks for hosts and networks. For each, link a matching repo and check whether they own it or contributed to it.",
+            "Find SEC-bench Pro in the native-binary exploit benchmarks. Read its evaluation setup and explain what an agent has to do for an attempt to count as a success. Cite the paper and link its code.",
+          ] : EXAMPLES).map((prompt) => (
             <div key={prompt}>
               <p>{prompt}</p>
               <CopyControl value={prompt} label="Copy example prompt" />
@@ -254,9 +265,9 @@ const McpView: React.FC = () => {
           <p className="sidebar-label mcp-kicker">Limits &amp; privacy</p>
           <h2 id="mcp-limits">Public by design</h2>
           <p>
-            No account, API key, or write access. Fair-use limits are 60 total requests
+            {isDiscoveryCatalog() ? "No account or API key is needed. Tools are read-only. Search uses indexed keywords; paper text comes from the catalog." : <>No account, API key, or write access. Fair-use limits are 60 total requests
             per minute, 10 semantic searches per minute, four concurrent requests per
-            client, and 25 list results per call.
+            client, and 25 list results per call.</>}
           </p>
           <p>
             MCP telemetry retains tool name, status, latency, response size, protocol,
@@ -274,9 +285,9 @@ const McpView: React.FC = () => {
             enabled by your workspace administrator, and that you pasted the URL exactly.
           </p>
           <nav className="mcp-links" aria-label="MCP documentation links">
-            <a href="https://github.com/huggingface/pwc-cli" target="_blank" rel="noreferrer">CLI repository <ExternalLink size={13} /></a>
+            <a href={pwcCliRepositoryUrl} target="_blank" rel="noreferrer">CLI repository <ExternalLink size={13} /></a>
             <a href="https://modelcontextprotocol.io/docs/2026-07-28/learn/server-concepts" target="_blank" rel="noreferrer">MCP specification <ExternalLink size={13} /></a>
-            <a href="/docs" target="_blank" rel="noreferrer">Public API <ExternalLink size={13} /></a>
+            <a href="/docs/api" target="_blank" rel="noreferrer">Public API <ExternalLink size={13} /></a>
             <a href="/mcp/schema" target="_blank" rel="noreferrer">MCP tool schema <ExternalLink size={13} /></a>
             <a href="/llms.txt" target="_blank" rel="noreferrer">llms.txt <ExternalLink size={13} /></a>
           </nav>

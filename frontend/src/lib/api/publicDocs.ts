@@ -1,3 +1,4 @@
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { apiRequest } from "./request";
 
 export interface Schema {
@@ -58,13 +59,15 @@ export function exampleUrl(path: string, operation: Operation): string {
       path = path.replace(`{${key}}`, encodeURIComponent(String(value)));
     else query.append(key, String(value));
   }
-  return `https://paperswithcode.co${path}${query.size ? `?${query}` : ""}`;
+  const origin = isDiscoveryCatalog() ? window.location.origin : "https://paperswithcode.co";
+  return `${origin}${path}${query.size ? `?${query}` : ""}`;
 }
 export function codeExample(url: string, language: string): string {
+  const plainText = new URL(url).pathname.endsWith("/text");
   if (language === "Python")
-    return `import requests\n\nresponse = requests.get(${JSON.stringify(url)}, timeout=30)\nresponse.raise_for_status()\nprint(response.json())`;
+    return `import requests\n\nresponse = requests.get(${JSON.stringify(url)}, timeout=30)\nresponse.raise_for_status()\nprint(${plainText ? "response.text" : "response.json()"})`;
   if (language === "JavaScript")
-    return `const response = await fetch(${JSON.stringify(url)}, {\n  credentials: "omit",\n});\nif (!response.ok) throw new Error(\`HTTP \${response.status}\`);\nconsole.log(await response.json());`;
+    return `const response = await fetch(${JSON.stringify(url)}, {\n  credentials: "omit",\n});\nif (!response.ok) throw new Error(\`HTTP \${response.status}\`);\nconsole.log(await response.${plainText ? "text" : "json"}());`;
   return `curl --fail-with-body ${JSON.stringify(url)}`;
 }
 export function schemaLabel(schema: Schema): string {

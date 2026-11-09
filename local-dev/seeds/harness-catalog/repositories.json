@@ -1,0 +1,263 @@
+{
+  "repositories": [
+    {
+      "full_name": "ACSE-Eval/acse-eval-experiments",
+      "url": "https://github.com/ACSE-Eval/acse-eval-experiments",
+      "stars": 3,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:17.628596+00:00",
+      "links": [
+        {
+          "arxiv_id": "2505.11565",
+          "paper_url": "https://arxiv.org/abs/2505.11565v2",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2505.11565v2",
+          "evidence_note": "Upstream association cross-checked against original study; experiment entrypoint, prompt and scorer are present."
+        }
+      ]
+    },
+    {
+      "full_name": "NickNameInvalid/LLM_CTF",
+      "url": "https://github.com/NickNameInvalid/LLM_CTF",
+      "stars": 66,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:18.184460+00:00",
+      "links": [
+        {
+          "arxiv_id": "2402.11814",
+          "paper_url": "https://arxiv.org/abs/2402.11814v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2402.11814v1",
+          "evidence_note": "Paper links the authors' LLM_CTF artifact; Docker build scripts and evaluation runners are present."
+        }
+      ]
+    },
+    {
+      "full_name": "PurCL/ASTRA",
+      "url": "https://github.com/PurCL/ASTRA",
+      "stars": 78,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:20.093676+00:00",
+      "links": [
+        {
+          "arxiv_id": "2508.03936",
+          "paper_url": "https://arxiv.org/abs/2508.03936v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2508.03936v1",
+          "evidence_note": "Official repository README identifies the paper; agent, enumerator and online search modules are present."
+        }
+      ]
+    },
+    {
+      "full_name": "1mocat/BlueCodeAgent",
+      "url": "https://github.com/1mocat/BlueCodeAgent",
+      "stars": 4,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:20.593331+00:00",
+      "links": [
+        {
+          "arxiv_id": "2510.18131",
+          "paper_url": "https://arxiv.org/abs/2510.18131v2",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2510.18131v2",
+          "evidence_note": "Author abstract names this URL; environment, scripts and source are present."
+        }
+      ]
+    },
+    {
+      "full_name": "ahang0712/CheckerBench-Dataset",
+      "url": "https://github.com/ahang0712/CheckerBench-Dataset",
+      "stars": 3,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:22.505126+00:00",
+      "links": [
+        {
+          "arxiv_id": "2610.07557",
+          "paper_url": "https://arxiv.org/abs/2610.07557v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2610.07557v1",
+          "evidence_note": "Paper PDF links the frozen Linux environment, tasks and verification scripts."
+        }
+      ]
+    },
+    {
+      "full_name": "meta-llama/PurpleLlama",
+      "url": "https://github.com/meta-llama/PurpleLlama",
+      "stars": 4468,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:23.836184+00:00",
+      "links": [
+        {
+          "arxiv_id": "2404.13161",
+          "paper_url": "https://arxiv.org/abs/2404.13161v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2404.13161v1",
+          "evidence_note": "The author repository contains the CybersecurityBenchmarks suite; the paper and repository documentation identify its second edition."
+        }
+      ]
+    },
+    {
+      "full_name": "RISys-Lab/KaliBench",
+      "url": "https://github.com/RISys-Lab/KaliBench",
+      "stars": 6,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:24.855102+00:00",
+      "links": [
+        {
+          "arxiv_id": "2610.02206",
+          "paper_url": "https://arxiv.org/abs/2610.02206v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2610.02206v1",
+          "evidence_note": "Paper links the repo; scoring and Docker are present."
+        }
+      ]
+    },
+    {
+      "full_name": "stratosphereips/NetSecGame",
+      "url": "https://github.com/stratosphereips/NetSecGame",
+      "stars": 69,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:25.336141+00:00",
+      "links": [
+        {
+          "arxiv_id": "2308.12086",
+          "paper_url": "https://arxiv.org/abs/2308.12086v2",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2308.12086v2",
+          "evidence_note": "PDF links the scenario YAML and implementation; environments and tests are present."
+        }
+      ]
+    },
+    {
+      "full_name": "RyuKosei/PACEbench",
+      "url": "https://github.com/RyuKosei/PACEbench",
+      "stars": 37,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:25.774531+00:00",
+      "links": [
+        {
+          "arxiv_id": "2510.11688",
+          "paper_url": "https://arxiv.org/abs/2510.11688v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2510.11688v1",
+          "evidence_note": "Authors' project page links this repo; config, Docker and main.py are present."
+        }
+      ]
+    },
+    {
+      "full_name": "bytedance/PatchEval",
+      "url": "https://github.com/bytedance/PatchEval",
+      "stars": 235,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:26.160477+00:00",
+      "links": [
+        {
+          "arxiv_id": "2511.11019",
+          "paper_url": "https://arxiv.org/abs/2511.11019v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2511.11019v1",
+          "evidence_note": "Paper PDF cites official repo; patcheval, scripts and tests are present."
+        }
+      ]
+    },
+    {
+      "full_name": "UKGovernmentBEIS/sandbox_escape_bench",
+      "url": "https://github.com/UKGovernmentBEIS/sandbox_escape_bench",
+      "stars": 68,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:27.491542+00:00",
+      "links": [
+        {
+          "arxiv_id": "2603.02277",
+          "paper_url": "https://arxiv.org/abs/2603.02277v3",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2603.02277v3",
+          "evidence_note": "Paper PDF links authors' solver, scenarios and sandbox runner."
+        }
+      ]
+    },
+    {
+      "full_name": "govtech-responsibleai/CIRCLE",
+      "url": "https://github.com/govtech-responsibleai/CIRCLE",
+      "stars": 0,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:28.816787+00:00",
+      "links": [
+        {
+          "arxiv_id": "2507.19399",
+          "paper_url": "https://arxiv.org/abs/2507.19399v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2507.19399v1",
+          "evidence_note": "Paper and project README identify the interpreter benchmark; experiment.py and run.sh are present."
+        }
+      ]
+    },
+    {
+      "full_name": "Alibaba-NLP/qqr",
+      "url": "https://github.com/Alibaba-NLP/qqr",
+      "stars": 325,
+      "archived": false,
+      "observed_at": "2026-11-08T05:01:29.227404+00:00",
+      "links": [
+        {
+          "arxiv_id": "2607.26791",
+          "paper_url": "https://arxiv.org/abs/2607.26791v1",
+          "is_official": true,
+          "evidence_url": "https://arxiv.org/pdf/2607.26791v1",
+          "evidence_note": "Authors' paper points to this exact subdirectory. Demo scenarios and runner are distinct from the enclosing training framework."
+        }
+      ]
+    },
+    {
+      "full_name": "cloudflare/security-audit-skill",
+      "url": "https://github.com/cloudflare/security-audit-skill",
+      "archived": false,
+      "stars": 66894,
+      "observed_at": "2026-11-09T01:31:25.798416+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/cloudflare/security-audit-skill",
+          "is_official": true,
+          "evidence_url": "https://github.com/cloudflare/security-audit-skill",
+          "evidence_note": "Standalone repository; verified current GitHub owner."
+        },
+        {
+          "paper_url": "https://blog.cloudflare.com/build-your-own-vulnerability-harness/",
+          "is_official": true,
+          "evidence_url": "https://blog.cloudflare.com/build-your-own-vulnerability-harness/",
+          "evidence_note": "Publisher explicitly links its audit skill in this article."
+        }
+      ]
+    },
+    {
+      "full_name": "chainreactors/cyber-harness",
+      "url": "https://github.com/chainreactors/cyber-harness",
+      "archived": false,
+      "stars": 385,
+      "observed_at": "2026-11-09T01:31:26.250316+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/chainreactors/cyber-harness",
+          "is_official": true,
+          "evidence_url": "https://github.com/chainreactors/cyber-harness",
+          "evidence_note": "Standalone repository; verified current GitHub owner."
+        }
+      ]
+    },
+    {
+      "full_name": "ossf/oss-crs",
+      "url": "https://github.com/ossf/oss-crs",
+      "archived": false,
+      "stars": 179,
+      "observed_at": "2026-11-09T01:31:45.305612+00:00",
+      "links": [
+        {
+          "paper_url": "https://github.com/ossf/oss-crs",
+          "is_official": true,
+          "evidence_url": "https://github.com/ossf/oss-crs",
+          "evidence_note": "Standalone OpenSSF repository already in the reviewed catalog."
+        }
+      ]
+    }
+  ]
+}

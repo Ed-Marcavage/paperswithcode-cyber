@@ -1,6 +1,6 @@
 # Agent-assisted paper editing
 
-The public CLI companion change lives in `huggingface/pwc-cli`. Research commands
+The public CLI companion change lives in `Ed-Marcavage/pwc-cli`. Research commands
 remain anonymous. Editing starts with `pwc auth login --paper PAPER`: the user
 signs in with Hugging Face in a browser, verifies a displayed code, and grants
 one hour of access to that paper. There is no automatic renewal or per-batch

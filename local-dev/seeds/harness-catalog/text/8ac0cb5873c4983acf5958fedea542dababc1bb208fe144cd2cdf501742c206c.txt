@@ -1,0 +1,2226 @@
+> KaliBench: A Fine-Grained Benchmark for Cybersecurity Tool Use on Kali Linux with Runtime-Free Verifiable Rewards — Pengfei Li, Naufal Suryanto, Sicheng Zhang, Muzammal Naseer. [Original](https://arxiv.org/html/2610.02206v1) · [License](https://creativecommons.org/licenses/by/4.0/). Converted from arXiv HTML to Markdown; consult the original for figures and layout.
+
+# KaliBench: A Fine-Grained Benchmark for Cybersecurity Tool Use on Kali Linux with Runtime-Free Verifiable Rewards
+
+[View original diagram](https://arxiv.org/html/2610.02206v1#p1.pic1) ![Refer to caption](https://arxiv.org/html/2610.02206v1/teaser-ori-modified.png)
+
+Figure 1: Why KaliBench Matters? KaliBench enables fine-grained, verifiable evaluation and runtime-free reward training for translating analyst intent into executable Kali commands.
+
+## 1 Introduction
+
+Large language models (LLMs) are increasingly adopted in cybersecurity workflows, ranging from interactive assistants to autonomous agents \[[40](https://arxiv.org/html/2610.02206v1#bib.bib19)\]. Early benchmarks in this domain primarily focus on *knowledge-based* assessment, testing models’ understanding of cybersecurity concepts via multiple-choice \[[36](https://arxiv.org/html/2610.02206v1#bib.bib16), [19](https://arxiv.org/html/2610.02206v1#bib.bib10)\] or structured-answer questions \[[14](https://arxiv.org/html/2610.02206v1#bib.bib6), [3](https://arxiv.org/html/2610.02206v1#bib.bib2)\]. More recent benchmarks move toward *end-to-end agentic* evaluation, measuring model performance in complex environments such as autonomously solving CTF-style challenges \[[32](https://arxiv.org/html/2610.02206v1#bib.bib15), [45](https://arxiv.org/html/2610.02206v1#bib.bib21)\]. While these benchmarks provide valuable insight into what LLMs know and how they behave in integrated workflows, they do not directly evaluate whether models can generate correct invocations of concrete cybersecurity tools in isolation.
+
+This limitation is consequential because modern security operations rely heavily on large, heterogeneous command-line toolchains. Kali Linux, a widely used platform among cybersecurity practitioners, provides access to over 2,000 pre-installed security tool packages \[[31](https://arxiv.org/html/2610.02206v1#bib.bib14)\]. In practice, analysts must translate high-level goals (e.g., “scan this subnet for SMB misconfigurations”) into precise command-line invocations of tools such as Nmap for scanning, Metasploit for exploitation, and Volatility for memory forensics. Although LLMs with function-calling capabilities aim to automate this process, CLIs are unforgiving: minor errors in argument order, flag spelling, alias misuse, or tool misinterpretation can invalidate execution. This motivates a central question: *Can current LLMs reliably translate natural-language security requests into exact, executable CLI commands?*
+
+While function-calling benchmarks for LLMs have matured rapidly \[[17](https://arxiv.org/html/2610.02206v1#bib.bib8), [10](https://arxiv.org/html/2610.02206v1#bib.bib3), [21](https://arxiv.org/html/2610.02206v1#bib.bib12), [20](https://arxiv.org/html/2610.02206v1#bib.bib11), [28](https://arxiv.org/html/2610.02206v1#bib.bib13)\], evaluating cybersecurity tool invocation poses distinct challenges. Existing benchmarks primarily assume schema-defined tools, in which functionality and parameters are explicitly specified via JSON schemas or APIs. In contrast, cybersecurity tooling is dominated by CLIs, such as the Kali Linux toolset, where enumerating hundreds of tool schemas in a model prompt is impractical in typical deployment settings due to context length limitations. As a result, Natural-Language-to-CLI (NL–to–CLI) evaluation is effectively *schema-free*: models must infer appropriate tools and arguments and generate syntactically correct, executable commands rather than populate structured fields.
+
+To address this gap, we develop KaliBench, a fine-grained benchmark for NL–to–CLI cybersecurity tool use on Kali Linux. As shown in Fig. [1](https://arxiv.org/html/2610.02206v1#S0.F1), KaliBench maps analyst intent to exact CLI commands, decomposing tool selection and argument construction for fine-grained, verifiable evaluation. It organizes tools across capability dimensions and security phases and is constructed via a manuscript-grounded pipeline. To ensure data quality, we employ a multi-stage verification process combining LLM-based validation, sandboxed execution, and human-in-the-loop refinement, producing semantically correct and executable commands.
+
+KaliBench provides fine-grained supervision over tool selection and argument construction. We evaluate models under three settings, unrestricted, restricted, and hinted, which vary the degree of tool information provided. This structured formulation further enables *runtime-free verifiable rewards*, allowing training without command execution. Using this framework, we evaluate 24 configurations of general-purpose and security-focused open-weight models and find that performance remains limited, with argument construction as the primary bottleneck. We further show that Supervised Fine-Tuning (SFT) and Reinforcement Learning with Verifiable Rewards (RLVR) improve an 8B model and achieve performance competitive with substantially larger models. Our main contributions are summarized as follows:
+
+- •
+
+  A fine-grained benchmark for schema-free NL-to-CLI evaluation. KaliBench is, to the best of our knowledge, the first benchmark for evaluating LLMs on cybersecurity tool invocation in schema-free CLI settings, comprising 8,504 query–command pairs over 23 capability dimensions and five security phases, split into 5,000 evaluation and 3,504 training samples after deduplication.
+
+- •
+
+  A verified and executable dataset. We construct a high-quality dataset through a multi-stage verification pipeline that ensures both semantic correctness and practical executability.
+
+- •
+
+  Runtime-free verifiable rewards. We show that deterministic CLI structure enables verifiable reward signals without runtime execution, supporting scalable reinforcement learning.
+
+- •
+
+  Fine-grained evaluation and training gains. We evaluate over 20 LLMs under three settings and identify argument construction as the primary bottleneck. Training with supervised fine-tuning and reinforcement learning using KaliBench rewards improves an 8B model’s mean Total Score across the three evaluation modes by 7.5 percentage points.
+
+## 2 Related Work
+
+#### LLMs and Cybersecurity Benchmarks.
+
+Early evaluations of LLMs focused on general-purpose knowledge as measured by MMLU \[[11](https://arxiv.org/html/2610.02206v1#bib.bib4)\]. HELM \[[18](https://arxiv.org/html/2610.02206v1#bib.bib9)\] later introduced a unified evaluation framework that aggregates benchmarks across broader dimensions. Although these evaluations characterize overall language understanding, they do not account for the domain-specific requirements or operational constraints encountered in cybersecurity settings.
+
+As a result, several domain-specific benchmarks have been proposed to evaluate LLMs in cybersecurity contexts. Benchmarks such as SecEval \[[16](https://arxiv.org/html/2610.02206v1#bib.bib7)\], CyberMetric \[[36](https://arxiv.org/html/2610.02206v1#bib.bib16)\], CyberBench \[[19](https://arxiv.org/html/2610.02206v1#bib.bib10)\], SECURE \[[3](https://arxiv.org/html/2610.02206v1#bib.bib2)\], CS-Eval \[[44](https://arxiv.org/html/2610.02206v1#bib.bib20)\], SecBench \[[14](https://arxiv.org/html/2610.02206v1#bib.bib6)\], and CTI-Bench \[[1](https://arxiv.org/html/2610.02206v1#bib.bib1)\] primarily assess cybersecurity knowledge through multiple-choice, true/false, short-answer, or other classification-style questions spanning software and network security, cryptography, industrial control systems, and cyber-threat intelligence. While these benchmarks provide useful insight into models’ conceptual understanding, they largely evaluate knowledge recall and static reasoning rather than concrete operational behavior.
+
+More recent work moves beyond static question answering toward *agentic* evaluation, where models interact with complex environments or autonomously solve multi-step tasks. For example, CyBench \[[45](https://arxiv.org/html/2610.02206v1#bib.bib21)\] and NYU-CTF Bench \[[32](https://arxiv.org/html/2610.02206v1#bib.bib15)\] evaluate LLMs in end-to-end security scenarios via Capture-the-Flag (CTF) challenges, while DefenderBench \[[46](https://arxiv.org/html/2610.02206v1#bib.bib22)\] studies language agents in enterprise-style cybersecurity environments with realistic defensive and offensive workflows. However, end-to-end task performance jointly depends on planning, environment interaction, observation interpretation, tool invocation, and error recovery, making it difficult to attribute failures to individual components. KaliBench complements these benchmarks by isolating command generation and separately evaluating tool selection, optional arguments, and positional arguments.
+
+![Refer to caption](https://arxiv.org/html/2610.02206v1/pipe.png)
+
+Figure 2: KaliBench end-to-end pipeline for NL-to-CLI evaluation on Kali Linux. The benchmark is constructed via LLM-based data generation, multi-round verification-regeneration, and representative-sample selection. Evaluation applies alias-aware parsing and fine-grained scoring over tools, arguments, and dimensional categories.
+
+#### Function-Calling Benchmarks and Evaluations.
+
+Beyond agentic evaluation, a growing body of work studies LLMs’ ability to invoke external tools through explicit function-calling benchmarks. Benchmarks such as BFCL \[[28](https://arxiv.org/html/2610.02206v1#bib.bib13)\], ToolSandbox \[[21](https://arxiv.org/html/2610.02206v1#bib.bib12)\], StableToolBench \[[10](https://arxiv.org/html/2610.02206v1#bib.bib3)\], and HammerBench \[[38](https://arxiv.org/html/2610.02206v1#bib.bib18)\] evaluate tool use across single-turn, multi-turn, conversational, and agentic settings, emphasizing structured, schema-defined APIs and deterministic validation for general-purpose tool invocation. As a result, these benchmarks assume that tools and parameters are specified through explicit schemas, and do not consider settings where tools must be inferred from a shared CLI. To the best of our knowledge, no existing benchmark directly evaluates natural-language–to–CLI translation for real-world cybersecurity tools under such schema-free conditions, or provides fine-grained, alias-aware assessment of command correctness. KaliBench addresses this gap by enabling systematic evaluation of exact, executable CLI command generation for real-world cybersecurity toolchains.
+
+## 3 KaliBench
+
+[Figure asset](https://arxiv.org/html/2610.02206v1/KaliBench-Sample.svg)
+
+Figure 3: KaliBench Structure and Representative Sample. KaliBench is a structured benchmark of Kali Linux tools organized along the security attack lifecycle. It comprises 5 security phases and 23 functional dimensions. The dataset sample includes natural-language queries and decomposed ground-truth commands. See Appendix [D](https://arxiv.org/html/2610.02206v1#A4) for a detailed view of examples of all 23 dimensions.
+
+KaliBench is a fine-grained benchmark and dataset that serves as a *translation layer* between natural-language cybersecurity queries and executable Kali Linux commands, spanning 1,642 tools and 8,504 query–command pairs. Figure [2](https://arxiv.org/html/2610.02206v1#S2.F2) illustrates the end-to-end pipeline for constructing, verifying, evaluating, and training with KaliBench. The pipeline proceeds in four stages: (1) we extract tool names, flag–value pairs, and documented aliases from official Kali Linux manuscripts, and use them as structured signals to guide LLM-based data generation; (2) generated candidates are iteratively filtered through LLM-based verification, sandboxed terminal execution, and human-in-the-loop evaluation; (3) the verified dataset is deduplicated and split into evaluation and training sets, enabling fine-grained evaluation across multiple metrics and capability dimensions; and (4) using the training split and verifiable reward signals, we demonstrate that parameter efficient post-training with supervised fine-tuning and reinforcement learning significantly improves model performance.
+
+#### 1. Data Generation.
+
+We curate official documentation for Kali Linux tools from the Kali Linux repository \[[15](https://arxiv.org/html/2610.02206v1#bib.bib26)\]. The source corpus comprises 2,372 tools described in structured Markdown, each specifying long and short options and relevant aliases. The documentation also provides a metapackage taxonomy, which we use to annotate each tool with its cybersecurity capability and functional dimension. We process the corpus at the tool level. For each tool, we use Qwen3-Max \[[30](https://arxiv.org/html/2610.02206v1#bib.bib27)\] to generate 10-13 natural-language query–command pairs, along with structured annotations including the tool name, optional arguments as alias-aware flag–value pairs, and positional arguments. These ground-truth command components enable fine-grained analysis of model performance in tool selection, argument construction, and syntactic validity under UNIX shell conventions. Representative examples are shown in Fig. [3](https://arxiv.org/html/2610.02206v1#S3.F3), illustrating the diversity of KaliBench across security phases and functional dimensions. This stage produces 27.7K query–command pairs covering all documented tools. More details about the data generation process can be found in Appendix [B](https://arxiv.org/html/2610.02206v1#A2).
+
+#### 2. Data Verification, Cleaning, and Deduplication.
+
+Despite grounding data generation in official Kali Linux tool manuscripts using a state-of-the-art model (Qwen3-Max), hallucination remains a major challenge. Our initial manual inspection shows that over 50% of generated commands contain hallucinated or misspelled options (e.g., `--silent` instead of `--silence`). To address this issue, we adopt a *multi-stage human-in-loop verification pipeline* that ultimately retains 8,504 high-quality query–command pairs after cleaning and deduplication.
+
+LLM-as-Verifier. We prompt an LLM with the query, the generated_command, and the corresponding tool_manuscript, and task it with verifying (i) whether all flags and arguments are documented, and (ii) whether the command faithfully implements the query using only supported functionality. After the first verification round, 53.8% of generated examples are filtered out. This leaves 413 tools (17.4%) without valid pairs; to preserve coverage, we iteratively regenerate and re-verify the data. The resulting LLM-validated dataset contains 14.5K query–command pairs, with 47.65% of the initial data removed. The prompt details are provided in Appendix [C.2](https://arxiv.org/html/2610.02206v1#A3.SS2).
+
+Terminal Verification. To further ensure the executability of ground-truth commands, we perform system-level validation by executing each LLM-verified command in a controlled sandbox. Specifically, we run each command inside a Docker container provisioned with a *Kali-linux-everything* image and record its outputs, including stdout, stderr, exit code, and execution timeouts. Because command parameters are synthetic (e.g., addresses, devices, paths, and files may not exist in the sandbox), we apply a rule-based filtering pipeline based on observed execution outputs. Commands are rejected when execution logs indicate errors caused by hallucinated tools or invalid arguments that were not detected by the LLM-as-Verifier. This process filters out 11.95% of the LLM-verified commands. Further details of the terminal verification process are provided in Appendix [E](https://arxiv.org/html/2610.02206v1#A5).
+
+Human-in-the-loop Evaluation. As a final verification step, we perform human-in-the-loop evaluation by analyzing model failures in the hinted setting (see the Evaluation Protocol). We focus on cases where even the strongest evaluated model fails to generate a correct command despite having access to tool documentation, as these cases are more likely to reflect issues in the dataset rather than model limitations. We use an AI agent<sup>11</sup> 1 [OpenAI Codex](https://github.com/openai/codex) with [GPT-5.4 Thinking](https://deploymentsafety.openai.com/gpt-5-4-thinking). to produce initial verdicts by cross-checking the semantic alignment among the query, generated command, ground-truth command, and tool documentation. Human reviewers then examine these verdicts to identify query ambiguities and labeling errors. This process reveals that an additional 4.9% of the verified dataset is invalid due to: (a) Malformed CLI options (e.g.,‘--g’ instead of the documented ‘-g’), (b) Omission of arguments explicitly required by the query (e.g., generating ‘\<tool\> completion’ instead of the query-required ‘\<tool\> completion bash’), and (c) Semantic mismatches in argument use (e.g., choosing a flag whose effect does not match the requested operation, swapping the positions of input and output operands, or supplying a filesystem path where the command expects a URL). Detailed cases can be found in Appendix [F](https://arxiv.org/html/2610.02206v1#A6).
+
+Deduplication and Train–test Split. To construct a compact yet semantically diverse evaluation set, we perform *semantic selection* using the SemHash framework \[[37](https://arxiv.org/html/2610.02206v1#bib.bib17)\]. Each record is represented as a semantic unit \[query, tool_name, ground_truth_command\]. Records are embedded into a dense vector space, clustered via approximate nearest-neighbor search, and grouped when pairwise cosine similarity exceeds 0.90. From each cluster, we retain representative examples selected by SemHash. The final cleaned and deduplicated dataset contains 8.5K verified query–command pairs (30.7% of the original 27.7K generated data), forming a high-quality and executable benchmark for NL–to–CLI evaluation. We then sample from this dataset to construct an evaluation set of 5,000 examples (covering all 1,642 tools) and a training set of 3,504 examples (covering 962 tools), prioritizing full tool coverage in the evaluation set while reserving a smaller training split for studying generalization.
+
+#### 3. Evaluation Protocol.
+
+For each query in the evaluation set, models are prompted to generate an executable Kali Linux CLI command under three settings that vary the amount of tool information provided: (1) *Unrestricted*, where the model receives only the natural-language query and must infer both the appropriate tool and its arguments; (2) *Restricted*, where the model is additionally provided with a randomly sampled list of 20 candidate tool names that includes the correct tool, reducing the tool-selection search space while still requiring correct argument construction; and (3) *Hinted*, where the model further receives the official documentation of the candidate tools, approximating schema-based function-calling benchmarks in which tool functionality and parameters are explicitly specified. Details of the structured prompting format and prompt templates are provided in Appendix [C.3](https://arxiv.org/html/2610.02206v1#A3.SS3).
+
+Command Parsing. Model outputs are parsed using Python’s shlex library for lexical analysis of shell-style syntax, enabling faithful emulation of Kali Linux command parsing under UNIX conventions without executing commands. Because KaliBench explicitly records the ground-truth tool_name, optional arguments (as alias-aware flag–value pairs), and ordered positional arguments for each example, we can perform deterministic, component-wise scoring. A CLI command follows the general form \<tool_name\> \<args\>, where arguments are either optional or positional. Optional arguments begin with `--` or `-` and may take values; their order is flexible and aliases are permitted. Positional arguments consist only of values and must appear in a fixed order. See Fig. [3](https://arxiv.org/html/2610.02206v1#S3.F3) for illustration.
+
+Evaluation Metrics. We report a set of fine-grained, component-level metrics, including Tool Accuracy (correct tool selection), Optional-Argument F1 (alias-aware matching of optional flag names), Positional-Argument F1 (multiset matching of positional argument values), Total Score (mean of tool and argument scores), and Exact Correct, which equals 1 only when the tool and all arguments exactly match the ground truth. These metrics enable detailed analysis of model performance across tool selection and argument construction. Details of the metric definitions and calculations are provided in Appendix [L](https://arxiv.org/html/2610.02206v1#A12).
+
+Capability Taxonomy and Security-Phase Annotation. To enable structured, domain-aware analysis beyond raw command correctness, we leverage capability metadata derived from Kali Linux’s official kali-tools metapackage taxonomy, which organizes offensive and defensive tools into 23 functional capability dimensions spanning the full cybersecurity workflow. Inspired by the Lockheed Martin Cyber Kill Chain \[[13](https://arxiv.org/html/2610.02206v1#bib.bib5)\], we group these dimensions into five security phases: *Reconnaissance & Initial Access* (information-gathering, 802-11, rfid, bluetooth, sdr, social-engineering), *Vulnerability Analysis* (vulnerability, fuzzing, web, database, voip), *Exploitation & Payload Delivery* (exploitation, sniffing-spoofing, hardware, wireless), *Post-Exploitation & Lateral Movement* (post-exploitation, passwords, windows-resources, crypto-stego), and *Defensive Analysis & Reporting* (reverse-engineering, forensics, reporting, gpu). Although some capabilities span multiple stages, each dimension is assigned a primary functional role for clarity, enabling aggregation of evaluation metrics across coherent capability dimensions and security phases and supporting systematic analysis of model performance in natural-language–to–CLI translation across different cybersecurity contexts.
+
+#### 4. Training Protocol.
+
+Our training data support LLM post-training via Supervised Fine-Tuning (SFT) and Reinforcement Learning with Verifiable Rewards (RLVR). We adopt the same prompt template used during evaluation, with the query, a randomly sampled list of candidate tools, and tool documentation as inputs. We concatenate data from all three evaluation settings, resulting in $3{,}504\times 3=10{,}512$ training samples. Additional details are provided in Appendix [G.2](https://arxiv.org/html/2610.02206v1#A7.SS2).
+
+![Refer to caption](https://arxiv.org/html/2610.02206v1/train_pipe.png)
+
+Figure 4: KaliBench Training Protocol.
+
+SFT. We use the constructed prompt template and treat the ground-truth command as the target output. The model is trained to generate the correct command given the query and optional tool information.
+
+RLVR. We extend the prompt template by instructing the model to produce intermediate reasoning within *\<think\>…\</think\>* tags before generating the final command, following \[[9](https://arxiv.org/html/2610.02206v1#bib.bib35)\]. Our reward function is derived from component-level evaluation metrics, providing fully verifiable signals for accurate prediction of tool name, positional arguments, and alias-aware optional arguments. This enables fine-grained learning signals beyond a binary exact-match objective. An additional reward is assigned for exact command matches. Because ground-truth commands are validated during data construction via sandboxed execution, rewards can be computed without executing model outputs, enabling efficient RL without runtime. We include a formatting reward to enforce output structure.
+
+Table 1: Open-weight model query-to-command performance across three modes. Columns report Unrestricted (U), Restricted (R), and Hinted (H). <sup>†</sup> indicates thinking-enabled models, and <sup>⋆</sup> denotes cybersecurity-tuned models. Bold/underline mark the best and second-best within each size group. Models are sorted by Averaged Total Score. MoE parameters use Total/Active (e.g., 685/37B).
+
+<table>
+<tr>
+<th rowspan="2">Model</th>
+<th>Size</th>
+<th colspan="3">Exact Correct (%)</th>
+<th colspan="3">Tool Acc. (%)</th>
+<th colspan="3">Optional F1 (%)</th>
+<th colspan="3">Positional F1 (%)</th>
+<th colspan="4">Total Score (%)</th></tr>
+<tr>
+<td>(B)</td>
+<td>U</td>
+<td>R</td>
+<td>H</td>
+<td>U</td>
+<td>R</td>
+<td>H</td>
+<td>U</td>
+<td>R</td>
+<td>H</td>
+<td>U</td>
+<td>R</td>
+<td>H</td>
+<td>U</td>
+<td>R</td>
+<td>H</td>
+<td>Avg.</td></tr>
+<tr>
+<td colspan="18">Compact Models ($\leq$ 8B)</td></tr>
+<tr>
+<td>Foundation-Sec-Ins<sup>⋆</sup></td>
+<td>8</td>
+<td>14.7</td>
+<td>19.1</td>
+<td>56.2</td>
+<td>66.5</td>
+<td>92.5</td>
+<td>86.8</td>
+<td>33.5</td>
+<td>37.4</td>
+<td>75.6</td>
+<td>53.0</td>
+<td>60.0</td>
+<td>81.3</td>
+<td>51.0</td>
+<td>63.3</td>
+<td>81.2</td>
+<td>65.2</td></tr>
+<tr>
+<td>Llama3.1-Ins</td>
+<td>8</td>
+<td>12.5</td>
+<td>18.2</td>
+<td>62.7</td>
+<td>61.7</td>
+<td>93.7</td>
+<td>95.4</td>
+<td>32.4</td>
+<td>37.2</td>
+<td>82.7</td>
+<td>53.5</td>
+<td>61.9</td>
+<td>85.8</td>
+<td>49.2</td>
+<td>64.3</td>
+<td>88.0</td>
+<td>67.2</td></tr>
+<tr>
+<td>Llama-Primus-Base<sup>⋆</sup></td>
+<td>8</td>
+<td>15.8</td>
+<td>19.3</td>
+<td>60.3</td>
+<td>67.3</td>
+<td>90.7</td>
+<td>94.1</td>
+<td>36.6</td>
+<td>39.2</td>
+<td>80.8</td>
+<td>56.3</td>
+<td>61.9</td>
+<td>84.0</td>
+<td>53.4</td>
+<td>63.9</td>
+<td>86.3</td>
+<td>67.9</td></tr>
+<tr>
+<td>Foundation-Sec-Rsn<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>13.3</td>
+<td>18.6</td>
+<td>66.6</td>
+<td>67.0</td>
+<td>92.8</td>
+<td>95.9</td>
+<td>34.8</td>
+<td>39.1</td>
+<td>85.5</td>
+<td>53.0</td>
+<td>57.9</td>
+<td>86.2</td>
+<td>51.6</td>
+<td>63.3</td>
+<td>89.2</td>
+<td>68.0</td></tr>
+<tr>
+<td>Llama-Primus-Merged<sup>⋆</sup></td>
+<td>8</td>
+<td>16.3</td>
+<td>21.0</td>
+<td>65.2</td>
+<td>66.2</td>
+<td>93.4</td>
+<td>95.2</td>
+<td>36.7</td>
+<td>40.8</td>
+<td>84.1</td>
+<td>56.6</td>
+<td>63.2</td>
+<td>87.1</td>
+<td>53.2</td>
+<td>65.8</td>
+<td>88.8</td>
+<td>69.3</td></tr>
+<tr>
+<td>RedSage-DPO<sup>⋆</sup></td>
+<td>8</td>
+<td>18.2</td>
+<td>25.4</td>
+<td>68.1</td>
+<td>66.8</td>
+<td>95.1</td>
+<td>95.7</td>
+<td>40.1</td>
+<td>46.1</td>
+<td>85.4</td>
+<td>56.7</td>
+<td>65.9</td>
+<td>88.5</td>
+<td>54.5</td>
+<td>69.0</td>
+<td>89.9</td>
+<td>71.1</td></tr>
+<tr>
+<td>Qwen3</td>
+<td>8</td>
+<td>18.3</td>
+<td>24.1</td>
+<td>73.1</td>
+<td>68.9</td>
+<td>95.6</td>
+<td>96.3</td>
+<td>39.3</td>
+<td>43.4</td>
+<td>88.2</td>
+<td>58.5</td>
+<td>65.6</td>
+<td>90.5</td>
+<td>55.5</td>
+<td>68.2</td>
+<td>91.6</td>
+<td>71.8</td></tr>
+<tr>
+<td>Qwen3<sup>†</sup></td>
+<td>8</td>
+<td>20.9</td>
+<td>27.7</td>
+<td>80.9</td>
+<td>70.3</td>
+<td>95.7</td>
+<td>96.2</td>
+<td>42.9</td>
+<td>47.2</td>
+<td>92.4</td>
+<td>59.9</td>
+<td>66.5</td>
+<td>93.4</td>
+<td>57.7</td>
+<td>69.8</td>
+<td>94.0</td>
+<td>73.8</td></tr>
+<tr>
+<td>RedSage-Ins<sup>⋆</sup></td>
+<td>8</td>
+<td>19.7</td>
+<td>26.1</td>
+<td>67.2</td>
+<td>67.9</td>
+<td>94.6</td>
+<td>95.3</td>
+<td>42.4</td>
+<td>46.9</td>
+<td>85.0</td>
+<td>58.8</td>
+<td>66.4</td>
+<td>88.3</td>
+<td>56.4</td>
+<td>69.3</td>
+<td>89.5</td>
+<td>71.7</td></tr>
+<tr>
+<td>RedSage-K (GRPO)<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>28.1</td>
+<td>33.0</td>
+<td>66.7</td>
+<td>76.5</td>
+<td>93.3</td>
+<td>93.1</td>
+<td>51.7</td>
+<td>53.7</td>
+<td>84.8</td>
+<td>73.9</td>
+<td>77.0</td>
+<td>88.4</td>
+<td>67.4</td>
+<td>74.6</td>
+<td>88.8</td>
+<td>76.9</td></tr>
+<tr>
+<td>RedSage-K (SFT)<sup>⋆</sup></td>
+<td>8</td>
+<td>30.6</td>
+<td>34.4</td>
+<td>77.1</td>
+<td>78.1</td>
+<td>95.9</td>
+<td>97.1</td>
+<td>52.8</td>
+<td>55.2</td>
+<td>90.5</td>
+<td>66.9</td>
+<td>68.4</td>
+<td>92.0</td>
+<td>65.9</td>
+<td>73.2</td>
+<td>93.2</td>
+<td>77.4</td></tr>
+<tr>
+<td>RedSage-K (SFT+GRPO)<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>32.2</td>
+<td>37.4</td>
+<td>69.4</td>
+<td>77.9</td>
+<td>95.0</td>
+<td>92.5</td>
+<td>56.1</td>
+<td>57.9</td>
+<td>86.5</td>
+<td>76.9</td>
+<td>80.9</td>
+<td>89.1</td>
+<td>70.3</td>
+<td>77.9</td>
+<td>89.3</td>
+<td>79.2</td></tr>
+<tr>
+<td colspan="18">Mid-size Models (20-32B)</td></tr>
+<tr>
+<td>Gemma-3-it</td>
+<td>27</td>
+<td>18.9</td>
+<td>24.0</td>
+<td>70.5</td>
+<td>73.4</td>
+<td>97.3</td>
+<td>87.0</td>
+<td>40.9</td>
+<td>44.2</td>
+<td>83.1</td>
+<td>60.2</td>
+<td>66.3</td>
+<td>88.4</td>
+<td>58.1</td>
+<td>69.2</td>
+<td>86.2</td>
+<td>71.2</td></tr>
+<tr>
+<td>GPT-OSS<sup>†</sup></td>
+<td>20/3.6</td>
+<td>19.6</td>
+<td>24.6</td>
+<td>78.1</td>
+<td>72.3</td>
+<td>95.1</td>
+<td>95.9</td>
+<td>42.2</td>
+<td>45.6</td>
+<td>91.3</td>
+<td>57.1</td>
+<td>63.6</td>
+<td>92.0</td>
+<td>57.2</td>
+<td>68.1</td>
+<td>93.0</td>
+<td>72.8</td></tr>
+<tr>
+<td>Mistral-Small-3.2</td>
+<td>24</td>
+<td>20.7</td>
+<td>27.4</td>
+<td>79.9</td>
+<td>70.6</td>
+<td>95.6</td>
+<td>96.2</td>
+<td>44.3</td>
+<td>48.2</td>
+<td>91.5</td>
+<td>62.6</td>
+<td>69.2</td>
+<td>93.2</td>
+<td>59.2</td>
+<td>71.0</td>
+<td>93.7</td>
+<td>74.6</td></tr>
+<tr>
+<td>Qwen3</td>
+<td>32</td>
+<td>20.6</td>
+<td>27.7</td>
+<td>79.8</td>
+<td>73.5</td>
+<td>96.3</td>
+<td>95.5</td>
+<td>43.4</td>
+<td>48.9</td>
+<td>91.2</td>
+<td>62.8</td>
+<td>69.9</td>
+<td>93.4</td>
+<td>59.9</td>
+<td>71.7</td>
+<td>93.4</td>
+<td>75.0</td></tr>
+<tr>
+<td>Qwen3<sup>†</sup></td>
+<td>32</td>
+<td>24.0</td>
+<td>30.9</td>
+<td>81.8</td>
+<td>72.4</td>
+<td>96.8</td>
+<td>95.2</td>
+<td>47.2</td>
+<td>51.6</td>
+<td>92.4</td>
+<td>65.3</td>
+<td>71.4</td>
+<td>94.0</td>
+<td>61.6</td>
+<td>73.3</td>
+<td>93.9</td>
+<td>76.3</td></tr>
+<tr>
+<td colspan="18">Large-scale Models ($\geq$ 70B)</td></tr>
+<tr>
+<td>Llama-Primus-Ins<sup>⋆</sup></td>
+<td>70</td>
+<td>18.8</td>
+<td>25.0</td>
+<td>71.2</td>
+<td>72.8</td>
+<td>96.4</td>
+<td>92.1</td>
+<td>41.9</td>
+<td>46.3</td>
+<td>88.1</td>
+<td>59.6</td>
+<td>67.0</td>
+<td>90.2</td>
+<td>58.1</td>
+<td>69.9</td>
+<td>90.1</td>
+<td>72.7</td></tr>
+<tr>
+<td>Llama-3.3-Ins</td>
+<td>70</td>
+<td>22.6</td>
+<td>28.7</td>
+<td>77.7</td>
+<td>72.1</td>
+<td>96.5</td>
+<td>94.1</td>
+<td>45.7</td>
+<td>49.9</td>
+<td>91.7</td>
+<td>61.9</td>
+<td>68.1</td>
+<td>92.5</td>
+<td>59.9</td>
+<td>71.5</td>
+<td>92.7</td>
+<td>74.7</td></tr>
+<tr>
+<td>GPT-OSS<sup>†</sup></td>
+<td>120/5.1</td>
+<td>24.0</td>
+<td>32.0</td>
+<td>80.9</td>
+<td>73.6</td>
+<td>95.6</td>
+<td>96.0</td>
+<td>48.0</td>
+<td>52.9</td>
+<td>92.2</td>
+<td>61.4</td>
+<td>68.7</td>
+<td>92.7</td>
+<td>61.0</td>
+<td>72.4</td>
+<td>93.6</td>
+<td>75.7</td></tr>
+<tr>
+<td>Qwen3-Coder-Next<sup>†</sup></td>
+<td>80/3</td>
+<td>26.2</td>
+<td>31.0</td>
+<td>79.9</td>
+<td>74.1</td>
+<td>96.8</td>
+<td>96.4</td>
+<td>48.8</td>
+<td>51.9</td>
+<td>91.4</td>
+<td>63.9</td>
+<td>70.7</td>
+<td>93.2</td>
+<td>62.3</td>
+<td>73.1</td>
+<td>93.6</td>
+<td>76.3</td></tr>
+<tr>
+<td>Qwen2.5-Ins</td>
+<td>72</td>
+<td>25.4</td>
+<td>30.2</td>
+<td>80.6</td>
+<td>76.0</td>
+<td>97.4</td>
+<td>96.8</td>
+<td>47.7</td>
+<td>51.1</td>
+<td>91.5</td>
+<td>67.0</td>
+<td>72.2</td>
+<td>93.3</td>
+<td>63.6</td>
+<td>73.6</td>
+<td>93.8</td>
+<td>77.0</td></tr>
+<tr>
+<td>DeepSeek-V3.2<sup>†</sup></td>
+<td>685/37</td>
+<td>33.0</td>
+<td>40.2</td>
+<td>84.5</td>
+<td>75.8</td>
+<td>98.3</td>
+<td>97.1</td>
+<td>57.0</td>
+<td>62.0</td>
+<td>93.5</td>
+<td>68.8</td>
+<td>75.4</td>
+<td>94.1</td>
+<td>67.2</td>
+<td>78.6</td>
+<td>94.9</td>
+<td>80.2</td></tr>
+<tr>
+<td>GLM-5.2<sup>†</sup></td>
+<td>753</td>
+<td>41.3</td>
+<td>52.0</td>
+<td>74.8</td>
+<td>86.3</td>
+<td>94.2</td>
+<td>94.9</td>
+<td>75.3</td>
+<td>71.9</td>
+<td>88.4</td>
+<td>51.3</td>
+<td>78.8</td>
+<td>90.6</td>
+<td>71.0</td>
+<td>81.7</td>
+<td>91.3</td>
+<td>81.3</td></tr>
+<tr>
+<td>Metric Average</td>
+<td>–</td>
+<td>22.3</td>
+<td>28.3</td>
+<td>73.1</td>
+<td>72.0</td>
+<td>95.2</td>
+<td>94.6</td>
+<td>45.1</td>
+<td>48.7</td>
+<td>87.8</td>
+<td>61.1</td>
+<td>68.2</td>
+<td>90.1</td>
+<td>59.4</td>
+<td>70.7</td>
+<td>90.8</td>
+<td>73.6</td></tr>
+</table>
+
+## 4 Experiments
+
+#### Experiment Setup.
+
+All evaluations of open-source models were conducted on an NVIDIA A100 multi-GPU cluster using the vLLM inference engine, with selected large models evaluated via external APIs<sup>22</sup> 2 OpenRouter: <https://openrouter.ai/>. We evaluate 14 general-purpose models: Llama3.1-Instruct (8B) \[[8](https://arxiv.org/html/2610.02206v1#bib.bib29)\], Qwen-3 (8B, 32B; with and without reasoning) \[[41](https://arxiv.org/html/2610.02206v1#bib.bib33)\], Mistral-3.2 (24B) \[[23](https://arxiv.org/html/2610.02206v1#bib.bib37)\], Gemma-3 (27B) \[[35](https://arxiv.org/html/2610.02206v1#bib.bib34)\], GPT-OSS (20B, 120B) \[[24](https://arxiv.org/html/2610.02206v1#bib.bib36)\], LLaMA-3.3-Instruct (70B) \[[22](https://arxiv.org/html/2610.02206v1#bib.bib38)\], Qwen-2.5-Instruct (72B) \[[29](https://arxiv.org/html/2610.02206v1#bib.bib40)\], Qwen3-Coder-Next (80B) \[[4](https://arxiv.org/html/2610.02206v1#bib.bib39)\], and DeepSeek-V3.2 (685B) \[[6](https://arxiv.org/html/2610.02206v1#bib.bib41)\], GLM-5.2 (753B) \[[7](https://arxiv.org/html/2610.02206v1#bib.bib42)\] along with 7 cybersecurity-oriented models: Foundation-Sec-Instruct (8B) \[[39](https://arxiv.org/html/2610.02206v1#bib.bib28)\], Foundation-Sec-Reasoning (8B) \[[42](https://arxiv.org/html/2610.02206v1#bib.bib31)\], Llama-Primus-Base/Merged (8B) and Llama-Primus-Nemotron (70B) \[[43](https://arxiv.org/html/2610.02206v1#bib.bib30)\], and RedSage-Ins/DPO (8B) \[[34](https://arxiv.org/html/2610.02206v1#bib.bib32)\], as well as three variants of a cybersecurity-oriented model further fine-tuned on KaliBench. Models with 72B or more parameters were evaluated through the OpenRouter API; all other models are obtained from their official Hugging Face repositories under their respective licenses and evaluated under a fixed inference configuration; details are in Appendix [G.1](https://arxiv.org/html/2610.02206v1#A7.SS1).
+
+#### Training Setup.
+
+We employ parameter-efficient fine-tuning using LoRA \[[12](https://arxiv.org/html/2610.02206v1#bib.bib23)\] with Unsloth \[[5](https://arxiv.org/html/2610.02206v1#bib.bib24)\]. We select the best-performing 8B cybersecurity-tuned model RedSage-Ins as the backbone. Using the training dataset described in Sec. [3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px4), we train three variants, collectively referred to as RedSage-K: (1) SFT, (2) RLVR with Group Relative Policy Optimization (GRPO) \[[33](https://arxiv.org/html/2610.02206v1#bib.bib25)\], and (3) SFT followed by GRPO (SFT+GRPO). All models are trained on a single H200 GPU (141GB VRAM) with a total batch size of 32 for two epochs; details are in Appendix [G.2](https://arxiv.org/html/2610.02206v1#A7.SS2).
+
+### 4.1 Model Performance Across Three Modes
+
+Table [1](https://arxiv.org/html/2610.02206v1#S3.T1) summarizes per-model performance under three modes: Unrestricted (U), Restricted (R), and Hinted (H). We report Exact Correct (EC), Tool Accuracy (TA), Optional-Argument F1 (Opt-F1), Positional-Argument F1 (Pos-F1), Total Score (TS), and Average TS (Avg.). We analyze key patterns with respect to tool information, model type and scale, and post-training on KaliBench.
+
+#### Impact of Evaluation Modes.
+
+The three evaluation modes reveal a clear separation between tool selection and argument construction. Transitioning from U to R substantially improves TA (72.0%$\rightarrow$95.2% on average), indicating that constraining the candidate tool space largely resolves tool-selection errors. However, this shift yields only modest gains in Opt-F1, Pos-F1, and EC, indicating that correct tool selection alone does not ensure accurate argument generation. The metric averages further reveal a hierarchy of difficulty: optional-argument prediction is the most challenging, followed by positional-argument prediction. In contrast, H produces the largest improvements, increasing Opt-F1 from 45.1% to 87.8%, Pos-F1 from 61.1% to 90.1%, TS from 59.4% to 90.8%, and EC from 22.3% to 73.1%. These gains indicate that tool hints resolve ambiguities in argument selection, ordering, and formatting, and suggest that existing models lack sufficient domain knowledge to construct accurate commands without tool documentation. Overall, R primarily improves *which* tool to use, whereas H improves *how* the command is constructed; without hints, open-weight models still struggle with accurate argument generation, the primary bottleneck.
+
+#### Impact of Model Type and Scale.
+
+Cybersecurity-oriented models (<sup>⋆</sup>) do not consistently outperform strong general-purpose models on query-to-command generation, but their advantages become more apparent in less-guided settings. In the compact regime, RedSage-Ins<sup>⋆</sup> achieves higher TS than non-thinking Qwen3 in both U and R (56.4% vs. 55.5% and 69.3% vs. 68.2%), suggesting that domain-specific training provides useful priors when models must infer command structure with limited support. In contrast, general-purpose models perform better in H, where Qwen3 surpasses RedSage-Ins<sup>⋆</sup> (91.6% vs. 89.5%), indicating stronger instruction-following and context utilization under richer guidance. Overall, cybersecurity-oriented models are more effective in under-specified settings, while general-purpose models better exploit explicit hints. Reasoning-enabled variants (<sup>†</sup>) further improve argument-level performance, particularly in Opt-F1, Pos-F1, and EC. For example, Qwen3<sup>†</sup> improves Avg from 71.8% to 73.8% over Qwen3 and achieves strong H-mode results (94.0% TS, 80.9% EC), highlighting the role of reasoning in intent decomposition and context utilization. Finally, while performance generally improves with scale, gains are uneven. For example, Qwen3<sup>†</sup> (8B) outperforms larger models, including Gemma-3-it (27B) and Llama-Primus-Ins<sup>⋆</sup> (70B), in Avg. These results suggest that effective NL–to–CLI generation depends on domain knowledge, instruction-following, reasoning, and task alignment, rather than scale alone.
+
+#### Proprietary Models and Scaffolded Inference.
+
+Our main evaluation emphasizes open-weight models because local deployment is particularly important in cybersecurity, where queries, target information, and operational data may be sensitive and cannot always be shared with proprietary APIs. To assess whether KaliBench remains challenging for stronger proprietary models and scaffolded systems, we additionally evaluate GPT-5.6-Sol \[[27](https://arxiv.org/html/2610.02206v1#bib.bib43)\], Claude Opus 5 \[[2](https://arxiv.org/html/2610.02206v1#bib.bib45)\], and OpenAI Codex  \[[25](https://arxiv.org/html/2610.02206v1#bib.bib44)\], powered by GPT-5.5 \[[26](https://arxiv.org/html/2610.02206v1#bib.bib46)\] with xhigh reasoning effort. We evaluate all systems on the 5,000 test queries in the Unrestricted setting.
+
+Table 2: Proprietary models and scaffolded inference in Unrestricted mode.
+
+| Model           | Answered queries | EC (%) | EC (%) (all 5K) |
+|-----------------|------------------|--------|-----------------|
+| GPT-5.6-Sol     | 4,988            | 61.83  | 61.68           |
+| Claude Opus 5   | 3,675            | 59.89  | 44.02           |
+| Codex (GPT-5.5) | 4,633            | 55.77  | 51.68           |
+
+EC (Exact Correct) is computed over answered queries; the EC (all 5K) counts blocked or missing outputs as incorrect. For Codex, we use its scaffolded CLI workflow and score only the final submitted command.
+
+As shown in Table [2](https://arxiv.org/html/2610.02206v1#S4.T2), GPT-5.6-Sol achieves the highest full-set Exact Correct of 61.68%, followed by Codex at 51.68% and Claude Opus 5 at 44.02%. All three outperform GLM-5.2, the strongest evaluated open-weight model in this setting, which achieves 41.32%. Response coverage, however, varies across systems: GPT-5.6-Sol answers 4,988 of 5,000 queries, compared with 4,633 for Codex and 3,675 for Claude Opus 5. These coverage differences suggest that provider-specific safety restrictions influence cybersecurity-related usage. For example, Claude Opus 5 achieves 59.89% EC on answered queries but answers only 73.50% of the test set, reducing its full-set EC to 44.02%. Moreover, despite the gains over open-weight models, the highest full-set accuracy among these systems is 61.68%, indicating that KaliBench remains unsaturated and that exact command generation is challenging. Complete metrics and reporting details are provided in Appendix [M](https://arxiv.org/html/2610.02206v1#A13).
+
+#### Impact of KaliBench Post-training.
+
+Post-training on the KaliBench training split substantially improves compact models. The three RedSage-K variants achieve Avg scores of 76.9, 77.4, and 79.2, with RedSage-K (SFT+GRPO) ranking third in Avg among all evaluated open-weight models, only 1.0 point below DeepSeek-V3.2<sup>†</sup> despite using an 8B backbone. The methods exhibit complementary strengths: RedSage-K (SFT) attains the best compact-model TA across all modes, shows stronger gains in Opt-F1, and delivers the largest improvements in H, suggesting that supervised fine-tuning effectively learns tool mapping and benefits from contextual hints. In contrast, RedSage-K (GRPO) shows stronger gains in Pos-F1 and TS under U and R, but is weaker in H.
+
+Combining both methods, RedSage-K (SFT+GRPO) yields the best compact-model U/R TS and EC, demonstrating the benefit of combining SFT and RLVR under limited guidance. However, RedSage-K (GRPO) and RedSage-K (SFT+GRPO) slightly reduce H-mode TS relative to the original RedSage-Ins model. Our paired analysis identifies argument-construction errors and regressions on previously solved examples, with SFT initialization mitigating these regressions (Appendix [I](https://arxiv.org/html/2610.02206v1#A9)). Overall, KaliBench post-training enables compact models to approach larger ones in cybersecurity tool use under less-guided settings.
+
+![Refer to caption](https://arxiv.org/html/2610.02206v1/boxplot_9.28.png)
+
+Figure 5: Performance across security dimensions and modes. (a) Performance over 23 dimensions and 5 phases per mode. Box plots show distributions (Q1–Q3), with whiskers for min/max. (b,c) Total Score and Exact Correct (%) across modes; dotted lines indicate inter-mode gaps.
+
+### 4.2 Fine-Grained Performance and Robustness Analysis
+
+#### Dimension-wise and Tool-level Analysis.
+
+Figure [5](https://arxiv.org/html/2610.02206v1#S4.F5)(a) reports TS performance across 23 capability dimensions, five security phases, and three evaluation modes, aggregated over all evaluated models. Performance varies across dimensions, but relative difficulty remains broadly consistent across modes, suggesting that additional tool information improves overall scores without fundamentally changing which dimensions are harder. Dimensions such as gpu and crypto-stego consistently achieve higher scores, whereas 802-11 and wireless show lower minima, especially in U and R modes. We also observe mode-specific deviations, such as hardware in H mode, where performance remains comparatively lower, likely reflecting the difficulty of longer or more complex tool descriptions.
+
+From a distributional perspective, variability decreases as tool information increases. The U mode shows the widest spread across models, reflecting high variance without tool guidance; R reduces this variability by constraining tool selection; and H further stabilizes performance across most dimensions. However, H narrows variance without eliminating dimension-level gaps, suggesting that documentation improves argument construction but does not fully resolve interface complexity. At the phase level, Reconnaissance and Vulnerability Analysis are relatively stable, while Post-Exploitation and Defensive Analysis show greater variation, likely due to more heterogeneous CLI structures.
+
+At the tool level, performance differences largely reflect CLI interface complexity. Tools with simple invocation patterns and well-defined defaults (e.g., truecrypt2john, jsql) are handled reliably, whereas those with irregular or uncommon options (e.g., nikto, hashrat) remain challenging due to precise flag–value binding and strict syntax. Additional full statistics are provided in Appendix [K](https://arxiv.org/html/2610.02206v1#A11), confirming that tool-level difficulty is driven more by interface complexity than model-specific limitations.
+
+#### Mode-wise Performance Trends.
+
+Figure [5](https://arxiv.org/html/2610.02206v1#S4.F5)(b,c) visualizes the distributions of Total Score and Exact Correct across the three evaluation modes. Both metrics improve consistently from U to R to H, with H achieving the strongest results. This supports our earlier finding that tool documentation provides the largest gains, primarily by improving argument prediction, the main bottleneck in accurate command construction.
+
+The two metrics exhibit different patterns of cross-model dispersion. The Total Score range narrows from 21.8 $\rightarrow$ 18.4 $\rightarrow$ 13.7 percentage points across U, R, and H. In contrast, the Exact Correct range remains wide at 28.8, 33.8, and 28.3 percentage points, respectively. This suggests that providing tool information brings models closer together in Total Score, while substantial differences in exact command correctness persist.
+
+#### Common Failure Pattern Analysis.
+
+Weak query-to-command performance primarily stems from accumulated errors in command construction, particularly with optional arguments. Across models, we observe four recurring patterns: (i) long–short option misuse, where alias forms are mixed (e.g., `--`domain/`-`d), producing invalid commands; (ii) option hallucination, where positional arguments are treated as flags or nonexistent aliases inferred (e.g., ‘st `--`client’); (iii) hallucinated long options, where tools with only short flags lead to invented long forms; and (iv) erroneous option names, where singular–plural confusion produces incorrect variants (e.g., `--`symlink vs. `--`symlinks).
+
+Table 3: Average change in Total Score, in percentage points, relative to original queries across eight model configurations.
+
+| Query style | Ures. | Res.  | Hinted |
+|-------------|-------|-------|--------|
+| Paraphrase  | +0.61 | +0.22 | -0.09  |
+| Informal    | -0.55 | -0.48 | -0.28  |
+| Messy       | -3.20 | -1.40 | -1.07  |
+
+#### Robustness to Query Variation.
+
+Since KaliBench queries are synthesized from tool documentation, we examine the sensitivity of model performance to changes in query wording and presentation. We evaluate eight model configurations under three query variations: Paraphrase (uses synonyms and alternative phrasing); Informal (adopts conversational wording); and Messy (introduces linguistic and formatting noise, such as grammatical errors, omitted prepositions or verbs, and incorrect word choices).
+
+Table [3](https://arxiv.org/html/2610.02206v1#S4.T3) shows that paraphrases have little overall effect and slightly improve performance in the Unrestricted and Restricted settings. Informal queries introduce a small but consistent degradation. Messy queries cause the largest drop across all settings, especially in the Unrestricted setting. Hinted mode shows the smallest decline under messy inputs (1.07 percentage points), suggesting that access to full tool documentation mitigates, but does not eliminate, the impact of noisy wording. The eight configurations and their model-level results for the Messy variation are detailed in Appendix [N](https://arxiv.org/html/2610.02206v1#A14).
+
+## 5 Discussion and Conclusion
+
+KaliBench exposes a clear gap between LLMs’ general cybersecurity knowledge and their ability to generate exact, executable CLI commands. Our results show that tool selection and argument construction are fundamentally different challenges: restricting candidate tools largely resolves tool-selection errors, while argument-level correctness, especially for optional flags and flag–value bindings, remains the primary bottleneck. Providing tool documentation results in the largest gains, indicating that failures often stem from limited domain knowledge rather than intent understanding. These findings highlight the importance of evaluating tool use at the command-structure level in schema-free settings, where models must infer tools and syntax without explicit APIs.
+
+Beyond evaluation, KaliBench enables effective model improvement through fine-grained, runtime-free verifiable rewards. Post-training with SFT and RLVR substantially improves compact models, allowing an 8B model to approach much larger systems. Despite these advances, limitations remain, including the focus on single-turn command generation and reliance on documentation-grounded data. Future work should extend to multi-step workflows, retrieval-augmented tool use, and environment-aware evaluation. Overall, KaliBench provides a practical benchmarking and training framework for advancing the reliable and executable use of LLM-based cybersecurity tools.
+
+## 6 Acknowledgements
+
+This research was funded by Khalifa University of Science and Technology through the Faculty Start-Ups under Project ID: KU-INT-FSU-2005-8474000775. This research was also supported by KU Research Center for Advanced Intelligent Systems (AIS), Khalifa University of Science and Technology (KU-AIS).
+
+## References
+
+- \[1\] M. T. Alam, D. Bhusal, L. Nguyen, and N. Rastogi (2024) Ctibench: a benchmark for evaluating llms in cyber threat intelligence. Advances in Neural Information Processing Systems 37, pp. 50805–50825. Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[2\] Anthropic (2026) System Card: Claude Opus 5. System Card Anthropic. External Links: [Link](https://www.anthropic.com/claude-opus-5-system-card) Cited by: [§4.1](https://arxiv.org/html/2610.02206v1#S4.SS1.SSS0.Px3.p1.1).
+- \[3\] D. Bhusal, M. T. Alam, L. Nguyen, A. Mahara, Z. Lightcap, R. Frazier, R. Fieblinger, G. L. Torales, B. A. Blakely, and N. Rastogi (2024) Secure: benchmarking large language models for cybersecurity. In 2024 Annual Computer Security Applications Conference (ACSAC), pp. 15–30. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[4\] R. Cao, M. Chen, J. Chen, Z. Cui, Y. Feng, B. Hui, Y. Jing, K. Li, M. Li, J. Lin, Z. Ma, K. Shum, X. Wang, J. Wei, J. Yang, J. Zhang, L. Zhang, Z. Zhang, W. Zhao, and F. Zhou (2026) Qwen3-coder-next technical report. External Links: 2603.00729, [Link](https://arxiv.org/abs/2603.00729) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[5\] Unsloth External Links: [Link](https://github.com/unslothai/unsloth) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px2.p1.1).
+- \[6\] DeepSeek-AI, A. Liu, A. Mei, B. Lin, B. Xue, B. Wang, B. Xu, B. Wu, B. Zhang, C. Lin, C. Dong, C. Lu, C. Zhao, C. Deng, C. Xu, C. Ruan, D. Dai, D. Guo, D. Yang, D. Chen, E. Li, F. Zhou, F. Lin, F. Dai, G. Hao, G. Chen, G. Li, H. Zhang, H. Xu, H. Li, H. Liang, H. Wei, H. Zhang, H. Luo, H. Ji, H. Ding, H. Tang, H. Cao, H. Gao, H. Qu, H. Zeng, J. Huang, J. Li, J. Xu, J. Hu, J. Chen, J. Xiang, J. Yuan, J. Cheng, J. Zhu, J. Ran, J. Jiang, J. Qiu, J. Li, J. Song, K. Dong, K. Gao, K. Guan, K. Huang, K. Zhou, K. Huang, K. Yu, L. Wang, L. Zhang, L. Wang, L. Zhao, L. Yin, L. Guo, L. Luo, L. Ma, L. Wang, L. Zhang, M. S. Di, M. Y. Xu, M. Zhang, M. Zhang, M. Tang, M. Zhou, P. Huang, P. Cong, P. Wang, Q. Wang, Q. Zhu, Q. Li, Q. Chen, Q. Du, R. Xu, R. Ge, R. Zhang, R. Pan, R. Wang, R. Yin, R. Xu, R. Shen, R. Zhang, S. H. Liu, S. Lu, S. Zhou, S. Chen, S. Cai, S. Chen, S. Hu, S. Liu, S. Hu, S. Ma, S. Wang, S. Yu, S. Zhou, S. Pan, S. Zhou, T. Ni, T. Yun, T. Pei, T. Ye, T. Yue, W. Zeng, W. Liu, W. Liang, W. Pang, W. Luo, W. Gao, W. Zhang, X. Gao, X. Wang, X. Bi, X. Liu, X. Wang, X. Chen, X. Zhang, X. Nie, X. Cheng, X. Liu, X. Xie, X. Liu, X. Yu, X. Li, X. Yang, X. Li, X. Chen, X. Su, X. Pan, X. Lin, X. Fu, Y. Q. Wang, Y. Zhang, Y. Xu, Y. Ma, Y. Li, Y. Li, Y. Zhao, Y. Sun, Y. Wang, Y. Qian, Y. Yu, Y. Zhang, Y. Ding, Y. Shi, Y. Xiong, Y. He, Y. Zhou, Y. Zhong, Y. Piao, Y. Wang, Y. Chen, Y. Tan, Y. Wei, Y. Ma, Y. Liu, Y. Yang, Y. Guo, Y. Wu, Y. Wu, Y. Cheng, Y. Ou, Y. Xu, Y. Wang, Y. Gong, Y. Wu, Y. Zou, Y. Li, Y. Xiong, Y. Luo, Y. You, Y. Liu, Y. Zhou, Z. F. Wu, Z. Z. Ren, Z. Zhao, Z. Ren, Z. Sha, Z. Fu, Z. Xu, Z. Xie, Z. Zhang, Z. Hao, Z. Gou, Z. Ma, Z. Yan, Z. Shao, Z. Huang, Z. Wu, Z. Li, Z. Zhang, Z. Xu, Z. Wang, Z. Gu, Z. Zhu, Z. Li, Z. Zhang, Z. Xie, Z. Gao, Z. Pan, Z. Yao, B. Feng, H. Li, J. L. Cai, J. Ni, L. Xu, M. Li, N. Tian, R. J. Chen, R. L. Jin, S. S. Li, S. Zhou, T. Sun, X. Q. Li, X. Jin, X. Shen, X. Chen, X. Song, X. Zhou, Y. X. Zhu, Y. Huang, Y. Li, Y. Zheng, Y. Zhu, Y. Ma, Z. Huang, Z. Xu, Z. Zhang, D. Ji, J. Liang, J. Guo, J. Chen, L. Xia, M. Wang, M. Li, P. Zhang, R. Chen, S. Sun, S. Wu, S. Ye, T. Wang, W. L. Xiao, W. An, X. Wang, X. Sun, X. Wang, Y. Tang, Y. Zha, Z. Zhang, Z. Ju, Z. Zhang, and Z. Qu (2025) DeepSeek-v3.2: pushing the frontier of open large language models. External Links: 2512.02556, [Link](https://arxiv.org/abs/2512.02556) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[7\] GLM-5-Team, :, A. Zeng, X. Lv, Z. Hou, Z. Du, Q. Zheng, B. Chen, D. Yin, C. Ge, C. Huang, C. Xie, C. Zhu, C. Yin, C. Wang, G. Pan, H. Zeng, H. Zhang, H. Wang, H. Chen, J. Zhang, J. Jiao, J. Guo, J. Wang, J. Du, J. Wu, K. Wang, L. Li, L. Fan, L. Zhong, M. Liu, M. Zhao, P. Du, Q. Dong, R. Lu, Shuang-Li, S. Cao, S. Liu, T. Jiang, X. Chen, X. Zhang, X. Huang, X. Dong, Y. Xu, Y. Wei, Y. An, Y. Niu, Y. Zhu, Y. Wen, Y. Cen, Y. Bai, Z. Qiao, Z. Wang, Z. Wang, Z. Zhu, Z. Liu, Z. Li, B. Wang, B. Wen, C. Huang, C. Cai, C. Yu, C. Li, C. Hu, C. Zhang, D. Zhang, D. Lin, D. Yang, D. Wang, D. Ai, E. Zhu, F. Yi, F. Chen, G. Wen, H. Sun, H. Zhao, H. Hu, H. Zhang, H. Liu, H. Zhang, H. Peng, H. Tai, H. Zhang, H. Liu, H. Wang, H. Yan, H. Ge, H. Liu, H. Chu, J. Zhao, J. Wang, J. Zhao, J. Ren, J. Wang, J. Zhang, J. Gui, J. Zhao, J. Li, J. An, J. Li, J. Yuan, J. Du, J. Liu, J. Zhi, J. Duan, K. Zhou, K. Wei, K. Wang, K. Luo, L. Zhang, L. Sha, L. Xu, L. Wu, L. Ding, L. Chen, M. Li, N. Lin, P. Ta, Q. Zou, R. Song, R. Yang, S. Tu, S. Yang, S. Wu, S. Zhang, S. Li, S. Li, S. Fan, W. Qin, W. Tian, W. Zhang, W. Yu, W. Liang, X. Kuang, X. Cheng, X. Li, X. Yan, X. Hu, X. Ling, X. Fan, X. Xia, X. Zhang, X. Zhang, X. Pan, X. Zou, X. Zhang, Y. Liu, Y. Wu, Y. Li, Y. Wang, Y. Zhu, Y. Tan, Y. Zhou, Y. Pan, Y. Zhang, Y. Su, Y. Geng, Y. Yan, Y. Tan, Y. Bi, Y. Shen, Y. Yang, Y. Li, Y. Liu, Y. Wang, Y. Li, Y. Wu, Y. Zhang, Y. Duan, Y. Zhang, Z. Liu, Z. Jiang, Z. Yan, Z. Zhang, Z. Wei, Z. Chen, Z. Feng, Z. Yao, Z. Chai, Z. Wang, Z. Zhang, B. Xu, M. Huang, H. Wang, J. Li, Y. Dong, and J. Tang (2026) GLM-5: from vibe coding to agentic engineering. External Links: 2602.15763, [Link](https://arxiv.org/abs/2602.15763) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[8\] A. Grattafiori, A. Dubey, A. Jauhri, A. Pandey, A. Kadian, A. Al-Dahle, A. Letman, A. Mathur, A. Schelten, A. Vaughan, et al. (2024) The llama 3 herd of models. arXiv preprint arXiv:2407.21783. Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[9\] D. Guo, D. Yang, H. Zhang, J. Song, P. Wang, Q. Zhu, R. Xu, R. Zhang, S. Ma, X. Bi, X. Zhang, X. Yu, Y. Wu, Z. F. Wu, Z. Gou, Z. Shao, Z. Li, Z. Gao, A. Liu, B. Xue, B. Wang, B. Wu, B. Feng, C. Lu, C. Zhao, C. Deng, C. Ruan, D. Dai, D. Chen, D. Ji, E. Li, F. Lin, F. Dai, F. Luo, G. Hao, G. Chen, G. Li, H. Zhang, H. Xu, H. Ding, H. Gao, H. Qu, H. Li, J. Guo, J. Li, J. Chen, J. Yuan, J. Tu, J. Qiu, J. Li, J. L. Cai, J. Ni, J. Liang, J. Chen, K. Dong, K. Hu, K. You, K. Gao, K. Guan, K. Huang, K. Yu, L. Wang, L. Zhang, L. Zhao, L. Wang, L. Zhang, L. Xu, L. Xia, M. Zhang, M. Zhang, M. Tang, M. Zhou, M. Li, M. Wang, M. Li, N. Tian, P. Huang, P. Zhang, Q. Wang, Q. Chen, Q. Du, R. Ge, R. Zhang, R. Pan, R. Wang, R. J. Chen, R. L. Jin, R. Chen, S. Lu, S. Zhou, S. Chen, S. Ye, S. Wang, S. Yu, S. Zhou, S. Pan, S. S. Li, S. Zhou, S. Wu, T. Yun, T. Pei, T. Sun, T. Wang, W. Zeng, W. Liu, W. Liang, W. Gao, W. Yu, W. Zhang, W. L. Xiao, W. An, X. Liu, X. Wang, X. Chen, X. Nie, X. Cheng, X. Liu, X. Xie, X. Liu, X. Yang, X. Li, X. Su, X. Lin, X. Q. Li, X. Jin, X. Shen, X. Chen, X. Sun, X. Wang, X. Song, X. Zhou, X. Wang, X. Shan, Y. K. Li, Y. Q. Wang, Y. X. Wei, Y. Zhang, Y. Xu, Y. Li, Y. Zhao, Y. Sun, Y. Wang, Y. Yu, Y. Zhang, Y. Shi, Y. Xiong, Y. He, Y. Piao, Y. Wang, Y. Tan, Y. Ma, Y. Liu, Y. Guo, Y. Ou, Y. Wang, Y. Gong, Y. Zou, Y. He, Y. Xiong, Y. Luo, Y. You, Y. Liu, Y. Zhou, Y. X. Zhu, Y. Huang, Y. Li, Y. Zheng, Y. Zhu, Y. Ma, Y. Tang, Y. Zha, Y. Yan, Z. Z. Ren, Z. Ren, Z. Sha, Z. Fu, Z. Xu, Z. Xie, Z. Zhang, Z. Hao, Z. Ma, Z. Yan, Z. Wu, Z. Gu, Z. Zhu, Z. Liu, Z. Li, Z. Xie, Z. Song, Z. Pan, Z. Huang, Z. Xu, Z. Zhang, and Z. Zhang (2025) DeepSeek-r1 incentivizes reasoning in llms through reinforcement learning. Nature 645 (8081), pp. 633–638. External Links: ISSN 1476-4687, [Link](http://dx.doi.org/10.1038/s41586-025-09422-z), [Document](https://dx.doi.org/10.1038/s41586-025-09422-z) Cited by: [§3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px4.p3.1).
+- \[10\] Z. Guo, S. Cheng, H. Wang, S. Liang, Y. Qin, P. Li, Z. Liu, M. Sun, and Y. Liu (2024) Stabletoolbench: towards stable large-scale benchmarking on tool learning of large language models. In Findings of the Association for Computational Linguistics: ACL 2024, pp. 11143–11156. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p3.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px2.p1.1).
+- \[11\] D. Hendrycks, C. Burns, S. Basart, A. Zou, M. Mazeika, D. Song, and J. Steinhardt (2021) Measuring massive multitask language understanding. Proceedings of the International Conference on Learning Representations (ICLR). Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p1.1).
+- \[12\] E. J. Hu, Y. Shen, P. Wallis, Z. Allen-Zhu, Y. Li, S. Wang, L. Wang, and W. Chen (2021) LoRA: low-rank adaptation of large language models. External Links: 2106.09685, [Link](https://arxiv.org/abs/2106.09685) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px2.p1.1).
+- \[13\] E. M. Hutchins, M. J. Cloppert, R. M. Amin, et al. (2011) Intelligence-driven computer network defense informed by analysis of adversary campaigns and intrusion kill chains. Leading Issues in Information Warfare & Security Research 1 (1), pp. 80. Cited by: [§3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px3.p4.1).
+- \[14\] P. Jing, M. Tang, X. Shi, X. Zheng, S. Nie, S. Wu, Y. Yang, and X. Luo (2024) Secbench: a comprehensive multi-dimensional benchmarking dataset for llms in cybersecurity. arXiv preprint arXiv:2412.20787. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[15\] Kali Linux Team (2022) Kali-tools: markdown format of www.kali.org/tools/. GitLab. Note: GitLab repository, accessed March 31, 2025 External Links: [Link](https://gitlab.com/kalilinux/documentation/kali-tools) Cited by: [§3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px1.p1.1).
+- \[16\] G. Li, Y. Li, W. Guannan, H. Yang, and Y. Yu (2023) SecEval: a comprehensive benchmark for evaluating cybersecurity knowledge of foundation models. GitHub. Note: https://github.com/XuanwuAI/SecEval Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[17\] M. Li, Y. Zhao, B. Yu, F. Song, H. Li, H. Yu, Z. Li, F. Huang, and Y. Li (2023) Api-bank: a comprehensive benchmark for tool-augmented llms. In Proceedings of the 2023 conference on empirical methods in natural language processing, pp. 3102–3116. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p3.1).
+- \[18\] P. Liang, R. Bommasani, T. Lee, D. Tsipras, D. Soylu, M. Yasunaga, Y. Zhang, D. Narayanan, Y. Wu, A. Kumar, B. Newman, B. Yuan, B. Yan, C. Zhang, C. A. Cosgrove, C. D. Manning, C. Re, D. Acosta-Navas, D. A. Hudson, E. Zelikman, E. Durmus, F. Ladhak, F. Rong, H. Ren, H. Yao, J. WANG, K. Santhanam, L. Orr, L. Zheng, M. Yuksekgonul, M. Suzgun, N. Kim, N. Guha, N. S. Chatterji, O. Khattab, P. Henderson, Q. Huang, R. A. Chi, S. M. Xie, S. Santurkar, S. Ganguli, T. Hashimoto, T. Icard, T. Zhang, V. Chaudhary, W. Wang, X. Li, Y. Mai, Y. Zhang, and Y. Koreeda (2023) Holistic evaluation of language models. Transactions on Machine Learning Research. External Links: ISSN 2835-8856, [Link](https://openreview.net/forum?id=iO4LZibEqW) Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p1.1).
+- \[19\] Z. Liu, J. Shi, and J. F. Buford (2024) Cyberbench: a multi-task benchmark for evaluating large language models in cybersecurity. In AAAI 2024 Workshop on Artificial Intelligence for Cyber Security, Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[20\] Z. Liu, T. Hoang, J. Zhang, M. Zhu, T. Lan, S. Kokane, J. Tan, W. Yao, Z. Liu, Y. Feng, et al. (2024) Apigen: automated pipeline for generating verifiable and diverse function-calling datasets. Advances in Neural Information Processing Systems 37, pp. 54463–54482. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p3.1).
+- \[21\] J. Lu, T. Holleis, Y. Zhang, B. Aumayer, F. Nan, H. Bai, S. Ma, S. Ma, M. Li, G. Yin, et al. (2025) Toolsandbox: a stateful, conversational, interactive evaluation benchmark for llm tool use capabilities. In Findings of the Association for Computational Linguistics: NAACL 2025, pp. 1160–1183. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p3.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px2.p1.1).
+- \[22\] Meta AI (2024) Llama-3.3-70b-instruct. Note: <https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct>Model card, released December 6, 2024, accessed May 5, 2026 Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[23\] Mistral AI (2025) Mistral-small-3.2-24b-instruct-2506. Note: <https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506>Model card, accessed May 5, 2026 Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[24\] OpenAI, :, S. Agarwal, L. Ahmad, J. Ai, S. Altman, A. Applebaum, E. Arbus, R. K. Arora, Y. Bai, B. Baker, H. Bao, B. Barak, A. Bennett, T. Bertao, N. Brett, E. Brevdo, G. Brockman, S. Bubeck, C. Chang, K. Chen, M. Chen, E. Cheung, A. Clark, D. Cook, M. Dukhan, C. Dvorak, K. Fives, V. Fomenko, T. Garipov, K. Georgiev, M. Glaese, T. Gogineni, A. Goucher, L. Gross, K. G. Guzman, J. Hallman, J. Hehir, J. Heidecke, A. Helyar, H. Hu, R. Huet, J. Huh, S. Jain, Z. Johnson, C. Koch, I. Kofman, D. Kundel, J. Kwon, V. Kyrylov, E. Y. Le, G. Leclerc, J. P. Lennon, S. Lessans, M. Lezcano-Casado, Y. Li, Z. Li, J. Lin, J. Liss, Lily, Liu, J. Liu, K. Lu, C. Lu, Z. Martinovic, L. McCallum, J. McGrath, S. McKinney, A. McLaughlin, S. Mei, S. Mostovoy, T. Mu, G. Myles, A. Neitz, A. Nichol, J. Pachocki, A. Paino, D. Palmie, A. Pantuliano, G. Parascandolo, J. Park, L. Pathak, C. Paz, L. Peran, D. Pimenov, M. Pokrass, E. Proehl, H. Qiu, G. Raila, F. Raso, H. Ren, K. Richardson, D. Robinson, B. Rotsted, H. Salman, S. Sanjeev, M. Schwarzer, D. Sculley, H. Sikchi, K. Simon, K. Singhal, Y. Song, D. Stuckey, Z. Sun, P. Tillet, S. Toizer, F. Tsimpourlas, N. Vyas, E. Wallace, X. Wang, M. Wang, O. Watkins, K. Weil, A. Wendling, K. Whinnery, C. Whitney, H. Wong, L. Yang, Y. Yang, M. Yasunaga, K. Ying, W. Zaremba, W. Zhan, C. Zhang, B. Zhang, E. Zhang, and S. Zhao (2025) Gpt-oss-120b & gpt-oss-20b model card. External Links: 2508.10925, [Link](https://arxiv.org/abs/2508.10925) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[25\] OpenAI Codex CLI. Note: Accessed: 2026-09-27 External Links: [Link](https://learn.chatgpt.com/docs/codex/cli) Cited by: [§4.1](https://arxiv.org/html/2610.02206v1#S4.SS1.SSS0.Px3.p1.1).
+- \[26\] OpenAI GPT-5.5 model. Note: Accessed: 2026-09-27 External Links: [Link](https://developers.openai.com/api/docs/models/gpt-5.5) Cited by: [§4.1](https://arxiv.org/html/2610.02206v1#S4.SS1.SSS0.Px3.p1.1).
+- \[27\] OpenAI GPT-5.6 Sol model. Note: Accessed: 2026-09-27 External Links: [Link](https://developers.openai.com/api/docs/models/gpt-5.6-sol) Cited by: [§4.1](https://arxiv.org/html/2610.02206v1#S4.SS1.SSS0.Px3.p1.1).
+- \[28\] S. G. Patil, H. Mao, F. Yan, C. C. Ji, V. Suresh, I. Stoica, and J. E. Gonzalez (2025) The berkeley function calling leaderboard (bfcl): from tool use to agentic evaluation of large language models. In Forty-second International Conference on Machine Learning, Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p3.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px2.p1.1).
+- \[29\] Qwen, :, A. Yang, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Li, D. Liu, F. Huang, H. Wei, H. Lin, J. Yang, J. Tu, J. Zhang, J. Yang, J. Yang, J. Zhou, J. Lin, K. Dang, K. Lu, K. Bao, K. Yang, L. Yu, M. Li, M. Xue, P. Zhang, Q. Zhu, R. Men, R. Lin, T. Li, T. Tang, T. Xia, X. Ren, X. Ren, Y. Fan, Y. Su, Y. Zhang, Y. Wan, Y. Liu, Z. Cui, Z. Zhang, and Z. Qiu (2025) Qwen2.5 technical report. External Links: 2412.15115, [Link](https://arxiv.org/abs/2412.15115) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[30\] Qwen Team (2025) Qwen3-max: just scale it. Note: <https://qwen.ai/blog?id=qwen3-max>Blog post, accessed May 5, 2026 Cited by: [§3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px1.p1.1).
+- \[31\] O. Security (2025) Kali tools. Note: Accessed: 2025-12-03 External Links: [Link](https://www.kali.org/tools/) Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p2.1).
+- \[32\] M. Shao, S. Jancheska, M. Udeshi, B. Dolan-Gavitt, H. Xi, K. Milner, B. Chen, M. Yin, S. Garg, P. Krishnamurthy, et al. (2024) Nyu ctf bench: a scalable open-source benchmark dataset for evaluating llms in offensive security. Advances in Neural Information Processing Systems 37, pp. 57472–57498. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p3.1).
+- \[33\] Z. Shao, P. Wang, Q. Zhu, R. Xu, J. Song, X. Bi, H. Zhang, M. Zhang, Y. Li, et al. (2024) Deepseekmath: pushing the limits of mathematical reasoning in open language models. arXiv preprint arXiv:2402.03300. Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px2.p1.1).
+- \[34\] N. Suryanto, M. Naseer, P. Li, S. T. Wasim, J. Yi, J. Gall, P. Ceravolo, and E. Damiani (2026) RedSage: a cybersecurity generalist llm. In The Fourteenth International Conference on Learning Representations, External Links: [Link](https://openreview.net/forum?id=W4FAenIrQ2) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[35\] G. Team, A. Kamath, J. Ferret, S. Pathak, N. Vieillard, R. Merhej, S. Perrin, T. Matejovicova, A. Ramé, M. Rivière, L. Rouillard, T. Mesnard, G. Cideron, J. Grill, S. Ramos, E. Yvinec, M. Casbon, E. Pot, I. Penchev, G. Liu, F. Visin, K. Kenealy, L. Beyer, X. Zhai, A. Tsitsulin, R. Busa-Fekete, A. Feng, N. Sachdeva, B. Coleman, Y. Gao, B. Mustafa, I. Barr, E. Parisotto, D. Tian, M. Eyal, C. Cherry, J. Peter, D. Sinopalnikov, S. Bhupatiraju, R. Agarwal, M. Kazemi, D. Malkin, R. Kumar, D. Vilar, I. Brusilovsky, J. Luo, A. Steiner, A. Friesen, A. Sharma, A. Sharma, A. M. Gilady, A. Goedeckemeyer, A. Saade, A. Feng, A. Kolesnikov, A. Bendebury, A. Abdagic, A. Vadi, A. György, A. S. Pinto, A. Das, A. Bapna, A. Miech, A. Yang, A. Paterson, A. Shenoy, A. Chakrabarti, B. Piot, B. Wu, B. Shahriari, B. Petrini, C. Chen, C. L. Lan, C. A. Choquette-Choo, C. Carey, C. Brick, D. Deutsch, D. Eisenbud, D. Cattle, D. Cheng, D. Paparas, D. S. Sreepathihalli, D. Reid, D. Tran, D. Zelle, E. Noland, E. Huizenga, E. Kharitonov, F. Liu, G. Amirkhanyan, G. Cameron, H. Hashemi, H. Klimczak-Plucińska, H. Singh, H. Mehta, H. T. Lehri, H. Hazimeh, I. Ballantyne, I. Szpektor, I. Nardini, J. Pouget-Abadie, J. Chan, J. Stanton, J. Wieting, J. Lai, J. Orbay, J. Fernandez, J. Newlan, J. Ji, J. Singh, K. Black, K. Yu, K. Hui, K. Vodrahalli, K. Greff, L. Qiu, M. Valentine, M. Coelho, M. Ritter, M. Hoffman, M. Watson, M. Chaturvedi, M. Moynihan, M. Ma, N. Babar, N. Noy, N. Byrd, N. Roy, N. Momchev, N. Chauhan, N. Sachdeva, O. Bunyan, P. Botarda, P. Caron, P. K. Rubenstein, P. Culliton, P. Schmid, P. G. Sessa, P. Xu, P. Stanczyk, P. Tafti, R. Shivanna, R. Wu, R. Pan, R. Rokni, R. Willoughby, R. Vallu, R. Mullins, S. Jerome, S. Smoot, S. Girgin, S. Iqbal, S. Reddy, S. Sheth, S. Põder, S. Bhatnagar, S. R. Panyam, S. Eiger, S. Zhang, T. Liu, T. Yacovone, T. Liechty, U. Kalra, U. Evci, V. Misra, V. Roseberry, V. Feinberg, V. Kolesnikov, W. Han, W. Kwon, X. Chen, Y. Chow, Y. Zhu, Z. Wei, Z. Egyed, V. Cotruta, M. Giang, P. Kirk, A. Rao, K. Black, N. Babar, J. Lo, E. Moreira, L. G. Martins, O. Sanseviero, L. Gonzalez, Z. Gleicher, T. Warkentin, V. Mirrokni, E. Senter, E. Collins, J. Barral, Z. Ghahramani, R. Hadsell, Y. Matias, D. Sculley, S. Petrov, N. Fiedel, N. Shazeer, O. Vinyals, J. Dean, D. Hassabis, K. Kavukcuoglu, C. Farabet, E. Buchatskaya, J. Alayrac, R. Anil, Dmitry, Lepikhin, S. Borgeaud, O. Bachem, A. Joulin, A. Andreev, C. Hardin, R. Dadashi, and L. Hussenot (2025) Gemma 3 technical report. External Links: 2503.19786, [Link](https://arxiv.org/abs/2503.19786) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[36\] N. Tihanyi, M. A. Ferrag, R. Jain, T. Bisztray, and M. Debbah (2024) Cybermetric: a benchmark dataset based on retrieval-augmented generation for evaluating llms in cybersecurity knowledge. In 2024 IEEE International Conference on Cyber Security and Resilience (CSR), pp. 296–302. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[37\] SemHash: fast multimodal semantic deduplication & filtering External Links: [Document](https://dx.doi.org/10.5281/zenodo.17265942), [Link](https://github.com/MinishLab/semhash) Cited by: [§3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px2.p5.1).
+- \[38\] J. Wang, J. Zhou, X. Wang, X. Mo, H. Zhang, Q. Lin, C. Jin, M. Wen, W. Zhang, Q. Peng, and J. Wang (2025) HammerBench: fine-grained function-calling evaluation in real mobile assistant scenarios. In Findings of the Association for Computational Linguistics: ACL 2025, W. Che, J. Nabende, E. Shutova, and M. T. Pilehvar (Eds.), Vienna, Austria, pp. 3350–3376. External Links: [Link](https://aclanthology.org/2025.findings-acl.175/), [Document](https://dx.doi.org/10.18653/v1/2025.findings-acl.175), ISBN 979-8-89176-256-5 Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px2.p1.1).
+- \[39\] S. Weerawardhena, P. Kassianik, B. Nelson, B. Saglam, A. Vellore, A. Priyanshu, S. Vijay, M. Aufiero, A. Goldblatt, F. Burch, et al. (2025) Llama-3.1-foundationai-securityllm-8b-instruct technical report. arXiv preprint arXiv:2508.01059. Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[40\] H. Xu, S. Wang, N. Li, K. Wang, Y. Zhao, K. Chen, T. Yu, Y. Liu, and H. Wang (2025) Large language models for cyber security: a systematic literature review. ACM Transactions on Software Engineering and Methodology. Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1).
+- \[41\] A. Yang, A. Li, B. Yang, B. Zhang, B. Hui, B. Zheng, B. Yu, C. Gao, C. Huang, C. Lv, et al. (2025) Qwen3 technical report. arXiv preprint arXiv:2505.09388. Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[42\] Z. Yang, E. Li, J. He, A. Priyanshu, B. Saglam, P. Kassianik, S. Weerawardhena, A. Vellore, B. Nelson, N. Javidnia, A. Goldblatt, F. Burch, A. Zohary, A. Eisenman, M. Sabbaghi, S. Vijay, R. Dharssi, D. Kedia, K. Oshiba, Y. Singer, and A. Karbasi (2026) Llama-3.1-foundationai-securityllm-reasoning-8b technical report. External Links: 2601.21051, [Link](https://arxiv.org/abs/2601.21051) Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[43\] Y. Yu, T. Chiang, C. Tsai, C. Huang, and W. Tsao (2025) Primus: a pioneering collection of open-source datasets for cybersecurity LLM training. In Proceedings of the 2025 Conference on Empirical Methods in Natural Language Processing, C. Christodoulopoulos, T. Chakraborty, C. Rose, and V. Peng (Eds.), Suzhou, China, pp. 10391–10413. External Links: [Link](https://aclanthology.org/2025.emnlp-main.527/), [Document](https://dx.doi.org/10.18653/v1/2025.emnlp-main.527), ISBN 979-8-89176-332-6 Cited by: [§4](https://arxiv.org/html/2610.02206v1#S4.SS0.SSS0.Px1.p1.1).
+- \[44\] Z. Yu, J. Zeng, S. Chen, W. Xu, D. Xu, X. Liu, Z. Ying, N. Wang, Y. Zhang, and M. Yang (2024) Cs-eval: a comprehensive large language model benchmark for cybersecurity. arXiv preprint arXiv:2411.16239. Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p2.1).
+- \[45\] A. K. Zhang, N. Perry, R. Dulepet, J. Ji, C. Menders, J. W. Lin, E. Jones, G. Hussein, S. Liu, D. J. Jasper, P. Peetathawatchai, A. Glenn, V. Sivashankar, D. Zamoshchin, L. Glikbarg, D. Askaryar, H. Yang, A. Zhang, R. Alluri, N. Tran, R. Sangpisit, K. O. Oseleononmen, D. Boneh, D. E. Ho, and P. Liang (2025) Cybench: a framework for evaluating cybersecurity capabilities and risks of language models. In The Thirteenth International Conference on Learning Representations, External Links: [Link](https://openreview.net/forum?id=tc90LV0yRL) Cited by: [§1](https://arxiv.org/html/2610.02206v1#S1.p1.1), [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p3.1).
+- \[46\] C. Zhang, M. Cote, M. Albada, A. Sankaran, J. W. Stokes, T. Wang, A. Abdi, W. Blum, and M. Abdul-Mageed (2025) DefenderBench: a toolkit for evaluating language agents in cybersecurity environments. arXiv preprint arXiv:2506.00739. Cited by: [§2](https://arxiv.org/html/2610.02206v1#S2.SS0.SSS0.Px1.p3.1).
+
+## NeurIPS Paper Checklist
+
+1.  1\.
+
+    Claims
+
+2.  Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope?
+
+3.  Answer: \[Yes\]
+
+4.  Justification: Our paper’s Abstract and Section 1: Introduction clearly define the article’s contributions and scope.
+
+5.  Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the abstract and introduction do not include the claims made in the paper.
+
+    - •
+
+      The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A \[No\] or \[N/A\] answer to this question will not be perceived well by the reviewers.
+
+    - •
+
+      The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings.
+
+    - •
+
+      It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper.
+
+6.  2\.
+
+    Limitations
+
+7.  Question: Does the paper discuss the limitations of the work performed by the authors?
+
+8.  Answer: \[Yes\]
+
+9.  Justification: We carefully discuss the limitations of our work in Appendix [O](https://arxiv.org/html/2610.02206v1#A15): Limitations.
+
+10. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper has no limitation while the answer \[No\] means that the paper has limitations, but those are not discussed in the paper.
+
+    - •
+
+      The authors are encouraged to create a separate “Limitations” section in their paper.
+
+    - •
+
+      The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be.
+
+    - •
+
+      The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated.
+
+    - •
+
+      The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon.
+
+    - •
+
+      The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size.
+
+    - •
+
+      If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness.
+
+    - •
+
+      While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an important role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations.
+
+11. 3\.
+
+    Theory Assumptions and Proofs
+
+12. Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof?
+
+13. Answer: \[N/A\]
+
+14. Justification: The contributions of this paper focus on experimental results rather than theoretical derivations and theoretical results.
+
+15. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not include theoretical results.
+
+    - •
+
+      All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced.
+
+    - •
+
+      All assumptions should be clearly stated or referenced in the statement of any theorems.
+
+    - •
+
+      The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition.
+
+    - •
+
+      Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material.
+
+    - •
+
+      Theorems and Lemmas that the proof relies upon should be properly referenced.
+
+16. 4\.
+
+    Experimental result reproducibility
+
+17. Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)?
+
+18. Answer: \[Yes\]
+
+19. Justification: We disclose the full code and data in the link of our project page (Abstract). In addition, the experiments in this paper evaluate multiple open-source models and utilize the vLLM engine during the inference phase; these settings ensure the standardization and reproducibility of the experiments (Section 4: Experiments). More specifically, Appendix B: CLI Command Generation and Appendix C: Prompt Templates provide all the prompts needed to reproduce the generation of the benchmark data, while Appendix E: Terminal verification Details provides the rules for sample-wise terminal verification, and Appendix [L](https://arxiv.org/html/2610.02206v1#A12): Details about Metrics Calculation details the metric calculations required to accurately reproduce the result.
+
+20. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not include experiments.
+
+    - •
+
+      If the paper includes experiments, a \[No\] answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not.
+
+    - •
+
+      If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable.
+
+    - •
+
+      Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed.
+
+    - •
+
+      While NeurIPS does not require releasing code, the conference does require all submissions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example
+
+      1.  \(a\)
+
+          If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm.
+
+      2.  \(b\)
+
+          If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully.
+
+      3.  \(c\)
+
+          If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset).
+
+      4.  \(d\)
+
+          We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results.
+
+21. 5\.
+
+    Open access to data and code
+
+22. Question: Does the paper provide open access to the data and code, with sufficient instructions to faithfully reproduce the main experimental results, as described in supplemental material?
+
+23. Answer: \[Yes\]
+
+24. Justification: We provide full access to the data (via Hugging Face) and the complete implementation code (via GitHub). Link contains these resources can be found at the beginning of the paper, along with sufficient instructions to reproduce the main experimental results.
+
+25. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that paper does not include experiments requiring code.
+
+    - •
+
+      Please see the NeurIPS code and data submission guidelines (<https://neurips.cc/public/guides/CodeSubmissionPolicy>) for more details.
+
+    - •
+
+      While we encourage the release of code and data, we understand that this might not be possible, so \[No\] is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark).
+
+    - •
+
+      The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines (<https://neurips.cc/public/guides/CodeSubmissionPolicy>) for more details.
+
+    - •
+
+      The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc.
+
+    - •
+
+      The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why.
+
+    - •
+
+      At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable).
+
+    - •
+
+      Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted.
+
+26. 6\.
+
+    Experimental Setting/Details
+
+27. Question: Does the paper specify all the training and test details (e.g., data splits, hyperparameters, how they were chosen, type of optimizer) necessary to understand the results?
+
+28. Answer: \[Yes\]
+
+29. Justification: The dataset splits, evaluation protocol, and training methods are described in Section 3. Model configurations and detailed training hyperparameters are provided in Appendix G.
+
+30. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not include experiments.
+
+    - •
+
+      The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them.
+
+    - •
+
+      The full details can be provided either with the code, in appendix, or as supplemental material.
+
+31. 7\.
+
+    Experiment Statistical Significance
+
+32. Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments?
+
+33. Answer: \[Yes\]
+
+34. Justification: The paper provides information about variability through distributional statistics. In particular, Figure 5 reports box plots (Q1–Q3 with min/max whiskers) across all models, security dimensions, and mode settings.
+
+35. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not include experiments.
+
+    - •
+
+      The authors should answer \[Yes\] if the results are accompanied by error bars, confidence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper.
+
+    - •
+
+      The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions).
+
+    - •
+
+      The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.)
+
+    - •
+
+      The assumptions made should be given (e.g., Normally distributed errors).
+
+    - •
+
+      It should be clear whether the error bar is the standard deviation or the standard error of the mean.
+
+    - •
+
+      It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified.
+
+    - •
+
+      For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g., negative error rates).
+
+    - •
+
+      If error bars are reported in tables or plots, the authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text.
+
+36. 8\.
+
+    Experiments Compute Resources
+
+37. Question: For each experiment, does the paper provide sufficient information on the computer resources (type of compute workers, memory, time of execution) needed to reproduce the experiments?
+
+38. Answer: \[Yes\]
+
+39. Justification: We have provided the GPU model, memory, and the amount of compute required for the experiment (Section 4: Experiments, Appendix [G.2](https://arxiv.org/html/2610.02206v1#A7.SS2)). The full research project required the same compute as reported in the paper.
+
+40. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not include experiments.
+
+    - •
+
+      The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage.
+
+    - •
+
+      The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute.
+
+    - •
+
+      The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper).
+
+41. 9\.
+
+    Code Of Ethics
+
+42. Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics <https://neurips.cc/public/EthicsGuidelines>?
+
+43. Answer: \[Yes\]
+
+44. Justification: We carefully checked the NeurIPS Code of Ethics and discussed in Appendix A: Ethical Statement that this paper does not raise any ethical issues.
+
+45. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the authors have not reviewed the NeurIPS Code of Ethics.
+
+    - •
+
+      If the authors answer \[No\] , they should explain the special circumstances that require a deviation from the Code of Ethics.
+
+    - •
+
+      The authors should make sure to preserve anonymity (e.g., if there is a special consideration due to laws or regulations in their jurisdiction).
+
+46. 10\.
+
+    Broader Impacts
+
+47. Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed?
+
+48. Answer: \[Yes\]
+
+49. Justification: We discuss the potential societal impacts in Appendix A: Ethical Statement.
+
+50. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that there is no societal impact of the work performed.
+
+    - •
+
+      If the authors answer \[N/A\] or \[No\] , they should explain why their work has no societal impact or why the paper does not address societal impact.
+
+    - •
+
+      Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations.
+
+    - •
+
+      The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate Deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster.
+
+    - •
+
+      The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology.
+
+    - •
+
+      If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML).
+
+51. 11\.
+
+    Safeguards
+
+52. Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pre-trained language models, image generators, or scraped datasets)?
+
+53. Answer: \[Yes\]
+
+54. Justification: The paper discusses potential dual-use risks of the cybersecurity benchmark and describes several release-related precautions in Appendix A: Ethical Statement.
+
+55. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper poses no such risks.
+
+    - •
+
+      Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters.
+
+    - •
+
+      Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images.
+
+    - •
+
+      We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort.
+
+56. 12\.
+
+    Licenses for existing assets
+
+57. Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected?
+
+58. Answer: \[Yes\]
+
+59. Justification: Appendix A: Ethical Statement documents the existing assets used in this work, credits their original sources, and states the applicable licenses and terms of use; we listed the evaluated model details in Appendix [G.1](https://arxiv.org/html/2610.02206v1#A7.SS1).
+
+60. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not use existing assets.
+
+    - •
+
+      The authors should cite the original paper that produced the code package or dataset.
+
+    - •
+
+      The authors should state which version of the asset is used and, if possible, include a URL.
+
+    - •
+
+      The name of the license (e.g., CC-BY 4.0) should be included for each asset.
+
+    - •
+
+      For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided.
+
+    - •
+
+      If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, [paperswithcode.com/datasets](https://paperswithcode.com/datasets) has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset.
+
+    - •
+
+      For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided.
+
+    - •
+
+      If this information is not available online, the authors are encouraged to reach out to the asset’s creators.
+
+61. 13\.
+
+    New assets
+
+62. Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets?
+
+63. Answer: \[Yes\]
+
+64. Justification: The paper introduces KaliBench as a new benchmark asset, and Appendix A: Ethical Statement documents its construction, intended use, licensing, and release considerations. Besides, Section 3 describes the benchmark’s construction, data structure, verification, splits, and evaluation protocol.
+
+65. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not release new assets.
+
+    - •
+
+      Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc.
+
+    - •
+
+      The paper should discuss whether and how consent was obtained from people whose asset is used.
+
+    - •
+
+      At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file.
+
+66. 14\.
+
+    Crowdsourcing and research with human subjects
+
+67. Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)?
+
+68. Answer: \[N/A\]
+
+69. Justification: Appendix A: Ethical Statement states that no data were collected from human subjects and no external annotators were involved; the paper does not include crowdsourcing or human-subject research.
+
+70. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not involve crowdsourcing nor research with human subjects.
+
+    - •
+
+      Including this information in the supplemental material is fine, but if the main contribution of the paper involves human subjects, then as much detail as possible should be included in the main paper.
+
+    - •
+
+      According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector.
+
+71. 15\.
+
+    Institutional review board (IRB) approvals or equivalent for research with human subjects
+
+72. Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained?
+
+73. Answer: \[N/A\]
+
+74. Justification: Appendix A: Ethical Statement states that no data were collected from human subjects and no external annotators were involved; therefore, this work does not involve human-subject research or crowdsourcing.
+
+75. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the paper does not involve crowdsourcing nor research with human subjects.
+
+    - •
+
+      Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper.
+
+    - •
+
+      We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution.
+
+    - •
+
+      For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review.
+
+76. 16\.
+
+    Declaration of LLM usage
+
+77. Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does *not* impact the core methodology, scientific rigor, or originality of the research, declaration is not required.
+
+78. Answer: \[Yes\]
+
+79. Justification: The paper clearly describes the use of LLMs as a core component, including their roles in data generation, verification (LLM-as-verifier), and model training (SFT and RL with verifiable rewards), as detailed in Section 3.
+
+80. Guidelines:
+
+    - •
+
+      The answer \[N/A\] means that the core method development in this research does not involve LLMs as any important, original, or non-standard components.
+
+    - •
+
+      Please refer to our LLM policy in the NeurIPS handbook for what should or should not be described.
+
+## Appendix A Ethical Statement
+
+Existing Assets. All data used in this work are derived from publicly available Kali Linux tool manuals and documentation. This source repository is part of the Kali Linux documentation project and is licensed under the GNU General Public License v3.0. Model inference was performed either offline in a controlled environment or via APIs. Open-weight models and proprietary API services are subject to their respective model licenses and provider terms. Except for our KaliBench post-trained variants, we did not perform additional fine-tuning on KaliBench.
+
+New Assets. KaliBench is intended for research purposes only and is released under the CC BY-NC 4.0 license. KaliBench is released together with documentation describing the structure of the benchmark, dataset fields, data construction and verification pipeline, train–test splits, evaluation protocol, licensing terms, intended use, limitations, and responsible-use guidelines. Since the dataset is derived from publicly available Kali Linux documentation and contains no personally identifiable information or human-subject data, no individual consent is required. We also provide release notes and usage instructions to support reproducible and responsible use of the benchmark.
+
+#### Artifact availability.
+
+The public repository provides code and instructions for data generation, filtering, verification, evaluation, and post-training, including SFT and GRPO.<sup>33</sup> 3 <https://github.com/RISys-Lab/KaliBench> Croissant metadata was also provided with the OpenReview submission to support machine-readable dataset documentation.
+
+Human Subjects. The KaliBench dataset contains no personally identifiable information. No data were collected from human subjects, and no external annotators were involved in data creation or evaluation. All human-in-the-loop verification is conducted by the authors solely for internal data quality control; no external annotators, crowd workers, or human subjects were involved.
+
+Social Impact. The main positive societal impact of this work lies in improving the reliability evaluation of large language models in cybersecurity settings. This work helps reduce the risk that security-oriented LLMs generate incorrect commands or mislead users before real-world deployment, and can support the development of more reliable defensive tools for legitimate scenarios such as security education, vulnerability assessment, incident response, and digital forensics. This work does not introduce new attack techniques, vulnerability exploitation methods, or end-to-end attack automation workflows. The data are primarily derived from publicly available Kali Linux tool documentation. KaliBench focuses only on single-command-level translation and evaluation, and does not provide multi-step attack chains, target-environment-adaptive attack procedures, or end-to-end automated penetration capabilities. Therefore, we believe that KaliBench does not directly introduce new security threats.
+
+LLM Usage. LLMs were used for query–command generation, documentation-grounded verification, and preliminary assessment of suspicious examples, with final manual-review decisions made by the authors. LLMs were also used for language editing of the manuscript. All experimental design, analysis, and conclusions were produced and verified by the authors.
+
+## Appendix B CLI Command Generation
+
+KaliBench focuses on deterministic natural-language-to-CLI translation at scale within Kali Linux ($\sim$2,372 tools). It defines reviewer-checkable canonicalization rules that specify:
+
+1.  i\.
+
+    Ordering: the command begins with the tool name, followed by all long flags, then all short flags (lexicographically), then flags with values, and finally positional arguments in document order.
+
+2.  ii\.
+
+    Flag syntax: flags and their values are space-separated (e.g., ‘`--`opt value’, ‘-s value’). Equals-style bindings (e.g., ‘`--`opt=value’) are allowed. Boolean flags take no value.
+
+3.  iii\.
+
+    Quoting and aliasing: quoting is applied only when required (e.g., values containing whitespace or shell meta-characters). Aliases (e.g., ‘`--`help’ vs. ‘-h’) are normalized, but the model must output a single canonical form—preferably the long-flag variant.
+
+To ensure unambiguous extraction, all CLI predictions are enclosed within a standardized \<output\> \</output\> tag. This enables robust isolation and symbolic comparison of the core command.
+
+In all, these constraints enable scalable and accurate evaluation by supporting diverse arguments and alias combinations in the data generation process, ensuring reproducibility through exact parse-tree matching.\
+
+## Appendix C Prompt Templates
+
+In this section, we list the three prompt templates used in our study, corresponding to the query-command generation, LLM-assisted data verification, and model evaluation.
+
+### C.1 Prompt for Generating the Query-Command Pairs
+
+This prompt defines a controlled data generation setting for constructing a cybersecurity command benchmark from official Kali/Linux tool documentation. The model is instructed to synthesize natural-language queries that uniquely determine a single, canonical shell command, together with structured argument annotations. Strict constraints enforce faithfulness to documented tool capabilities, deterministic command formatting, and explicit parameter specification, thereby reducing ambiguity and unsupported behaviors. The resulting dataset enables reliable evaluation of command generation, argument parsing, and hallucination under reproducible conditions.
+
+[View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS1.p2.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS1.p3.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS1.p4.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS1.p5.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS1.p6.pic1)
+
+### C.2 Prompt for LLM-assisted Data Verification
+
+The following prompt is designed for dataset cleaning and validation by instructing the model to act as a strict CLI command verifier. Given a \<natural language query\>, a \<corresponding ground-truth command\>, and \<the official usage documentation of a specified tool\>, the model evaluates whether the command is valid or hallucinated. The verification focuses on flag existence, argument correctness, and functional alignment with the documented capabilities of the tool. The output consists of a binary verdict accompanied by a concise justification, enabling reliable filtering of erroneous or unsupported command annotations.
+
+[View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS2.p2.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS2.p3.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS2.p4.pic1)
+
+### C.3 Prompt for Model Evaluation
+
+The following prompt tells the model how to analyze a query and generate corresponding CLI commands in Unrestricted mode for evaluation. The model is instructed to act as a cybersecurity function-calling agent with direct access to a Kali/Linux execution environment. Given a user query, the model is required to output a single, executable shell command that precisely accomplishes the requested task. The prompt enforces strict constraints on tool selection, argument completeness, and option–value correctness, while explicitly prohibiting explanatory text or non-command output. This design enables controlled evaluation of the model’s accuracy and completeness in generating real-world security-related commands. System prompts for Restricted and Hinted modes are similar as that of unrestricted. The only difference is that these two modes embed a subset of \<“a group of tool names"\> and \<“a group of tool names with their corresponding usage manuscripts"\> in the Task Definition Part.
+
+[View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS3.p2.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS3.p3.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS3.p4.pic1) [View original diagram](https://arxiv.org/html/2610.02206v1#A3.SS3.p5.pic1)
+
+## Appendix D KaliBench Samples in Detail
+
+This section provides a detailed overview of KaliBench. As illustrated in Figure [6](https://arxiv.org/html/2610.02206v1#A4.F6), the benchmark is structured around five core security phases, covering 23 fine-grained evaluation dimensions. Each instance consists of a natural language query, its corresponding tool invocation (including optional and positional arguments), and a ground-truth command. This design enables systematic evaluation of a model’s ability to interpret, decompose, and execute security-oriented tasks. Overall, KaliBench captures a diverse range of real-world security workflows.
+
+[Figure asset](https://arxiv.org/html/2610.02206v1/23_dim_samples.svg)
+
+Figure 6: Overview of KaliBench samples. Representative examples spanning all five security phases and 23 evaluation dimensions are shown. Zoom in for finer details.
+
+## Appendix E Terminal verification Details
+
+We perform sample-wise terminal verification by executing each ground_truth_command in a controlled Docker sandbox (with Kali Linux environment). For each command, we create an isolated working directory to avoid side effects, and run it via subprocess with a fixed timeout and resource limits. During execution, we capture stdout, stderr, exit_code, and runtime signals.
+
+After execution, we assign labels based on simple rules:
+
+- •
+
+  PASS_EXECUTED: exit code = 0
+
+- •
+
+  TIMEOUT: command exceeds time limit
+
+- •
+
+  REJECT_HALLUCINATED_TOOL: tool not found (e.g., exit code 127 or error patterns)
+
+- •
+
+  REJECT_HALLUCINATED_PARAMETER: invalid or unsupported options detected from error messages
+
+- •
+
+  PASS_RUNTIME_ERROR: non-zero exit code without clear hallucination signals
+
+We use regex-based pattern matching on stderr/stdout to detect tool and parameter errors, ensuring that obvious hallucinations can be filtered out even if the command executes.
+
+A brief Pseudo-code can further show our execution process:
+
+
+    # Input: JSONL dataset of query–command pairs
+    # Output: execution logs with classification labels
+    for each row in dataset:
+        # 1. Prepare command
+        cmd = row["ground_truth_command"]
+
+        # 2. Create isolated sandbox
+        workdir = create_sandbox(cmd)
+
+        # 3. Execute command with timeout
+        result = run(cmd, timeout=20s, in workdir)
+        stdout, stderr = result.stdout, result.stderr
+        exit_code = result.exit_code
+
+        # 4. Classify execution outcome
+        if result.timed_out:
+            label = TIMEOUT
+
+        elif exit_code == 127 or match(tool_error_pattern, stderr, stdout):
+            label = REJECT_HALLUCINATED_TOOL
+
+        elif match(parameter_error_pattern, stderr, stdout):
+            label = REJECT_HALLUCINATED_PARAMETER
+
+        elif exit_code == 0:
+            label = PASS_EXECUTED
+
+        else:
+            label = PASS_RUNTIME_ERROR
+
+        # 5. Save execution log
+        save {
+            command, stdout, stderr,
+            exit_code, label, workdir
+        }
+
+This process filters out commands with hallucinated tools or invalid parameters, while retaining executable commands and partially valid ones that are syntactically correct but may fail at runtime due to placeholder inputs (e.g., using non-existent targets such as curl https://example.com).
+
+## Appendix F Representative Invalid Cases Identified During Manual Review
+
+To further substantiate the error types summarized in the main text, we provide representative invalid cases identified during manual review.
+
+#### (a) Malformed CLI options.
+
+For the query “Launch debug_me via qemu-aarch64_be and wait for a GDB connection on port 1234,” the correct command is “qemu-aarch64_be -g 1234 debug_me”, whereas the annotated ground truth uses the malformed option --g instead of -g.
+
+#### (b) Omission of query-required arguments.
+
+For the query “Generate shell completion script for kustomize so it can be used with bash,” the correct command is “kustomize completion bash”, but the annotated ground truth uses only “kustomize completion” and omits the shell argument, which is specifically asked by the query.
+
+#### (c) Semantic mismatches in argument use.
+
+We observe three common subtypes. First, the annotated command may use a flag with the wrong function: for the query “Run Git with the working directory set to /home/user/project,” the correct command is “git -C /home/user/project status”, while the ground truth uses work-tree, which changes the repository work tree rather than the working directory. Second, the annotated command may reverse operand order: for the query “converting mac.txt to unix3.txt”, the correct form is dos2unix -n mac.txt unix3.txt, while the ground truth swaps input and output. Third, the annotated command may use the wrong argument type: for the query "Execute svnsync’s ’sync’ subcommand on the local mirror located at ’/srv/svn/replica’", the correct command is "svnsync sync file:///srv/svn/replica", while the ground truth supplies the plain path “/srv/svn/replica” where a URL is required.
+
+## Appendix G Experiment Details
+
+### G.1 Evaluated Model Details.
+
+We evaluated open-source models with diverse sizes and architectures from 8B to 753B parameters. Models were either run locally using weights obtained from their official Hugging Face repositories or accessed via APIs. Table [4](https://arxiv.org/html/2610.02206v1#A7.T4) summarizes the evaluated models, their parameter counts, inference modes, and Hugging Face repositories.
+
+We used a fixed temperature of 0.2 and a maximum context length of 16,384 tokens, reserving 8,192 tokens for the input and 8,192 tokens for the output. When the combined prompt and tool documentation exceeded the reserved input budget, the tool documentation was truncated to fit within the input limit. Models with fewer than 72B parameters were evaluated on our $4\times$ A100 GPU server using the vLLM inference engine with BF16 precision. Models with 72B or more parameters were evaluated through the OpenRouter API.
+
+| Model Name | Size | Inference | Hugging Face Repository |
+|----|----|----|----|
+| Llama3.1-Instruct | 8B | local vLLM | [meta-llama/Llama-3.1-8B-Instruct](https://huggingface.co/meta-llama/Llama-3.1-8B-Instruct) |
+| Foundation-Sec-Instruct | 8B | local vLLM | [fdtn-ai/Foundation-Sec-8B](https://huggingface.co/fdtn-ai/Foundation-Sec-8B) |
+| Foundation-Sec-Reasoning | 8B | local vLLM | [fdtn-ai/Foundation-Sec-8B-Reasoning](https://huggingface.co/fdtn-ai/Foundation-Sec-8B-Reasoning) |
+| Llama-Primus-Base | 8B | local vLLM | [trend-cybertron/Llama-Primus-Base](https://huggingface.co/trend-cybertron/Llama-Primus-Base) |
+| Llama-Primus-Merged | 8B | local vLLM | [trendmicro-ailab/Llama-Primus-Merged](https://huggingface.co/trendmicro-ailab/Llama-Primus-Merged) |
+| RedSage-Qwen3-8B-Ins | 8B | local vLLM | [RISys-Lab/RedSage-Qwen3-8B-Ins](https://huggingface.co/RISys-Lab/RedSage-Qwen3-8B-Ins) |
+| RedSage-Qwen3-8B-DPO | 8B | local vLLM | [RISys-Lab/RedSage-Qwen3-8B-DPO](https://huggingface.co/RISys-Lab/RedSage-Qwen3-8B-DPO) |
+| RedSage-K (SFT) | 8B | local vLLM | [RISys-Lab/RedSage-K-SFT](https://huggingface.co/RISys-Lab/RedSage-K-SFT) |
+| RedSage-K (GRPO) | 8B | local vLLM | [RISys-Lab/RedSage-K-GRPO](https://huggingface.co/RISys-Lab/RedSage-K-GRPO) |
+| RedSage-K (SFT+GRPO) | 8B | local vLLM | [RISys-Lab/RedSage-K-SFT-GRPO](https://huggingface.co/RISys-Lab/RedSage-K-SFT-GRPO) |
+| Qwen-3-8B | 8B | local vLLM | [Qwen/Qwen3-8B](https://huggingface.co/Qwen/Qwen3-8B) |
+| GPT-OSS-20B | 21B | local vLLM | [openai/gpt-oss-20b](https://huggingface.co/openai/gpt-oss-20b) |
+| Mistral-3.2-24B | 24B | local vLLM | [mistralai/Mistral-Small-3.2-24B-Instruct-2506](https://huggingface.co/mistralai/Mistral-Small-3.2-24B-Instruct-2506) |
+| Gemma-3-27B | 27B | local vLLM | [google/gemma-3-27b-it](https://huggingface.co/google/gemma-3-27b-it) |
+| Qwen-3-32B | 32B | local vLLM | [Qwen/Qwen3-32B](https://huggingface.co/Qwen/Qwen3-32B) |
+| LLaMA-3.3-Instruct | 70B | local vLLM | [meta-llama/Llama-3.3-70B-Instruct](https://huggingface.co/meta-llama/Llama-3.3-70B-Instruct) |
+| Llama-Primus-Nemotron-70B-Instruct | 71B | local vLLM | [trend-cybertron/Llama-Primus-Nemotron-70B-Instruct](https://huggingface.co/trend-cybertron/Llama-Primus-Nemotron-70B-Instruct) |
+| Qwen-2.5-Instruct | 72B | OpenRouter API | [Qwen/Qwen2.5-72B-Instruct](https://huggingface.co/Qwen/Qwen2.5-72B-Instruct) |
+| Qwen3-Coder-Next | 80B | OpenRouter API | [Qwen/Qwen3-Coder-Next](https://huggingface.co/Qwen/Qwen3-Coder-Next) |
+| GPT-OSS-120B | 120B | OpenRouter API | [openai/gpt-oss-120b](https://huggingface.co/openai/gpt-oss-120b) |
+| DeepSeek-V3.2 | 685B | OpenRouter API | [deepseek-ai/DeepSeek-V3.2](https://huggingface.co/deepseek-ai/DeepSeek-V3.2) |
+| GLM-5.2 | 753B | OpenRouter API | [zai-org/GLM-5.2](https://openrouter.ai/z-ai/glm-5.2) |
+
+Table 4: Evaluated open-weight model configurations, parameter counts, inference platforms, and model sources. The inference platform used for each configuration is specified in the table.
+
+### G.2 Training Setup.
+
+We fine-tuned RedSage-Qwen3-8B-Ins using parameter-efficient LoRA adapters on a single NVIDIA H200 GPU. For both SFT and GRPO training, we used LoRA rank 64, LoRA alpha 128, and zero LoRA dropout, applying adapters to the attention and MLP projection layers: q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, and down_proj. Training used bfloat16 precision, gradient checkpointing, and the 8-bit AdamW optimizer with learning rate $5\times 10^{-6}$, weight decay $10^{-3}$, Adam betas $(0.9,0.999)$, gradient clipping at 1.0, and a linear learning-rate schedule with 10% warmup. We trained for 2 epochs. The software stack included Transformers 4.57.6, Unsloth 2026.4.6, PEFT 0.19.1, and Python 3.12.13.
+
+For the SFT model, we trained from the RedSage-Qwen3-8B-Ins checkpoint with a per-device batch size of 4 and gradient accumulation of 8, giving an effective batch size of 32. The maximum sequence length was 16,384 tokens, with packing disabled and padding-free training enabled. The SFT objective used the standard negative log-likelihood loss. SFT training required $\sim$32 minutes.
+
+For the GRPO-trained model, we used the same optimizer, LoRA, precision, and batch settings as SFT. GRPO used 8 generations per prompt, a generation batch size of 32, and group-based reward scaling. The maximum prompt length was 5,549 tokens, and the maximum completion length was 6,739 tokens. We used the BNPO-style GRPO loss with clipping parameter $\epsilon=0.2$ and KL coefficient $\beta=0.001$. Generation during GRPO was accelerated with colocated vLLM, using tensor parallel size 1 and GPU memory utilization 0.3. GRPO training required $\sim$28 hours when initialized directly from RedSage-Qwen3-8B-Ins, and $\sim$17 hours when initialized from our SFT checkpoint.
+
+Table 5: Performance deltas across execution modes. We report differences between three execution modes: Unrestricted (U), Restricted (R), and Hinted (H). $\Delta_{1}$ denotes (R$-$U), $\Delta_{2}$ denotes (H$-$R), and $\Delta_{3}$ denotes (H$-$U), all measured in percentage points (pp). <sup>†</sup> indicates thinking-enabled models, and <sup>⋆</sup> denotes cybersecurity-tuned models. Bold/underline mark the largest and second-largest deltas within each size group. Model order follows Table [1](https://arxiv.org/html/2610.02206v1#S3.T1).
+
+<table>
+<tr>
+<th rowspan="2">Model</th>
+<th rowspan="2">Size</th>
+<th colspan="3">Tool score $\Delta$ (pp)</th>
+<th colspan="3">Optional F1 $\Delta$ (pp)</th>
+<th colspan="3">Positional F1 $\Delta$ (pp)</th>
+<th colspan="3">Total score $\Delta$ (pp)</th>
+<th colspan="3">Exact $\Delta$ (pp)</th></tr>
+<tr>
+<td>$\Delta_{1}$</td>
+<td>$\Delta_{2}$</td>
+<td>$\Delta_{3}$</td>
+<td>$\Delta_{1}$</td>
+<td>$\Delta_{2}$</td>
+<td>$\Delta_{3}$</td>
+<td>$\Delta_{1}$</td>
+<td>$\Delta_{2}$</td>
+<td>$\Delta_{3}$</td>
+<td>$\Delta_{1}$</td>
+<td>$\Delta_{2}$</td>
+<td>$\Delta_{3}$</td>
+<td>$\Delta_{1}$</td>
+<td>$\Delta_{2}$</td>
+<td>$\Delta_{3}$</td></tr>
+<tr>
+<td colspan="17">Compact Models ($\leq$ 8B)</td></tr>
+<tr>
+<td>Foundation-Sec-Ins<sup>⋆</sup></td>
+<td>8</td>
+<td>26.00</td>
+<td>-5.70</td>
+<td>20.30</td>
+<td>3.90</td>
+<td>38.20</td>
+<td>42.10</td>
+<td>7.00</td>
+<td>21.30</td>
+<td>28.30</td>
+<td>12.30</td>
+<td>17.90</td>
+<td>30.20</td>
+<td>4.40</td>
+<td>37.10</td>
+<td>41.50</td></tr>
+<tr>
+<td>Llama3.1-Ins</td>
+<td>8</td>
+<td>32.00</td>
+<td>1.70</td>
+<td>33.70</td>
+<td>4.80</td>
+<td>45.50</td>
+<td>50.30</td>
+<td>8.40</td>
+<td>23.90</td>
+<td>32.30</td>
+<td>15.10</td>
+<td>23.70</td>
+<td>38.80</td>
+<td>5.70</td>
+<td>44.50</td>
+<td>50.20</td></tr>
+<tr>
+<td>Llama-Primus-Base<sup>⋆</sup></td>
+<td>8</td>
+<td>23.40</td>
+<td>3.40</td>
+<td>26.80</td>
+<td>2.60</td>
+<td>41.60</td>
+<td>44.20</td>
+<td>5.60</td>
+<td>22.10</td>
+<td>27.70</td>
+<td>10.50</td>
+<td>22.40</td>
+<td>32.90</td>
+<td>3.50</td>
+<td>41.00</td>
+<td>44.50</td></tr>
+<tr>
+<td>Foundation-Sec-Rsn<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>25.80</td>
+<td>3.10</td>
+<td>28.90</td>
+<td>4.30</td>
+<td>46.40</td>
+<td>50.70</td>
+<td>4.90</td>
+<td>28.30</td>
+<td>33.20</td>
+<td>11.70</td>
+<td>25.90</td>
+<td>37.60</td>
+<td>5.30</td>
+<td>48.00</td>
+<td>53.30</td></tr>
+<tr>
+<td>Llama-Primus-Merged<sup>⋆</sup></td>
+<td>8</td>
+<td>27.20</td>
+<td>1.80</td>
+<td>29.00</td>
+<td>4.10</td>
+<td>43.30</td>
+<td>47.40</td>
+<td>6.60</td>
+<td>23.90</td>
+<td>30.50</td>
+<td>12.60</td>
+<td>23.00</td>
+<td>35.60</td>
+<td>4.70</td>
+<td>44.20</td>
+<td>48.90</td></tr>
+<tr>
+<td>RedSage-DPO<sup>⋆</sup></td>
+<td>8</td>
+<td>28.30</td>
+<td>0.60</td>
+<td>28.90</td>
+<td>6.00</td>
+<td>39.30</td>
+<td>45.30</td>
+<td>9.20</td>
+<td>22.60</td>
+<td>31.80</td>
+<td>14.50</td>
+<td>20.90</td>
+<td>35.40</td>
+<td>7.20</td>
+<td>42.70</td>
+<td>49.90</td></tr>
+<tr>
+<td>Qwen3</td>
+<td>8</td>
+<td>26.70</td>
+<td>0.70</td>
+<td>27.40</td>
+<td>4.10</td>
+<td>44.80</td>
+<td>48.90</td>
+<td>7.10</td>
+<td>24.90</td>
+<td>32.00</td>
+<td>12.70</td>
+<td>23.40</td>
+<td>36.10</td>
+<td>5.80</td>
+<td>49.00</td>
+<td>54.80</td></tr>
+<tr>
+<td>Qwen3<sup>†</sup></td>
+<td>8</td>
+<td>25.40</td>
+<td>0.50</td>
+<td>25.90</td>
+<td>4.30</td>
+<td>45.20</td>
+<td>49.50</td>
+<td>6.60</td>
+<td>26.90</td>
+<td>33.50</td>
+<td>12.10</td>
+<td>24.20</td>
+<td>36.30</td>
+<td>6.80</td>
+<td>53.20</td>
+<td>60.00</td></tr>
+<tr>
+<td>RedSage-Ins<sup>⋆</sup></td>
+<td>8</td>
+<td>26.70</td>
+<td>0.70</td>
+<td>27.40</td>
+<td>4.50</td>
+<td>38.10</td>
+<td>42.60</td>
+<td>7.60</td>
+<td>21.90</td>
+<td>29.50</td>
+<td>12.90</td>
+<td>20.20</td>
+<td>33.10</td>
+<td>6.40</td>
+<td>41.10</td>
+<td>47.50</td></tr>
+<tr>
+<td>RedSage-K (GRPO)<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>16.80</td>
+<td>-0.20</td>
+<td>16.60</td>
+<td>2.00</td>
+<td>31.10</td>
+<td>33.10</td>
+<td>3.10</td>
+<td>11.40</td>
+<td>14.50</td>
+<td>7.20</td>
+<td>14.20</td>
+<td>21.40</td>
+<td>4.90</td>
+<td>33.70</td>
+<td>38.60</td></tr>
+<tr>
+<td>RedSage-K (SFT)<sup>⋆</sup></td>
+<td>8</td>
+<td>17.80</td>
+<td>1.20</td>
+<td>19.00</td>
+<td>2.40</td>
+<td>35.30</td>
+<td>37.70</td>
+<td>1.50</td>
+<td>23.60</td>
+<td>25.10</td>
+<td>7.30</td>
+<td>20.00</td>
+<td>27.30</td>
+<td>3.80</td>
+<td>42.70</td>
+<td>46.50</td></tr>
+<tr>
+<td>RedSage-K (SFT+GRPO)<sup>⋆</sup><sup>†</sup></td>
+<td>8</td>
+<td>17.10</td>
+<td>-2.50</td>
+<td>14.60</td>
+<td>1.80</td>
+<td>28.60</td>
+<td>30.40</td>
+<td>4.00</td>
+<td>8.20</td>
+<td>12.20</td>
+<td>7.60</td>
+<td>11.40</td>
+<td>19.00</td>
+<td>5.20</td>
+<td>32.00</td>
+<td>37.20</td></tr>
+<tr>
+<td colspan="17">Mid-size Models (20-32B)</td></tr>
+<tr>
+<td>Gemma-3-it</td>
+<td>27</td>
+<td>23.90</td>
+<td>-10.30</td>
+<td>13.60</td>
+<td>3.30</td>
+<td>38.90</td>
+<td>42.20</td>
+<td>6.10</td>
+<td>22.10</td>
+<td>28.20</td>
+<td>11.10</td>
+<td>17.00</td>
+<td>28.10</td>
+<td>5.10</td>
+<td>46.50</td>
+<td>51.60</td></tr>
+<tr>
+<td>GPT-OSS<sup>†</sup></td>
+<td>20/3.6</td>
+<td>22.80</td>
+<td>0.80</td>
+<td>23.60</td>
+<td>3.40</td>
+<td>45.70</td>
+<td>49.10</td>
+<td>6.50</td>
+<td>28.40</td>
+<td>34.90</td>
+<td>10.90</td>
+<td>24.90</td>
+<td>35.80</td>
+<td>5.00</td>
+<td>53.50</td>
+<td>58.50</td></tr>
+<tr>
+<td>Mistral-Small-3.2</td>
+<td>24</td>
+<td>25.00</td>
+<td>0.60</td>
+<td>25.60</td>
+<td>3.90</td>
+<td>43.30</td>
+<td>47.20</td>
+<td>6.60</td>
+<td>24.00</td>
+<td>30.60</td>
+<td>11.80</td>
+<td>22.70</td>
+<td>34.50</td>
+<td>6.70</td>
+<td>52.50</td>
+<td>59.20</td></tr>
+<tr>
+<td>Qwen3</td>
+<td>32</td>
+<td>22.80</td>
+<td>-0.80</td>
+<td>22.00</td>
+<td>5.50</td>
+<td>42.30</td>
+<td>47.80</td>
+<td>7.10</td>
+<td>23.50</td>
+<td>30.60</td>
+<td>11.80</td>
+<td>21.70</td>
+<td>33.50</td>
+<td>7.10</td>
+<td>52.10</td>
+<td>59.20</td></tr>
+<tr>
+<td>Qwen3<sup>†</sup></td>
+<td>32</td>
+<td>24.40</td>
+<td>-1.60</td>
+<td>22.80</td>
+<td>4.40</td>
+<td>40.80</td>
+<td>45.20</td>
+<td>6.10</td>
+<td>22.60</td>
+<td>28.70</td>
+<td>11.70</td>
+<td>20.60</td>
+<td>32.30</td>
+<td>6.90</td>
+<td>50.90</td>
+<td>57.80</td></tr>
+<tr>
+<td colspan="17">Large-scale Models ($\geq$ 70B)</td></tr>
+<tr>
+<td>Llama-Primus-Ins<sup>⋆</sup></td>
+<td>70</td>
+<td>23.60</td>
+<td>-4.30</td>
+<td>19.30</td>
+<td>4.40</td>
+<td>41.80</td>
+<td>46.20</td>
+<td>7.40</td>
+<td>23.20</td>
+<td>30.60</td>
+<td>11.80</td>
+<td>20.20</td>
+<td>32.00</td>
+<td>6.20</td>
+<td>46.20</td>
+<td>52.40</td></tr>
+<tr>
+<td>Llama-3.3-Ins</td>
+<td>70</td>
+<td>24.40</td>
+<td>-2.40</td>
+<td>22.00</td>
+<td>4.20</td>
+<td>41.80</td>
+<td>46.00</td>
+<td>6.20</td>
+<td>24.40</td>
+<td>30.60</td>
+<td>11.60</td>
+<td>21.20</td>
+<td>32.80</td>
+<td>6.10</td>
+<td>49.00</td>
+<td>55.10</td></tr>
+<tr>
+<td>GPT-OSS<sup>†</sup></td>
+<td>120/5.1</td>
+<td>22.00</td>
+<td>0.40</td>
+<td>22.40</td>
+<td>4.90</td>
+<td>39.30</td>
+<td>44.20</td>
+<td>7.30</td>
+<td>24.00</td>
+<td>31.30</td>
+<td>11.40</td>
+<td>21.20</td>
+<td>32.60</td>
+<td>8.00</td>
+<td>48.90</td>
+<td>56.90</td></tr>
+<tr>
+<td>Qwen3-Coder-Next<sup>†</sup></td>
+<td>80/3</td>
+<td>22.70</td>
+<td>-0.40</td>
+<td>22.30</td>
+<td>3.10</td>
+<td>39.50</td>
+<td>42.60</td>
+<td>6.80</td>
+<td>22.50</td>
+<td>29.30</td>
+<td>10.80</td>
+<td>20.50</td>
+<td>31.30</td>
+<td>4.80</td>
+<td>48.90</td>
+<td>53.70</td></tr>
+<tr>
+<td>Qwen2.5-Ins</td>
+<td>72</td>
+<td>21.40</td>
+<td>-0.60</td>
+<td>20.80</td>
+<td>3.40</td>
+<td>40.40</td>
+<td>43.80</td>
+<td>5.20</td>
+<td>21.10</td>
+<td>26.30</td>
+<td>10.00</td>
+<td>20.20</td>
+<td>30.20</td>
+<td>4.80</td>
+<td>50.40</td>
+<td>55.20</td></tr>
+<tr>
+<td>DeepSeek-V3.2<sup>†</sup></td>
+<td>685/37</td>
+<td>22.50</td>
+<td>-1.20</td>
+<td>21.30</td>
+<td>5.00</td>
+<td>31.50</td>
+<td>36.50</td>
+<td>6.60</td>
+<td>18.70</td>
+<td>25.30</td>
+<td>11.40</td>
+<td>16.30</td>
+<td>27.70</td>
+<td>7.20</td>
+<td>44.30</td>
+<td>51.50</td></tr>
+<tr>
+<td>GLM-5.2<sup>†</sup></td>
+<td>753</td>
+<td>7.90</td>
+<td>0.70</td>
+<td>8.60</td>
+<td>-3.40</td>
+<td>16.50</td>
+<td>13.10</td>
+<td>27.50</td>
+<td>11.80</td>
+<td>39.30</td>
+<td>10.70</td>
+<td>9.60</td>
+<td>20.30</td>
+<td>10.70</td>
+<td>22.80</td>
+<td>33.50</td></tr>
+<tr>
+<td>Metric Average</td>
+<td>–</td>
+<td>23.19</td>
+<td>-0.58</td>
+<td>22.62</td>
+<td>3.62</td>
+<td>39.13</td>
+<td>42.75</td>
+<td>7.13</td>
+<td>21.89</td>
+<td>29.01</td>
+<td>11.31</td>
+<td>20.14</td>
+<td>31.45</td>
+<td>5.93</td>
+<td>44.80</td>
+<td>50.73</td></tr>
+</table>
+
+## Appendix H Model Performance Difference across Execution Modes
+
+Table [5](https://arxiv.org/html/2610.02206v1#A7.T5) provides a model-wise decomposition of performance changes across execution modes, complementing the raw-score analysis in Table [1](https://arxiv.org/html/2610.02206v1#S3.T1).
+
+A consistent pattern is that improvements in tool selection do not propagate proportionally to exact command correctness. Although Tool $\Delta_{1}$ is large across all models (23.2 pp on average), Exact $\Delta_{1}$ remains much smaller (5.9 pp on average). This indicates that even if the tool name can be settled, the remaining errors are still dominated by argument selection, value binding, and command formatting. Thus, restricted mode mainly reduces tool-choice ambiguity, but does not substantially solve command construction.
+
+The restricted-to-hinted transition shows the opposite behavior. Tool $\Delta_{2}$ is small, unstable, and often negative: 11 out of 24 models show degraded Tool Accuracy after adding full tool manuscripts, with Gemma-3-it-27B dropping by 10.3 pp. In contrast, argument-related metrics improve substantially, with Optional F1 increasing by about 39.1 pp and Positional F1 by about 21.9 pp on average. This asymmetry suggests that tool manuscripts are not primarily useful for identifying tools; instead, they help models resolve optional-argument ambiguity, flag selection, value specification, and positional ordering.
+
+Exact Correct further confirms this mechanism. Exact $\Delta_{2}$ averages 44.8 pp, nearly eight times larger than Exact $\Delta_{1}$, showing that argument correction is far more effective than tool disambiguation for producing fully correct commands. Model-wise, the largest Exact gains are more closely associated with large Optional $\Delta_{2}$ than with large Tool $\Delta_{1}$, suggesting that optional-argument modeling is the key factor determining whether partial command understanding becomes exact command reconstruction.
+
+The RedSage-K variants show a distinct delta pattern: despite strong raw performance in the U and R settings, they benefit less from mode switching than many baselines. In particular, RedSage-K (GRPO) and RedSage-K (SFT+GRPO) exhibit smaller Optional, Positional, Total, and Exact $\Delta$s than strong general-purpose models. This suggests that KaliBench post-training improves intrinsic command understanding, but the RedSage-K variants may be less effective at exploiting full tool documentation, consistent with their weaker Hinted-mode gains in the main results.
+
+Overall, the delta analysis shows that NL-to-CLI errors are not reduced uniformly across components. The main model-wise differentiator is not the magnitude of tool-selection gains, but how efficiently models use documentation to repair argument errors and produce exact commands.
+
+![Refer to caption](https://arxiv.org/html/2610.02206v1/wordcloud.png)
+
+\(a\) Word cloud of options
+
+![Refer to caption](https://arxiv.org/html/2610.02206v1/histo.png)
+
+\(b\) Top-40 option frequency distribution.
+
+Figure 7: Coverage of CLI options in KaliBench (Evaluation Subset). While common flags (e.g., --help, --verbose) appear frequently, many functional tool-specific options also occur across the dataset.
+
+## Appendix I RLVR Failure Analysis
+
+Table 6: Effect of RLVR on RedSage-K across evaluation modes. Scores are Total Score percentages. $\Delta$ denotes the change from the original RedSage-Ins model in percentage points.
+
+|  |  |  |  |  |  |
+|----|----|----|----|----|----|
+| Mode | RedSage-Ins | RedSage-K (GRPO) | $\boldsymbol{\Delta}_{\mathrm{\textbf{GRPO}}}$ | RedSage-K (SFT+GRPO) | $\boldsymbol{\Delta}_{\mathrm{\textbf{SFT+GRPO}}}$ |
+| Unrestricted | 56.36 | 67.40 | +11.04 | 70.31 | +13.95 |
+| Restricted | 69.31 | 74.65 | +5.34 | 77.93 | +8.62 |
+| Hinted | 89.53 | 88.77 | -0.76 | 89.34 | -0.19 |
+
+Our paired analysis of all 5,000 evaluation examples across the three settings identifies three recurring RLVR failure modes: invalid optional arguments or option–value pairs, incorrect positional-argument construction, and regressions on examples already solved by the baseline. The model often selects the correct tool but generates incorrect argument forms, such as msfvenom --list-formats instead of msfvenom --list formats.
+
+Although the GRPO and SFT+GRPO variants of RedSage-K improve Total Score in U and R, they reduce it in H by 0.76 and 0.19 percentage points, respectively, relative to the original RedSage-Ins model. In H, the GRPO variant corrects 537 baseline exact-match failures but regresses on 562 baseline successes. The degradation is concentrated in commands requiring optional arguments or a mixture of optional and positional arguments.
+
+SFT initialization mitigates these regressions. Compared with GRPO alone, SFT+GRPO improves Total Score by 2.91 points in U and 3.28 points in R, while reducing H-mode exact-match regressions from 562 to 488.
+
+Across security dimensions, both RLVR variants show broad improvements in U and R. We find no robust evidence of a dimension in which RLVR systematically fails to improve; the small variations in H do not form a consistent dimension-specific pattern.
+
+## Appendix J Analysis of CLI Option Distribution
+
+To assess whether KaliBench captures meaningful CLI behaviors rather than being dominated by generic flags, we analyze option frequencies across evaluation, train, and full sets. In all, there are 3,074 different optional arguments in the evaluation set, 2,739 in the train set, and 4,378 in the full set. Figure [7](https://arxiv.org/html/2610.02206v1#A8.F7) shows the top 40 options in the evaluation subset. As expected, broadly supported meta-flags such as --verbose\|-v and --help\|-h appear most frequently. However, the distribution also covers security-relevant CLI patterns, including network and web parameters (--port\|-p, --domain\|-d, --url\|-u), interface/address controls (--interface\|-i, --dst-addr\|-d), and data/output handling flags (--file\|-f, --format\|-f, --output\|-o, --reportformat).
+
+This distribution confirms that KaliBench does not collapse into trivial command templates. Although generic flags are frequent due to broad tool support, many options correspond to functional behaviors such as scanning configuration, target selection, credential or hash handling, and other core Kali Linux workflows. These security-specific flags demonstrate that KaliBench covers diverse and operationally meaningful command patterns, making it suitable for evaluating fine-grained CLI generation in realistic cybersecurity settings.
+
+## Appendix K Complete List of Best-Worst Performed Tools
+
+Table [7](https://arxiv.org/html/2610.02206v1#A11.T7) reports representative high- and low-performing tools after aggregating scores across 24 open-weight model configurations and three evaluation modes. For each tool, scores are averaged over all associated evaluation records.
+
+High-performing tools show consistently strong performance across all sub-metrics. For example, d2j-std-apk, rfdump, and truecrypt2john achieve perfect average scores, while jsql and reconspider remain near-perfect with avg_exact scores of $0.995$ and $0.993$, respectively. Their high avg_optional and avg_positional scores indicate that the evaluated models reliably construct arguments for these tools.
+
+By contrast, low-performing tools reveal substantial weaknesses in argument generation. Although their avg_total scores range from $0.347$ to $0.560$, their Exact scores remain much lower. The clearest example is nikto, which has near-perfect tool identification (avg_tool $=0.986$) but zero exact correctness (avg_exact $=0.000$), alongside very low avg_optional and avg_positional scores ($0.012$ and $0.042$). Similar gaps appear for steghide, above, and exiflooter, showing that strong performance on an individual component is insufficient for complete command correctness.
+
+Table 7: Best- and worst-representative tools aggregated from the scoring files of all models.
+
+<table>
+<tr>
+<th>title</th>
+<th>avg_total</th>
+<th>avg_tool</th>
+<th>avg_optional</th>
+<th>avg_positional</th>
+<th>avg_exact</th>
+<th>count</th>
+<th>score_sum</th></tr>
+<tr>
+<td colspan="8">Best Reps</td></tr>
+<tr>
+<td>d2j-std-apk</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$72$</td>
+<td>$5.000$</td></tr>
+<tr>
+<td>rfdump</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$72$</td>
+<td>$5.000$</td></tr>
+<tr>
+<td>truecrypt2john</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$72$</td>
+<td>$5.000$</td></tr>
+<tr>
+<td>jsql</td>
+<td>$0.998$</td>
+<td>$1.000$</td>
+<td>$0.995$</td>
+<td>$1.000$</td>
+<td>$0.995$</td>
+<td>$216$</td>
+<td>$4.989$</td></tr>
+<tr>
+<td>reconspider</td>
+<td>$0.998$</td>
+<td>$1.000$</td>
+<td>$1.000$</td>
+<td>$0.993$</td>
+<td>$0.993$</td>
+<td>$288$</td>
+<td>$4.984$</td></tr>
+<tr>
+<td colspan="8">Worst Reps</td></tr>
+<tr>
+<td>steghide</td>
+<td>$0.560$</td>
+<td>$1.000$</td>
+<td>$0.347$</td>
+<td>$0.333$</td>
+<td>$0.319$</td>
+<td>$72$</td>
+<td>$2.560$</td></tr>
+<tr>
+<td>above</td>
+<td>$0.490$</td>
+<td>$0.747$</td>
+<td>$0.357$</td>
+<td>$0.368$</td>
+<td>$0.319$</td>
+<td>$288$</td>
+<td>$2.281$</td></tr>
+<tr>
+<td>exiflooter</td>
+<td>$0.491$</td>
+<td>$0.719$</td>
+<td>$0.379$</td>
+<td>$0.375$</td>
+<td>$0.191$</td>
+<td>$288$</td>
+<td>$2.155$</td></tr>
+<tr>
+<td>hashrat</td>
+<td>$0.464$</td>
+<td>$0.524$</td>
+<td>$0.273$</td>
+<td>$0.593$</td>
+<td>$0.184$</td>
+<td>$288$</td>
+<td>$2.038$</td></tr>
+<tr>
+<td>nikto</td>
+<td>$0.347$</td>
+<td>$0.986$</td>
+<td>$0.012$</td>
+<td>$0.042$</td>
+<td>$0.000$</td>
+<td>$72$</td>
+<td>$1.386$</td></tr>
+</table>
+
+Notes: count denotes the number of times that a tool appears in the files. score_sum is the unweighted sum of all averaged metrics.
+
+## Appendix L Details about Metrics Calculation
+
+### L.1 Command-level Scoring for Evaluating Models
+
+For each example, we extract the predicted command from the \<output\> tag and parse both the ground-truth and predicted commands into: \<tool name\>, \<optional flags\>, and \<positional arguments\> to know which flags take values and which flags are aliases.
+
+#### Tool score
+
+Tool_score is a binary indicator: it is 1 if the predicted tool name exactly matches the ground-truth tool name, and 0 otherwise.
+
+#### Optional-argument F1.
+
+Ground-truth optional flags are grouped into alias sets (e.g., ‘-h’ \| ‘`--`help’). A predicted flag is counted as correct for a group if it matches any alias in that group. Let $G$ be the number of ground-truth groups, $N_{\text{pred}}$ be the total number of predicted optional flags, and $H$ be the number of ground-truth groups that are “hit” by at least one predicted alias. We define $\text{precision}_{\text{opt}}=H/N_{\text{pred}}$ and $\text{recall}_{\text{opt}}=H/G$, and compute
+
+|     |                |     |
+|-----|----------------|-----|
+|     | $$\text{optional\_f1}=\frac{2\times\text{precision}_{\text{opt}}\times\text{recall}_{\text{opt}}}{\text{precision}_{\text{opt}}+\text{recall}_{\text{opt}}}.$$ |     |
+
+If both ground truth and prediction have no optional flags, we set optional_f1 to 1; if ground truth command has no optional flags while the predicted command has, we set it to 0.
+
+#### Positional-argument F1.
+
+The ground-truth and predicted positional arguments form 2 sets. We match each predicted argument to an identical ground-truth argument at most once: every successful match counts as a true positive $TP$; any remaining unmatched predicted arguments are false positives $FP$; and any remaining unmatched ground-truth arguments are false negatives $FN$. We then define $\text{precision}_{\text{pos}}=TP/(TP+FP)$ and $\text{recall}_{\text{pos}}=TP/(TP+FN)$, and compute
+
+|     |                |     |
+|-----|----------------|-----|
+|     | $$\text{positional\_f1}=\frac{2\,\text{precision}_{\text{pos}}\,\text{recall}_{\text{pos}}}{\text{precision}_{\text{pos}}+\text{recall}_{\text{pos}}}.$$ |     |
+
+If both lists are empty, we set positional_f1 to 1; if exactly one is empty, we set it to 0.
+
+#### Total score and Exact match
+
+Total score is the average of tool score, optional f1 and positional f1. And Exact match evaluates end-to-end command correctness which is 1 for generating a correct canonicalized command, and 0 for any error in parameters.
+
+### L.2 Dimensional Score Calculation
+
+To analyze model performance across functional security domains, we leverage Kali’s metapackage taxonomy (Section [3](https://arxiv.org/html/2610.02206v1#S3.SS0.SSS0.Px3)) to assign each tool to one or more of $D=23$ capability dimensions. Each query–command pair is therefore annotated with a multi-hot vector $\mathbf{v}^{(i)}\in\{0,1\}^{D}$ indicating the dimensions to which its ground-truth tool belongs.
+
+For each evaluation instance $i$, we project its scalar prediction score $s^{(i)}\in[0,1]$ onto the corresponding capability dimensions by element-wise multiplication:
+
+|     |                |     |
+|-----|----------------|-----|
+|     | $$\mathbf{s}^{(i)}=s^{(i)}\cdot\mathbf{v}^{(i)}.$$ |     |
+
+This assigns the score $s^{(i)}$ to all dimensions associated with the tool, while all other dimensions receive zero. Summing $\mathbf{s}^{(i)}$ over all instances yields per-dimension performance scores for each model, enabling fine-grained analysis across the 23 cybersecurity capability dimensions.
+
+#### Example.
+
+Consider a tool that is associated with three capability dimensions in Kali’s taxonomy, corresponding to dimensions 2, 4, and 6 out of the total $D=23$. Its multi-hot encoding vector is therefore
+
+|     |                |     |
+|-----|----------------|-----|
+|     | $$\mathbf{v}^{(i)}=(0,1,0,1,0,1,0,\ldots,0)\in\{0,1\}^{23},$$ |     |
+
+where the nonzero entries indicate the relevant capability dimensions and all remaining positions are zero. If the model assigns this instance a scalar prediction score $s^{(i)}=0.8$, the projected dimensional score vector becomes
+
+|     |                |     |
+|-----|----------------|-----|
+|     | $$\mathbf{s}^{(i)}=0.8\cdot\mathbf{v}^{(i)}=(0,0.8,0,0.8,0,0.8,0,\ldots,0).$$ |     |
+
+Thus, the same prediction score is assigned to each of the associated capability dimensions (2, 4, and 6), while having no effect on the others. Aggregating such vectors across all evaluation instances yields cumulative performance scores for each capability dimension.
+
+## Appendix M Detailed Results for Proprietary Models and Agentic Scaffold
+
+Table 8: Complete results for proprietary models and agentic scaffolds in the Unrestricted setting. We used the following abbreviations: Tool Accuracy (TA), Optional-Argument F1 (Opt-F1), Positional-Argument F1 (Pos-F1), Total Score (TS), and Exact Correct (EC). All metric scores are percentages. Bold shows the best.
+
+| Model / Scaffold | Answered queries | Blocked / Missing | TA | Opt-F1 | Pos-F1 | TS | EC Answered | EC All 5K |
+|----|----|----|----|----|----|----|----|----|
+| GPT-5.6-Sol | 4,988 (99.76%) | 12 (0.24%) | 92.54 | 87.42 | 71.51 | 83.83 | 61.83 | 61.68 |
+| Claude Opus 5 | 3,675 (73.50%) | 1,325 (26.50%) | 90.67 | 85.95 | 68.57 | 81.73 | 59.89 | 44.02 |
+| Codex (GPT-5.5, xhigh) | 4,633 (92.66%) | 367 (7.34%) | 91.28 | 82.39 | 63.46 | 79.04 | 55.77 | 51.68 |
+
+Table [8](https://arxiv.org/html/2610.02206v1#A13.T8) reveals a different component-score pattern from the aggregate open-weight results: both standalone proprietary models achieve lower Pos-F1 than Opt-F1 despite high tool-selection accuracy. This pattern also appears in the Codex configuration, suggesting that argument construction remains challenging across both standalone and scaffolded settings. Moreover, Exact Correct (EC) reflects the joint correctness of the entire command construction process, requiring correct tool selection, flag–value bindings, and positional arguments. Errors across these components accumulate, yielding EC scores below the lowest component score for all three modes. These findings underscore the value of fine-grained evaluation in explaining the gap between individual component performance and complete command correctness.
+
+## Appendix N Model-wise Sensitivity to Messy Queries
+
+We examine whether sensitivity to messy user queries is shared across the evaluated model configurations. Under the Unrestricted setting, we compare each configuration’s Total Score on Messy Query inputs with its own performance on the corresponding Clean Query inputs.
+
+Fig [8](https://arxiv.org/html/2610.02206v1#A14.F8) shows that every tested configuration experiences a decrease in Total Score. Most configurations lose approximately 3 percentage points, while the two most sensitive configurations lose more than 4 percentage points. Even the smallest observed decrease is 1.98 percentage points. This consistent trend across the tested configurations suggests that degradation to messy queries is not confined to a single model family, and how to deal with messy user queries remain a systematic challenge for natural-language-to-CLI translation task.
+
+[Figure asset](https://arxiv.org/html/2610.02206v1/fig3_messy_drop_by_model_en.svg)
+
+Figure 8: Model-wise Sensitivity to Messy Queries
+
+## Appendix O Limitations
+
+KaliBench is designed as a deterministic and reproducible benchmark for evaluating NL–to–CLI function calling, and it inherits several limitations intrinsic to the CLI ecosystem and its documentation sources. Ground-truth commands are derived from Kali Linux tool manuals available at dataset construction time. As these manuals evolve across versions through the addition, deprecation, renaming, or reinterpretation of flags, some canonicalized commands may become outdated as upstream documentation changes. In practice, such effects are limited, as tools often maintain backward compatibility, and evaluation in the hinted setting is further insulated from drift by explicitly providing models with the tool documentation to follow.
+
+In addition, real-world tool documentation may occasionally contain inconsistencies or errors. For example, the regtree manual lists the -V option with conflicting semantics (`-`V, `--`no-values and `-`V, `--`version), and several tools in the Impacket family document atypical short-option forms (e.g., -aesKey) that differ from common usage conventions (e.g., `--`aesKey). Such cases reflect the diversity and historical evolution of CLI interfaces rather than issues specific to KaliBench, and they make fully deterministic canonicalization inherently approximate when documentation diverges from observed behavior or when multiple variants coexist.
+
+Our LLM-as-Verifier pipeline substantially filters hallucinated flags and arguments by grounding validation in official manuals, but it remains imperfect; human verification of a random subset indicates that residual errors are limited. Similarly, the alias-aware scoring mechanism relies on semi-automatically extracted alias groups and cannot capture all historical, distribution-specific, or community-adopted variants.
+
+Taken together, these considerations position KaliBench as a controlled and well-defined abstraction of real-world CLI tool invocation. It is designed to support systematic, fine-grained evaluation of NL-to-CLI translation, while complementing execution-based or agentic evaluations in operational cybersecurity environments.

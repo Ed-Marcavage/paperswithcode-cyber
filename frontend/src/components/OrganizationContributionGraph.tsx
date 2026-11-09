@@ -1,3 +1,4 @@
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import React, { useEffect, useMemo, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -226,6 +227,7 @@ export const OrganizationContributionGraph: React.FC<{
     <ContributionGraphContent
       data={contributionsQ.data}
       organizationName={organizationName}
+      {...(isDiscoveryCatalog() ? {title: "Publications", noun: "publication"} : {})}
     />
   );
 };

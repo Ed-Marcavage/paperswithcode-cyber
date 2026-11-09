@@ -18,6 +18,7 @@ from backend.services.paper_markdown_service import (
     PaperMarkdownVersionMismatchError,
     read_paper_markdown_bounded,
     read_paper_markdown_chunk,
+    chunk_text_bytes,
 )
 
 router = APIRouter(prefix="/research", tags=["research"])
@@ -80,6 +81,13 @@ def read_paper(
     chunk_mode = any(
         value is not None for value in (raw_offset, raw_limit, raw_version)
     )
+    if settings.discovery_catalog:
+        from backend.database.connection import db_manager
+        from backend.services.discovery_catalog import paper_text
+        with db_manager.session_local() as db:
+            stored = paper_text(db, paper_id)
+        if stored is None:
+            raise HTTPException(404, "Paper has no curated catalog record")
     if chunk_mode:
         parsed_offset = _integer_query_value(
             raw_offset,
@@ -105,14 +113,17 @@ def read_paper(
                 "Query parameter content_version is required for a nonzero offset"
             )
         try:
-            chunk = read_paper_markdown_chunk(
-                paper_id,
-                bucket_id=settings.paper_markdown_hf_bucket_id,
-                token=settings.hf_token or None,
-                offset=parsed_offset,
-                limit=parsed_limit,
-                content_version=raw_version,
-            )
+            if settings.discovery_catalog:
+                chunk = chunk_text_bytes(stored.encode("utf-8"), parsed_offset, parsed_limit, raw_version)
+            else:
+                chunk = read_paper_markdown_chunk(
+                    paper_id,
+                    bucket_id=settings.paper_markdown_hf_bucket_id,
+                    token=settings.hf_token or None,
+                    offset=parsed_offset,
+                    limit=parsed_limit,
+                    content_version=raw_version,
+                )
         except PaperMarkdownVersionMismatchError as error:
             raise HTTPException(
                 status_code=409,
@@ -156,6 +167,9 @@ def read_paper(
             headers["X-PwC-Next-Offset"] = str(chunk.next_offset)
         return PlainTextResponse(chunk.markdown, headers=headers)
 
+    if settings.discovery_catalog:
+        chunk = chunk_text_bytes(stored.encode("utf-8"), 0, _MARKDOWN_MAX_BYTES, None)
+        return PlainTextResponse(chunk.markdown, headers={"X-PWC-Truncated": str(int(chunk.truncated))})
     try:
         markdown, truncated = read_paper_markdown_bounded(
             paper_id,

@@ -1,3 +1,4 @@
+import { catalogNavigation } from "@/lib/catalogAnalytics";
 import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -8,6 +9,7 @@ import {
   CANONICAL_CHAT_URL,
   isAuthDisabled,
   isChatEnabled,
+  isDiscoveryCatalog,
   isChatMirror,
 } from "@/lib/apiUrl";
 import { useAuth } from "@/lib/authContext";
@@ -98,7 +100,16 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
     : isChatMirror()
       ? { to: "/chat", label: "Chat", end: false, badge: "New", href: CANONICAL_CHAT_URL }
       : null;
-  const navLinks: readonly HeaderNavLink[] = chatLink
+  const navLinks: readonly HeaderNavLink[] = isDiscoveryCatalog()
+    ? [
+        NAV_LINKS[0],
+        { to: "/catalog", label: "Browse catalog", end: false },
+        { to: "/organizations", label: "Organizations", end: false },
+        { to: "/developers", label: "Developers", end: false },
+        { to: "/mcp", label: "MCP", end: false },
+        { to: "/personal-agents", label: "Personal agents", end: true },
+      ]
+    : chatLink
     ? [NAV_LINKS[0], chatLink, ...NAV_LINKS.slice(1)]
     : NAV_LINKS;
 
@@ -146,7 +157,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
               Papers <em>With Code</em>
             </span>
           </NavLink>
-          <nav className="nav" ref={navRef}>
+          <nav className={isDiscoveryCatalog() ? "nav nav-catalog" : "nav"} ref={navRef}>
             {navLinks.map(({ to, label, end, badge, href }) => {
               const content = (
                 <>
@@ -169,6 +180,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
                   key={to}
                   to={to}
                   end={end}
+                  onClick={() => catalogNavigation(to)}
                   className={({ isActive }) => `nav-item${badge ? " nav-item-with-badge" : ""}${isActive ? " active" : ""}`}
                 >
                   {content}
@@ -182,6 +194,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
             />
           </nav>
           <div className="header-spacer"></div>
+          {!isDiscoveryCatalog() && <>
           <a
             className="feedback-link header-feedback-link"
             href={FEEDBACK_URL}
@@ -200,6 +213,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           >
             <HeaderIcon name="github" size={14} />
           </a>
+          </>}
           <button
             className="search-trigger"
             aria-label="Search papers, authors, domains"
@@ -240,7 +254,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
             </button>
           </Dialog.Trigger>
         </div>
-        {!isReaderRoute && showAnnouncement && (
+        {!isReaderRoute && !isDiscoveryCatalog() && showAnnouncement && (
           <div className="site-announcement" role="status">
             <span>New: </span>
             {authDisabled ? (
@@ -295,11 +309,12 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
                   {content}
                 </a>
               ) : (
-                <NavLink key={to} to={to} end={end} className={className} onClick={closeMobile}>
+                <NavLink key={to} to={to} end={end} className={className} onClick={() => { catalogNavigation(to); closeMobile(); }}>
                   {content}
                 </NavLink>
               );
             })}
+            {!isDiscoveryCatalog() && <>
             <a
               className="mobile-nav-link"
               href={FEEDBACK_URL}
@@ -318,6 +333,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
             >
               GitHub
             </a>
+            </>}
             {!authDisabled && (
               <NavLink to="/saved" className="mobile-nav-link" onClick={closeMobile}>
                 Saved papers

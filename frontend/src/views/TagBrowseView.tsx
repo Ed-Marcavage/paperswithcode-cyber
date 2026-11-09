@@ -1,3 +1,5 @@
+import { paperLinkHandlers } from "@/lib/catalogAnalytics";
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import ResearchFollowButton from "@/components/ResearchFollowButton";
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -96,7 +98,11 @@ export const TaskBreadcrumb: React.FC<{
   parents: Task[];
 }> = ({ task, area, parents }) => (
   <nav className="breadcrumb" aria-label="Breadcrumb">
-    <Link to="/tasks">Tasks</Link>
+    {isDiscoveryCatalog() && <>
+      <Link to="/">Trending</Link>
+      <span className="sep">/</span>
+    </>}
+    <Link to="/tasks">{isDiscoveryCatalog() ? "All Domains" : "Tasks"}</Link>
     {area && (
       <>
         <span className="sep">/</span>
@@ -568,7 +574,7 @@ const TagBrowseView: React.FC = () => {
                     </div>
                     <div className="bench-row-paper" role="cell">
                       {benchmark.best_paper_route && benchmark.best_paper_title ? (
-                        <Link to={`/paper/${encodeURIComponent(benchmark.best_paper_route)}`}>
+                        <Link to={`/paper/${encodeURIComponent(benchmark.best_paper_route)}`} {...paperLinkHandlers(benchmark.best_paper_route, benchmark.best_paper_title, "title", "benchmark")}>
                           {benchmark.best_paper_title}
                         </Link>
                       ) : (

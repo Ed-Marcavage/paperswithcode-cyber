@@ -1,0 +1,414 @@
+{
+  "schema_version": 1,
+  "names": {
+    "topic": {},
+    "target": {},
+    "contribution": {},
+    "kind": {
+      "repository": "Repository"
+    },
+    "year": {}
+  },
+  "rows": [
+    {
+      "id": "gh-repo-1017550802",
+      "title": "0x4m4/hexstrike-ai",
+      "abstract": "HexStrike AI MCP Agents is an advanced MCP server that lets AI agents (Claude, GPT, Copilot, etc.) autonomously run 150+ cybersecurity tools for automated pentesting, vulnerability discovery, bug bounty automation, and security research. Seamlessly bridge LLMs with real-world offensive security capabilities.",
+      "url": "https://github.com/0x4m4/hexstrike-ai",
+      "artifact_url": "https://github.com/0x4m4/hexstrike-ai",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-764418725",
+      "title": "albertan017/LLM4Decompile",
+      "abstract": "Reverse Engineering: Decompiling Binary Code with Large Language Models",
+      "url": "https://github.com/albertan017/LLM4Decompile",
+      "artifact_url": "https://github.com/albertan017/LLM4Decompile",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1366445233",
+      "title": "AntAISecurityLab/Creation",
+      "abstract": "An agentic system for real-world vulnerability detection and exploitation",
+      "url": "https://github.com/AntAISecurityLab/Creation",
+      "artifact_url": "https://github.com/AntAISecurityLab/Creation",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-680027364",
+      "title": "cyberkaida/reverse-engineering-assistant",
+      "abstract": "MCP server for reverse engineering tasks in Ghidra 👩‍💻",
+      "url": "https://github.com/cyberkaida/reverse-engineering-assistant",
+      "artifact_url": "https://github.com/cyberkaida/reverse-engineering-assistant",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1242867671",
+      "title": "evilsocket/audit",
+      "abstract": "An 8-stage vulnerability-discovery agent.",
+      "url": "https://github.com/evilsocket/audit",
+      "artifact_url": "https://github.com/evilsocket/audit",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1078171437",
+      "title": "gadievron/raptor",
+      "abstract": "Raptor turns Claude Code into a general-purpose AI offensive/defensive security agent. By using Claude.md and creating rules, sub-agents, and skills, and orchestrating security tool usage, we configure the agent for adversarial thinking, and perform research or attack/defense operations.",
+      "url": "https://github.com/gadievron/raptor",
+      "artifact_url": "https://github.com/gadievron/raptor",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-984413599",
+      "title": "GH05TCREW/pentestagent",
+      "abstract": "PentestAgent is an AI agent framework for black-box security testing, supporting bug bounty, red-team, and penetration testing workflows.",
+      "url": "https://github.com/GH05TCREW/pentestagent",
+      "artifact_url": "https://github.com/GH05TCREW/pentestagent",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1156191030",
+      "title": "JameZUK/Arkana",
+      "abstract": "Arkana - Your entire malware analysis lab, behind one AI prompt. 250+ MCP tools for binary analysis with Claude Code or other MCP",
+      "url": "https://github.com/JameZUK/Arkana",
+      "artifact_url": "https://github.com/JameZUK/Arkana",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1348178527",
+      "title": "JordyZomer/lemmalog",
+      "abstract": "A Datalog engine for LLM agent memory: stratified rules, provenance-tracked facts, incremental derivation, and an MCP server that lets your harness use it as a shared brain.",
+      "url": "https://github.com/JordyZomer/lemmalog",
+      "artifact_url": "https://github.com/JordyZomer/lemmalog",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-574156195",
+      "title": "JusticeRage/Gepetto",
+      "abstract": "IDA plugin which queries language models to speed up reverse-engineering",
+      "url": "https://github.com/JusticeRage/Gepetto",
+      "artifact_url": "https://github.com/JusticeRage/Gepetto",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-574693353",
+      "title": "mahaloz/DAILA",
+      "abstract": "A decompiler-agnostic plugin for interacting with AI in your decompiler. GPT, Claude, and local models supported!",
+      "url": "https://github.com/mahaloz/DAILA",
+      "artifact_url": "https://github.com/mahaloz/DAILA",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1168714080",
+      "title": "Masriyan/Claude-Code-CyberSecurity-Skill",
+      "abstract": "22 production-quality Claude Code Skills for cybersecurity professionals , covering offensive security, defensive operations, reverse engineering, threat hunting, threat intelligence, purple team / adversary emulation, CSOC automation, AI/LLM security, mobile, OT/ICS, GRC, software supply chain security, and more. ",
+      "url": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill",
+      "artifact_url": "https://github.com/Masriyan/Claude-Code-CyberSecurity-Skill",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1209966933",
+      "title": "morluto/rea",
+      "abstract": "Reverse engineer anything with agents, from app behavior down to native binaries.",
+      "url": "https://github.com/morluto/rea",
+      "artifact_url": "https://github.com/morluto/rea",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-954963562",
+      "title": "mrexodia/ida-pro-mcp",
+      "abstract": "AI-powered reverse engineering assistant that bridges IDA Pro with language models through MCP.",
+      "url": "https://github.com/mrexodia/ida-pro-mcp",
+      "artifact_url": "https://github.com/mrexodia/ida-pro-mcp",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1171770865",
+      "title": "mrphrazer/binary-ninja-headless-mcp",
+      "abstract": "Headless Binary Ninja MCP server — giving AI agents deep reverse-engineering capabilities via 180 tools.",
+      "url": "https://github.com/mrphrazer/binary-ninja-headless-mcp",
+      "artifact_url": "https://github.com/mrphrazer/binary-ninja-headless-mcp",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1166506614",
+      "title": "mukul975/Anthropic-Cybersecurity-Skills",
+      "abstract": "817 structured cybersecurity skills for AI agents · Mapped to 6 frameworks: MITRE ATT&CK, NIST CSF 2.0, MITRE ATLAS, D3FEND, NIST AI RMF & MITRE F3 (Fight Fraud) · agentskills.io standard · Works with Claude Code, GitHub Copilot, Codex CLI, Cursor, Gemini CLI & 20+ platforms · 29 security domains · Apache 2.0",
+      "url": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills",
+      "artifact_url": "https://github.com/mukul975/Anthropic-Cybersecurity-Skills",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-953204432",
+      "title": "n132/ARVO",
+      "abstract": "ARVO: an Atlas of Reproducible Vulnerabilities in Open source software.",
+      "url": "https://github.com/n132/ARVO",
+      "artifact_url": "https://github.com/n132/ARVO",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1293290940",
+      "title": "s0ld13rr/pentestcode",
+      "abstract": "PentestCode - Multi-agent AI penetration testing system with persistent engagement state, strategic coordination, and parallel autonomous operations.",
+      "url": "https://github.com/s0ld13rr/pentestcode",
+      "artifact_url": "https://github.com/s0ld13rr/pentestcode",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1124754056",
+      "title": "samugit83/redamon",
+      "abstract": "Open-source, self-hosted AI penetration testing framework: maps your attack surface into a graph, autonomously exploits it from a Kali sandbox with human approval gates, and opens PRs that fix what it finds. MCP both ways: plug in any MCP server as a tool, or drive RedAmon from Claude Code or your own agent.",
+      "url": "https://github.com/samugit83/redamon",
+      "artifact_url": "https://github.com/samugit83/redamon",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1110046254",
+      "title": "SanMuzZzZz/LuaN1aoAgent",
+      "abstract": "LuaN1aoAgent is a fully autonomous AI-driven penetration testing agent powered by graph-based cognitive reasoning.Developed by the Intelligent Offense & Defense Research Group, led by Professor LuHui and Tian Zhihong at Fang Class,Guangzhou University.",
+      "url": "https://github.com/SanMuzZzZz/LuaN1aoAgent",
+      "artifact_url": "https://github.com/SanMuzZzZz/LuaN1aoAgent",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1301938254",
+      "title": "scadastrangelove/rust-in-peace",
+      "abstract": "Agent-assisted vulnerability research across Rust, Android APKs, and AI agents: independent discovery, skeptical triage, verification, and patch review.",
+      "url": "https://github.com/scadastrangelove/rust-in-peace",
+      "artifact_url": "https://github.com/scadastrangelove/rust-in-peace",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1146833101",
+      "title": "Vasco0x4/AIDA",
+      "abstract": "Turn any LLM into an autonomous pentester. You define the scope, the agent does the work, you review the findings.",
+      "url": "https://github.com/Vasco0x4/AIDA",
+      "artifact_url": "https://github.com/Vasco0x4/AIDA",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1093274901",
+      "title": "yhy0/CHYing-agent",
+      "abstract": "腾讯云黑客松 - 智能渗透挑战赛 第一届Top9",
+      "url": "https://github.com/yhy0/CHYing-agent",
+      "artifact_url": "https://github.com/yhy0/CHYing-agent",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1123203851",
+      "title": "yohannesgk/blacksmith",
+      "abstract": " BlacksmithAI is an OPEN-SOURCE advanced penetration testing framework that leverages multiple AI agents to automate security assessments. The system orchestrates specialized agents through a complete penetration testing lifecycle, from reconnaissance to post-exploitation using professional security tools in a controlled environment.",
+      "url": "https://github.com/yohannesgk/blacksmith",
+      "artifact_url": "https://github.com/yohannesgk/blacksmith",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    },
+    {
+      "id": "gh-repo-1237819660",
+      "title": "zhaoxuya520/reverse-skill",
+      "abstract": "Reverse Engineering / Authorized Penetration Testing / Security Research Skill Router Pack AI-powered routing + On-demand toolchain bootstrapping + Self-evolving knowledge base  Supports Claude Code, Kiro, Cursor, Cline, and other AI coding clients 逆向/渗透/安全技能路由包 - AI 自动路由 + 按需自举工具链 + 自动进化经验库 | 支持 Claude Code / Kiro / Cursor / Cline 等代码 AI 客户端",
+      "url": "https://github.com/zhaoxuya520/reverse-skill",
+      "artifact_url": "https://github.com/zhaoxuya520/reverse-skill",
+      "facets": {
+        "kind": [
+          "repository"
+        ],
+        "topic": [],
+        "target": [],
+        "contribution": [],
+        "year": []
+      }
+    }
+  ]
+}

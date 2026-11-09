@@ -3,7 +3,7 @@ FastAPI router for organization endpoints.
 """
 
 import hashlib
-from typing import Optional
+from typing import Literal, Optional
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
@@ -39,12 +39,29 @@ COMPAT_LOGO_CACHE_HEADERS = {
 }
 
 
+OrganizationSort = Literal["trending", "papers", "stars", "name"]
+
+def sort_organizations(result: Organizations, sort: OrganizationSort | None) -> Organizations:
+    if sort is None:
+        return result
+    def key(org):
+        if sort == "stars":
+            return (org.catalog_stars is None, -(org.catalog_stars or 0), org.name.casefold(), org.slug)
+        if sort == "papers":
+            return (-(org.paper_count or 0), org.name.casefold(), org.slug)
+        if sort == "trending":
+            return (-(org.organization_trending_score or 0), -(org.paper_count or 0), org.name.casefold(), org.slug)
+        return (org.name.casefold(), org.slug)
+    return result.model_copy(update={"results": sorted(result.results, key=key)})
+
+
 @router.get(
     "/",
     response_model=Organizations,
     summary="List all organizations",
 )
 def get_organizations(
+    sort: OrganizationSort | None = Query(None),
     featured_only: bool = Query(
         False, description="Return only the curated featured organizations"
     ),
@@ -60,8 +77,8 @@ def get_organizations(
 ):
     service = OrganizationService(db)
     if q is not None:
-        return service.search_organizations(q, limit)
-    return service.get_organizations(featured_only=featured_only)
+        return sort_organizations(service.search_organizations(q, limit), sort)
+    return sort_organizations(service.get_organizations(featured_only=featured_only), sort)
 
 
 @router.get(
@@ -69,8 +86,8 @@ def get_organizations(
     response_model=Organizations,
     summary="List curated organization cards for the public directory",
 )
-def get_organization_index(db: Session = Depends(get_database_session)):
-    return OrganizationService(db).get_organization_index()
+def get_organization_index(sort: OrganizationSort | None = Query(None), db: Session = Depends(get_database_session)):
+    return sort_organizations(OrganizationService(db).get_organization_index(), sort)
 
 
 @router.post(

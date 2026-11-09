@@ -6,12 +6,13 @@ description: "Papers With Code CLI (`pwc`) for searching and reading AI/ML paper
 Install:
 
 ```bash
-pwc_repo=https://raw.githubusercontent.com/huggingface/pwc-cli/main
-curl -LsSf "$pwc_repo/standalone_cli/install.py" | python3
+uv tool install 'git+https://github.com/Ed-Marcavage/pwc-cli.git@125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b#subdirectory=standalone_cli'
+export PWC_API_URL=http://localhost:8095/api/v1
+pwc search EVMbench --mode keyword
 ```
 
-The `pwc` CLI is anonymous and read-only. It queries the public
-[Papers With Code](https://paperswithcode.co) catalog and requires no token.
+Public research commands are anonymous and read-only. Use the API URL of the
+Cyberintel catalog you want to search; the example selects the local review site.
 Run `pwc --help` or a nested `--help` command when the live parser and this skill
 disagree; the parser is authoritative.
 

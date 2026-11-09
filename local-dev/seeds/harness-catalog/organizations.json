@@ -1,0 +1,219 @@
+[
+  {
+    "slug": "cloudflare",
+    "name": "Cloudflare",
+    "website_url": "https://www.cloudflare.com",
+    "github_url": "https://github.com/cloudflare",
+    "works": [
+      {
+        "id": "post:cloudflare:build-your-own-vulnerability-harness",
+        "role": "publisher",
+        "evidence": "https://blog.cloudflare.com/build-your-own-vulnerability-harness/"
+      },
+      {
+        "id": "post:cloudflare:cyber-frontier-models",
+        "role": "publisher",
+        "evidence": "https://blog.cloudflare.com/cyber-frontier-models/"
+      },
+      {
+        "id": "post:cloudflare:frontier-model-defense",
+        "role": "publisher",
+        "evidence": "https://blog.cloudflare.com/frontier-model-defense/"
+      },
+      {
+        "id": "repo:cloudflare/security-audit-skill",
+        "role": "repository owner",
+        "evidence": "https://github.com/cloudflare/security-audit-skill"
+      }
+    ],
+    "github_account_id": 314135
+  },
+  {
+    "slug": "chain-reactors",
+    "name": "Chain Reactors",
+    "website_url": "https://chainreactors.github.io",
+    "github_url": "https://github.com/chainreactors",
+    "works": [
+      {
+        "id": "repo:chainreactors/cyber-harness",
+        "role": "repository owner",
+        "evidence": "https://github.com/chainreactors/cyber-harness"
+      }
+    ],
+    "github_account_id": 102843259
+  },
+  {
+    "slug": "openai",
+    "name": "OpenAI",
+    "website_url": "https://openai.com",
+    "github_url": "https://github.com/openai",
+    "works": [
+      {
+        "id": "arxiv:2603.04915",
+        "role": "research affiliation",
+        "evidence": "https://openai.com/index/introducing-evmbench/"
+      },
+      {
+        "id": "post:openai:defense-factory",
+        "role": "publisher",
+        "evidence": "https://openai.com/the-defense-factory/"
+      }
+    ],
+    "github_account_id": 14957082
+  },
+  {
+    "slug": "google",
+    "name": "Google",
+    "website_url": "https://research.google",
+    "github_url": "https://github.com/google",
+    "works": [
+      {
+        "id": "post:google:chrome-stronger-with-every-update",
+        "role": "publisher",
+        "evidence": "https://blog.google/security/chrome-stronger-with-every-update/"
+      }
+    ],
+    "github_account_id": 1342004
+  },
+  {
+    "slug": "ramp",
+    "name": "Ramp",
+    "website_url": "https://engineering.ramp.com",
+    "github_url": null,
+    "works": [
+      {
+        "id": "post:ramp:100-vulnerabilities-patched-with-0-humans",
+        "role": "publisher",
+        "evidence": "https://engineering.ramp.com/post/100-vulnerabilities-patched-with-0-humans"
+      }
+    ]
+  },
+  {
+    "slug": "trail-of-bits",
+    "name": "Trail of Bits",
+    "website_url": "https://www.trailofbits.com",
+    "github_url": "https://github.com/trailofbits",
+    "works": [
+      {
+        "id": "post:trail-of-bits:auditing-in-the-age-of-good-enough-ai",
+        "role": "publisher",
+        "evidence": "https://blog.trailofbits.com/2026/09/18/auditing-in-the-age-of-good-enough-ai/"
+      }
+    ],
+    "github_account_id": 2314423
+  },
+  {
+    "slug": "anthropic",
+    "name": "Anthropic",
+    "website_url": "https://www.anthropic.com",
+    "github_url": "https://github.com/anthropics",
+    "works": [
+      {
+        "id": "post:anthropic:multiagent-systems",
+        "role": "publisher",
+        "evidence": "https://www.anthropic.com/research/multiagent-systems"
+      }
+    ],
+    "github_account_id": 76263028
+  },
+  {
+    "slug": "shopify",
+    "name": "Shopify",
+    "website_url": "https://shopify.engineering",
+    "github_url": "https://github.com/Shopify",
+    "works": [
+      {
+        "id": "post:shopify:river-vulnerability-remediation",
+        "role": "publisher",
+        "evidence": "https://shopify.engineering/river-vulnerability-remediation"
+      }
+    ],
+    "github_account_id": 8085
+  },
+  {
+    "slug": "accomplish",
+    "name": "Accomplish",
+    "website_url": "https://accomplish.ai",
+    "github_url": null,
+    "works": [
+      {
+        "id": "post:accomplish:beltdown-escaping-the-claude-code-sandbox",
+        "role": "publisher",
+        "evidence": "https://accomplish.ai/blog/beltdown-escaping-the-claude-code-sandbox/"
+      }
+    ]
+  },
+  {
+    "slug": "booz-allen",
+    "name": "Booz Allen Hamilton",
+    "website_url": "https://www.boozallen.com",
+    "github_url": null,
+    "works": [
+      {
+        "id": "post:booz-allen:cyber-weapon-index",
+        "role": "publisher",
+        "evidence": "https://www.boozallen.com/insights/cyber/cyber-weapon-index.html"
+      }
+    ]
+  },
+  {
+    "slug": "meta",
+    "name": "Meta",
+    "website_url": "https://ai.meta.com",
+    "github_url": "https://github.com/meta-llama",
+    "works": [
+      {
+        "id": "arxiv:2404.13161",
+        "role": "research affiliation",
+        "evidence": "https://github.com/meta-llama/PurpleLlama/tree/main/CybersecurityBenchmarks"
+      },
+      {
+        "id": "arxiv:2408.01605",
+        "role": "research affiliation",
+        "evidence": "https://github.com/meta-llama/PurpleLlama/tree/main/CybersecurityBenchmarks"
+      }
+    ],
+    "github_account_id": 153379578
+  },
+  {
+    "slug": "uk-ai-security-institute",
+    "name": "UK AI Security Institute",
+    "website_url": "https://www.aisi.gov.uk",
+    "github_url": "https://github.com/UKGovernmentBEIS",
+    "works": [
+      {
+        "id": "arxiv:2603.02277",
+        "role": "research affiliation",
+        "evidence": "https://arxiv.org/pdf/2603.02277v3"
+      }
+    ],
+    "github_account_id": 19221939
+  },
+  {
+    "slug": "shellphish",
+    "name": "Shellphish",
+    "website_url": "https://support.shellphish.net",
+    "github_url": null,
+    "works": [
+      {
+        "id": "shellphish",
+        "role": "publisher",
+        "evidence": "https://support.shellphish.net/blog/2025/08/22/shellphish-x-aixcc-pm/"
+      }
+    ]
+  },
+  {
+    "slug": "openssf",
+    "name": "OpenSSF",
+    "website_url": "https://openssf.org",
+    "github_url": "https://github.com/ossf",
+    "works": [
+      {
+        "id": "oss-crs",
+        "role": "repository owner",
+        "evidence": "https://github.com/ossf/oss-crs"
+      }
+    ],
+    "github_account_id": 67707773
+  }
+]

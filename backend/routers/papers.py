@@ -478,6 +478,10 @@ def search_papers(
     hybrid search fuses both rankings with RRF. Endpoint cold starts, timeouts,
     and malformed vectors fall back immediately to keyword search.
     """
+    if get_settings().discovery_catalog:
+        if mode not in (None, "keyword"):
+            raise HTTPException(422, "This catalog supports keyword search only")
+        mode = "keyword"
     service = PaperService(db)
     return service.search_papers_page(
         q,
@@ -513,6 +517,8 @@ def search_papers_feed(
     db: Session = Depends(get_database_session),
 ):
     """Apply filters before retrieval, then reorder one capped candidate pool."""
+    if get_settings().discovery_catalog:
+        mode = "keyword"
     return PaperService(db).search_papers_feed(
         q,
         page=page,

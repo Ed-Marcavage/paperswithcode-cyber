@@ -35,12 +35,25 @@ PUBLIC_ENDPOINTS = {
 }
 
 
+DISCOVERY_ENDPOINTS = {
+    "/api/v1/developers/": {"topic": "penetration-testing", "target": "networks",
+                            "contribution": "benchmark", "include_facet_counts": True, "limit": 5},
+    "/api/v1/developers/{github_id}": {"github_id": 40309309},
+    "/api/v1/catalog/filters": {},
+    "/api/v1/catalog/papers": {"target": "smart-contracts", "contribution": "benchmark"},
+    "/api/v1/catalog/papers/{reference}": {"reference": "2603.04915"},
+    "/api/v1/catalog/papers/{reference}/text": {"reference": "2603.04915"},
+}
+
+
 def public_openapi(app: FastAPI) -> dict:
+    discovery = any(getattr(route, "path", "") == "/api/v1/catalog/filters" for route in app.routes)
+    examples = {**PUBLIC_ENDPOINTS, **DISCOVERY_ENDPOINTS} if discovery else PUBLIC_ENDPOINTS
     routes = [
         route
         for route in app.routes
         if isinstance(route, APIRoute)
-        and route.path in PUBLIC_ENDPOINTS
+        and route.path in examples
         and "GET" in route.methods
     ]
     # Routes can also declare writes; explicitly project GET below.
@@ -53,12 +66,12 @@ def public_openapi(app: FastAPI) -> dict:
             "announced at least 14 days ahead at /docs/api#changelog."
         ),
         routes=routes,
-        servers=[{"url": "https://paperswithcode.co"}],
+        servers=[{"url": "/" if discovery else "https://paperswithcode.co"}],
     )
     for path, item in schema["paths"].items():
         operation = deepcopy(item["get"])
         operation["security"] = []
-        operation["x-example-parameters"] = PUBLIC_ENDPOINTS[path]
+        operation["x-example-parameters"] = examples[path]
         operation["responses"]["429"] = {
             "description": "IP traffic limit exceeded. Wait at least Retry-After seconds and retry with backoff.",
             "headers": {

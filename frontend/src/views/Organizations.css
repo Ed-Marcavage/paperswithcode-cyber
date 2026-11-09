@@ -36,12 +36,15 @@
 @keyframes organization-skeleton-pulse { 50% { opacity: .55; } }
 @media (prefers-reduced-motion: reduce) { .organization-card-skeleton { animation: none; } }
 .organizations-empty { padding: 4rem 1rem; border: 1px dashed var(--hairline-strong); color: var(--ink-soft); text-align: center; font-family: var(--serif); }
-@media (max-width: 1100px) { .organizations-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 1100px) { .organizations-grid { grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); } }
 @media (max-width: 800px) { .organizations-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 640px) {
   .organizations-controls, .organizations-section-heading { align-items: stretch; flex-direction: column; }
   .organizations-controls label { width: 100%; max-width: none; flex: none; }
-  .organizations-sort { display: grid; width: 100%; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .organizations-sort { display: grid; width: 100%; grid-template-columns: repeat(auto-fit, minmax(70px, 1fr)); }
   .organizations-sort button { min-width: 0; padding-inline: .35rem; }
   .organizations-grid { grid-template-columns: minmax(0, 1fr); }
 }
+
+.organization-card-metrics .organization-kind-summary { grid-column: 1 / -1; font-size: .68rem; line-height: 1.4; color: var(--ink-soft); }
+.organization-card-header .organization-logo--fallback { display: grid; place-items: center; font: 1.2rem var(--serif); }

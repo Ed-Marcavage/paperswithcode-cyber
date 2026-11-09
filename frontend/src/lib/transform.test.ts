@@ -3,6 +3,10 @@ import { describe, expect, it } from "vitest";
 import { displayTaskName, toSotaRanks } from "./transform";
 
 describe("displayTaskName", () => {
+  it("keeps the catalog namespace in routes only", () => {
+    expect(displayTaskName("Cyberintel Penetration Testing", "cyberintel-penetration-testing")).toBe("Penetration Testing");
+    expect(displayTaskName(undefined, "cyberintel-binary-analysis")).toBe("Binary Analysis");
+  });
   it("keeps acronyms written in capitals in the task name", () => {
     expect(displayTaskName("PII Detection", "pii-detection")).toBe("PII Detection");
     expect(displayTaskName("LLM Evaluation", "llm-evaluation")).toBe("LLM Evaluation");

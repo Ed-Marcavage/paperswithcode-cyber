@@ -219,11 +219,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .nav { margin-right: 16px; }
 /* Drop the last two links before the header actions run out of room. */
 @media (max-width: 1440px) {
-  .nav-item:nth-last-child(-n+3) { display: none; }
+  .nav:not(.nav-catalog) .nav-item:nth-last-child(-n+3) { display: none; }
 }
 @media (max-width: 1200px) {
   .nav { gap: 18px; }
-  .nav-item:nth-child(n+4) { display: none; }
+  .nav:not(.nav-catalog) .nav-item:nth-child(n+4) { display: none; }
 }
 @media (max-width: 920px) {
   .search-trigger kbd { display: none; }

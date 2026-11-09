@@ -7,6 +7,7 @@ from starlette.routing import Match
 from starlette.middleware.cors import CORSMiddleware
 
 from backend.services.public_api_schema import (
+    DISCOVERY_ENDPOINTS,
     PUBLIC_ENDPOINTS,
     PUBLIC_SCHEMA_PATH,
     public_openapi,
@@ -121,7 +122,7 @@ class PublicReadCorsMiddleware:
     @staticmethod
     def _is_public_route(scope):
         partial_match = False
-        public_paths = {*PUBLIC_ENDPOINTS, PUBLIC_SCHEMA_PATH}
+        public_paths = {*PUBLIC_ENDPOINTS, *DISCOVERY_ENDPOINTS, PUBLIC_SCHEMA_PATH}
         for route in scope["app"].routes:
             match, _ = route.matches(scope)
             if match == Match.FULL:

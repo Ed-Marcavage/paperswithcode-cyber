@@ -21,9 +21,10 @@ jobs:
       pull-requests: write
     runs-on: ubuntu-24.04
     env:
-      UPSTREAM_REPOSITORY: huggingface/pwc-cli
+      UPSTREAM_REPOSITORY: Ed-Marcavage/pwc-cli
       UPSTREAM_PATH: standalone_cli/SKILL.md
       DESTINATION: backend/chat_sandbox_worker/PWC_CLI_SKILL.md
+      SKILL_INDEX: frontend/public/.well-known/agent-skills/index.json
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,6 +62,23 @@ jobs:
             exit 0
           fi
           install -m 0644 "$skill_temporary" "$DESTINATION"
+          python3 - "$DESTINATION" "$SKILL_INDEX" "$upstream_url" <<'PYTHON'
+          import hashlib
+          import json
+          import sys
+          from pathlib import Path
+
+          source, index = map(Path, sys.argv[1:3])
+          content = source.read_bytes()
+          frontmatter = content.decode().split("---", 2)[1]
+          description = next(line.removeprefix("description: ").strip('"')
+                             for line in frontmatter.splitlines() if line.startswith("description: "))
+          data = json.loads(index.read_text())
+          skill = next(entry for entry in data["skills"] if entry["name"] == "pwc-cli")
+          skill.update(url=sys.argv[3], description=description,
+                      digest="sha256:" + hashlib.sha256(content).hexdigest())
+          index.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+          PYTHON
           echo "changed=true" >> "$GITHUB_OUTPUT"
           echo "upstream_commit=$upstream_commit" >> "$GITHUB_OUTPUT"
 
@@ -80,7 +98,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git switch --create "$branch"
-          git add "$DESTINATION"
+          git add "$DESTINATION" "$SKILL_INDEX"
           git commit \
             -m "Sync chat CLI skill" \
             -m "Upstream skill: ${UPSTREAM_REPOSITORY}@${UPSTREAM_COMMIT}"

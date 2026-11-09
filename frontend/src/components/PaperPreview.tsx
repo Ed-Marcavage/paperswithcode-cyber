@@ -1,4 +1,5 @@
 import React from "react";
+import { isDiscoveryCatalog } from "@/lib/apiUrl";
 
 // Hand-drawn PDF preview (fallback when no real thumbnail exists)
 
@@ -234,5 +235,6 @@ export const PaperPreview: React.FC<{ paperId: string; title: string; thumbnailU
       </div>
     );
   }
+  if (isDiscoveryCatalog()) return <span className="paper-preview-unavailable">Preview unavailable</span>;
   return <PdfThumbnail paperId={paperId} />;
 };

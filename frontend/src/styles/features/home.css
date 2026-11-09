@@ -68,14 +68,18 @@
   .feed-content:has(> .following-intro) > .following-intro { order: 0; margin: 0; }
 }
 
-.sidebar-tools-mcp {
+.sidebar-tool-link {
   width: 100%;
   justify-content: space-between;
   padding: 10px 14px;
   font-size: 15px;
   font-weight: 600;
 }
-.sidebar-tools-mcp:hover { border-color: var(--ink-faint); }
+.sidebar-tool-link:hover { border-color: var(--ink-faint); }
+.sidebar-tool-link.sidebar-personal-agents {
+  margin-bottom: 8px;
+  background: color-mix(in srgb, var(--bg-elevated) 65%, var(--accent-soft));
+}
 .sidebar-tools-copy {
   font-size: 12px;
   line-height: 1.5;

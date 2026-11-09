@@ -75,6 +75,7 @@ frontend/.ds-tailwind.css
 frontend/.ds-ui-barrel.ts
 frontend/tailwind.sync.config.ts
 frontend/*.tsbuildinfo
+/frontend/.personal-agent-icons/
 
 # Local build rollback snapshots
 frontend/dist.rollback-*/
