@@ -30,7 +30,7 @@ def load_index_html() -> Optional[str]:
     settings = get_settings()
     paths = (
         (settings.frontend_dist_path / "index.html",)
-        if settings.is_deployed
+        if settings.is_deployed or settings.frontend_dist_dir
         else (_RELEASE_INDEX_PATH, _DIST_INDEX_PATH, _SRC_INDEX_PATH)
     )
     for path in paths:

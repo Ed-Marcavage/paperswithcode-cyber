@@ -30,7 +30,7 @@ if values["VITE_POSTHOG_PROJECT_TOKEN"] and (not values["VITE_POSTHOG_PROJECT_TO
     parser.error("Use a public PostHog project token and its regional ingest host")
 env = {k: v for k, v in os.environ.items() if not k.startswith("VITE_")}
 env.update(values, VITE_API_URL="", VITE_LOCAL_CATALOG="true", VITE_DISABLE_AUTH="1",
-           VITE_CATALOG_ANALYTICS_ENV=args.environment, VITE_CHAT_ENABLED="false", VITE_CHAT_LIVE="false",
+           VITE_PUBLIC_SITE_URL=args.site.rstrip("/"), VITE_CATALOG_ANALYTICS_ENV=args.environment, VITE_CHAT_ENABLED="false", VITE_CHAT_LIVE="false",
            VITE_CHAT_MCP_APPS_HOST_ENABLED="false", VITE_NATIVE_PDF_READER_ENABLED="false",
            VITE_PAPER_READER_CHAT_ENABLED="false", VITE_PAPER_READER_SELECTION_ENABLED="false",
            VITE_CODEX_ADD_EVALS_ENABLED="false", VITE_CODEX_ENRICH_PAPER_ENABLED="false")
@@ -39,5 +39,6 @@ index = out / "index.html"
 html = index.read_text()
 for name in ('property="og:url"', 'property="og:image"', 'name="twitter:image"'):
     html = html.replace(name + ' content="https://paperswithcode.co/', name + ' content="' + args.site.rstrip("/") + '/')
+html = html.replace("Papers with Code", "Papers With Code Cyber").replace("Trending AI research papers with code, datasets, methods, and evaluation leaderboards.", "Cybersecurity research papers, security agent harnesses, code and benchmarks.")
 index.write_text(html)
 print(f"Built {args.environment} catalog; PostHog {'enabled' if values['VITE_POSTHOG_PROJECT_TOKEN'] else 'disabled'}.")

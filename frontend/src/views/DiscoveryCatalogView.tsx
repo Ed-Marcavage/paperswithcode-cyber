@@ -3,12 +3,10 @@ import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import { axes, type Axis, browseQuery, filtersQuery } from "@/lib/api/discovery";
-import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import "./DiscoveryCatalog.css";
 
 const PAGE = 25;
 export default function DiscoveryCatalogView() {
-  useDocumentTitle("Browse research catalog");
   const [params, setParams] = useSearchParams();
   const terms = useQuery(filtersQuery);
   const requested = Number(params.get("offset"));
@@ -29,6 +27,12 @@ export default function DiscoveryCatalogView() {
     if (!value || (key === "offset" && value === "0")) next.delete(key);
     else next.set(key, value);
     setParams(next);
+  }
+  function pageHref(at: number) {
+    const next = new URLSearchParams(params);
+    if (at) next.set("offset", String(at));
+    else next.delete("offset");
+    return "/catalog" + (next.size ? "?" + next.toString() : "");
   }
   return <main className="page discovery">
     <header className="feed-header"><div>
@@ -51,8 +55,8 @@ export default function DiscoveryCatalogView() {
         </li>)}</ul>
         {papers.data.results.length === 0 && <p>No papers match this selection.</p>}
         <nav className="discovery-pager" aria-label="Catalog pages">
-          {offset > 0 && <button onClick={() => change("offset", String(Math.max(0, offset - PAGE)))}>Previous</button>}
-          {offset + PAGE < papers.data.total && <button onClick={() => change("offset", String(offset + PAGE))}>Next</button>}
+          {offset > 0 && <Link rel="prev" to={pageHref(Math.max(0, offset - PAGE))}>Previous</Link>}
+          {offset + PAGE < papers.data.total && <Link rel="next" to={pageHref(offset + PAGE)}>Next</Link>}
         </nav>
       </>}
   </main>;

@@ -4,6 +4,7 @@ from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 
 from backend.config import get_settings
+from backend.services.public_site_service import public_origin
 
 router = APIRouter()
 
@@ -15,7 +16,7 @@ def robots_policy(environment: str) -> tuple[str, dict[str, str]]:
             {"X-Robots-Tag": "noindex, nofollow", "Cache-Control": "no-store"},
         )
     return (
-        "User-agent: *\nAllow: /\nSitemap: https://paperswithcode.co/sitemap.xml\n",
+        f"User-agent: *\nAllow: /\nSitemap: {public_origin()}/sitemap.xml\n",
         {"Cache-Control": "public, max-age=300"},
     )
 

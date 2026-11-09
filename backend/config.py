@@ -7,8 +7,9 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import List, Literal
+from urllib.parse import urlsplit
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from backend.chat_configuration.settings import (
@@ -29,6 +30,22 @@ class Settings(BaseSettings, ChatSettings):
     model_config = SettingsConfigDict(env_file=["keys.env"], env_prefix="PWC_")
 
     discovery_catalog: bool = False
+    public_site_url: str = ""
+
+    @field_validator("public_site_url")
+    @classmethod
+    def validate_public_site_url(cls, value: str) -> str:
+        if not value:
+            return value
+        url = urlsplit(value)
+        if (
+            url.scheme != "https" or not url.hostname or url.username or url.password
+            or url.path not in ("", "/") or url.query or url.fragment
+            or any(character.isspace() for character in value)
+        ):
+            raise ValueError("public_site_url must be an HTTPS origin")
+        return value.rstrip("/")
+
     research_email_enabled: bool = False
     resend_api_key: str = ""
     resend_from: str = ""

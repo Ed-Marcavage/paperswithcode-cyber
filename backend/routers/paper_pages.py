@@ -25,6 +25,10 @@ from fastapi import Path as FastApiPath
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from backend.config import get_settings
+from backend.services.public_site_service import (
+    cyber_shell, finish_cyber_document, public_origin, site_name,
+)
 from backend.database.connection import get_database_session
 from backend.services.content_negotiation_service import (
     prefers_markdown,
@@ -32,7 +36,6 @@ from backend.services.content_negotiation_service import (
 )
 from backend.services.default_og_image import get_default_og_image_bytes
 from backend.services.paper_seo_service import (
-    PRODUCTION_ORIGIN,
     build_paper_seo_document,
     inject_initial_document,
     render_initial_paper_document,
@@ -65,10 +68,10 @@ def _render_missing_paper() -> HTMLResponse:
         content=(
             '<!doctype html><html lang="en"><head>'
             '<meta charset="utf-8"><meta name="robots" content="noindex">'
-            "<title>Paper not found | Papers with Code</title></head>"
+            f"<title>Paper not found | {site_name()}</title></head>"
             "<body><main><h1>Paper not found</h1>"
             "<p>The requested paper is not available.</p>"
-            '<p><a href="/papers/recent">Browse recent papers</a></p>'
+            f'<p><a href="{"/catalog" if get_settings().discovery_catalog else "/papers/recent"}">Browse papers</a></p>'
             "</main></body></html>"
         ),
         status_code=404,
@@ -107,6 +110,7 @@ def _render_paper_html(
     db: Session,
     is_legacy_path: bool,
     request: Request,
+    markdown: bool = False,
 ) -> Response:
     try:
         paper = PaperService(db).get_paper_by_id_or_arxiv(
@@ -114,7 +118,7 @@ def _render_paper_html(
         )
     except PaperNotFoundError:
         normalized_id = normalize_paper_route_identifier(paper_id)
-        if validate_arxiv_id(normalized_id):
+        if validate_arxiv_id(normalized_id) and not get_settings().discovery_catalog:
             return _render_unindexed_arxiv_paper()
         return _render_missing_paper()
     except DatabaseError as exc:
@@ -137,14 +141,16 @@ def _render_paper_html(
     canonical_path = f"/paper/{route_identifier}"
     if is_legacy_path or paper_id != route_identifier:
         return RedirectResponse(
-            url=canonical_path,
+            url=canonical_path + (".md" if markdown else ""),
             status_code=301,
             headers={"Cache-Control": "public, max-age=3600"},
         )
 
     document = build_paper_seo_document(paper, route_identifier)
     headers = public_page_headers(document.canonical_url)
-    if prefers_markdown(request.headers.get("accept")):
+    if get_settings().environment.lower() == "staging":
+        headers["X-Robots-Tag"] = "noindex, nofollow"
+    if markdown or prefers_markdown(request.headers.get("accept")):
         return Response(
             render_paper_markdown(document),
             media_type="text/markdown",
@@ -161,10 +167,10 @@ def _render_paper_html(
         )
 
     meta = build_paper_meta(
-        paper, route_identifier=route_identifier, origin=PRODUCTION_ORIGIN
+        paper, route_identifier=route_identifier, origin=public_origin()
     )
     try:
-        rendered = inject_paper_meta(index_html, meta, document)
+        rendered = inject_paper_meta(cyber_shell(index_html), meta, document)
         rendered = inject_initial_document(
             rendered, render_initial_paper_document(document)
         )
@@ -177,7 +183,13 @@ def _render_paper_html(
             headers={"Cache-Control": "no-store"},
         )
 
+    rendered = finish_cyber_document(rendered, document.canonical_url)
     return HTMLResponse(content=rendered, status_code=200, headers=headers)
+
+
+@router.api_route("/paper/{paper_id}.md", methods=["GET", "HEAD"], include_in_schema=False)
+def get_paper_markdown(request: Request, paper_id: str, db: Session = Depends(get_database_session)) -> Response:
+    return _render_paper_html(paper_id, db, False, request, markdown=True)
 
 
 @router.api_route(

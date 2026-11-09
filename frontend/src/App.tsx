@@ -1,3 +1,4 @@
+import { CyberMetadata } from "@/components/CyberMetadata";
 import { catalogPageview } from "@/lib/catalogAnalytics";
 /**
  * Root app: react-router-dom routes. Every page is bookmarkable and the
@@ -358,6 +359,7 @@ const App: React.FC = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
       <Router>
+        {isDiscoveryCatalog() && <CyberMetadata />}
         <Shell />
       </Router>
       <Toaster />

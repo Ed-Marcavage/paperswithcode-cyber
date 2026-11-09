@@ -470,6 +470,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           <h1 className="feed-title">
             Trending <em>Research</em>
           </h1>
+          {localCatalog && <p className="feed-subtitle">Explore cybersecurity papers, security agent harnesses, code and benchmarks. Browse reviewed research on penetration testing, vulnerability research and AI security.</p>}
           <div className="feed-subtitle">{localCatalog
             ? "Cyberintel collection · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
             : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>

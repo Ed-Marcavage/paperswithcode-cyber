@@ -11,7 +11,8 @@ from urllib.parse import quote, urljoin, urlsplit, urlunsplit
 from backend.services.discovery_page_service import DiscoveryPage
 from backend.services.discovery_text_service import markdown_plain_text
 from backend.services.paper_seo_service import NamedLink, PaperSeoDocument
-from backend.services.sitemap_service import PRODUCTION_ORIGIN, ArchivePage
+from backend.services.public_site_service import public_origin
+from backend.services.sitemap_service import ArchivePage
 
 _MARKDOWN_CONTROL_RE = re.compile(r"([\\`*_{}\[\]()#+.!>|~-])")
 
@@ -39,7 +40,7 @@ def _markdown_text(value: object) -> str:
 def _safe_url(value: str) -> str | None:
     if "\r" in value or "\n" in value:
         return None
-    absolute = urljoin(f"{PRODUCTION_ORIGIN}/", value)
+    absolute = urljoin(f"{public_origin()}/", value)
     parts = urlsplit(absolute)
     if parts.scheme not in {"http", "https"} or not parts.netloc:
         return None

@@ -1,0 +1,9 @@
+# Optional deployment overlay; does not change the normal Vite dev environment.
+services:
+  backend:
+    environment:
+      PWC_DISCOVERY_CATALOG: "true"
+      PWC_PUBLIC_SITE_URL: "https://paperswithcode-cyber.com"
+      PWC_FRONTEND_DIST_DIR: /app/frontend-dist
+    volumes:
+      - ${CYBER_FRONTEND_DIST:?Set the matching immutable frontend build path}:/app/frontend-dist:ro

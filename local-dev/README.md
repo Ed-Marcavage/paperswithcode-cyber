@@ -253,3 +253,43 @@ distinct matching owned repos with known star counts). Request
 `include_facet_counts=true` to see distinct developer counts after replacing
 each individual filter while retaining the others, including username and repo.
 The MCP tools `list_developers` and `get_developer` use the same endpoints.
+
+### Public HTML and Markdown
+
+With `PWC_DISCOVERY_CATALOG=true`, FastAPI serves visible initial HTML at `/`,
+`/catalog` and `/paper/{reference}`. React replaces that initial document when it
+loads. The catalog uses the same filters and 25-row offsets as the API, with
+crawlable pagination links. Filtered selections are `noindex,follow`; each
+unfiltered page has its own canonical. Unknown paths and missing papers return
+404. Other recognized browser routes retain their SPA views and are not included
+in the sitemap yet.
+
+`/index.md`, `/catalog.md` and `/paper/{reference}.md` provide the same page data
+as Markdown. `Accept: text/markdown` on the HTML URL also works; shared caches must
+honor `Vary: Accept`. The canonical always identifies the HTML representation.
+`/robots.txt`, `/sitemap.xml` and `/sitemaps/*.xml` are backend documents, not SPA
+fallbacks. The sitemap includes only the homepage, unfiltered catalog pages and
+reviewed catalog papers. `/llms.txt` describes the Markdown and MCP entry points.
+
+For a separately authorized release, build a new immutable frontend directory
+using `build_catalog_site.py --site https://paperswithcode-cyber.com` and mount
+that **same directory** into the matching backend release. The optional
+`compose.public-pages.yaml` overlay sets `PWC_FRONTEND_DIST_DIR`; set
+`CYBER_FRONTEND_DIST` to the host build path. `PWC_PUBLIC_SITE_URL` is a validated
+HTTPS origin and must match the build's `--site`. Canonicals never trust Host.
+
+Adapt `nginx-public-pages.conf` inside the existing Cyber server block, replacing
+the old `location /` SPA fallback and any overlapping paper/discovery locations.
+Keep the existing API, MCP Accept/method negotiation, PDF reader and immutable
+asset routing. The example targets the Cyber backend on port 8018. This is an
+integration fragment, not a replacement server configuration. Validate the
+assembled config in an isolated unprivileged nginx before any reload. Normal
+Vite development still uses its own SPA fallback; test HTTP status and initial
+HTML against FastAPI or the assembled proxy, not the Vite dev server.
+
+Before publishing, check GET and HEAD for the discovery files, one existing and
+one missing paper, an unknown path, HTML/Markdown negotiation, a paginated catalog,
+assets, API, MCP browser/transport requests and the reader. Check JS-disabled
+visibility and navigation after React loads. Set `PWC_ENVIRONMENT=staging` for
+preview backends to emit crawl restrictions. Revert backend, frontend mount and
+proxy fragment together if rolling back.

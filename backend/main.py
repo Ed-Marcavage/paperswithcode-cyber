@@ -547,7 +547,8 @@ def create_app() -> FastAPI:
         thumbnails,
     )
 
-    app.include_router(agent_discovery.router, tags=["agent_discovery"])
+    if not settings.discovery_catalog:
+        app.include_router(agent_discovery.router, tags=["agent_discovery"])
     app.include_router(autonomous_operations.router, prefix="/api/v1", tags=["admin"])
     app.include_router(auth.router, prefix="/api/v1", tags=["auth"])
     app.include_router(staging_access.router, prefix="/api/v1", tags=["staging-access"])
@@ -603,7 +604,8 @@ def create_app() -> FastAPI:
     # app root because the public URL shape is `/paper/{id}` (not under
     # `/api/v1/...`).
     app.include_router(search_discovery.router, tags=["search_discovery"])
-    app.include_router(sitemaps.router, tags=["sitemaps"])
+    if not settings.discovery_catalog:
+        app.include_router(sitemaps.router, tags=["sitemaps"])
     app.include_router(paper_pages.router, tags=["paper_pages"])
     if settings.cron_enabled:
         app.include_router(cron.router, prefix="/api/v1", tags=["cron"])
@@ -699,7 +701,12 @@ def create_app() -> FastAPI:
     # narrow top-level organization fallback.
     from backend.routers import discovery_pages
 
-    app.include_router(discovery_pages.router, tags=["discovery_pages"])
+    if settings.discovery_catalog:
+        from backend.routers import cyber_pages
+
+        app.include_router(cyber_pages.router, tags=["cyber_pages"])
+    else:
+        app.include_router(discovery_pages.router, tags=["discovery_pages"])
 
     if settings.is_deployed:
         # Admit before database dependencies and handler response allocation.

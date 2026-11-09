@@ -10,15 +10,16 @@ from datetime import date
 from typing import Iterable, Optional
 from urllib.parse import urlsplit
 
+from backend.config import get_settings
 from backend.models.papers import Paper
+from backend.services.public_site_service import public_origin, site_name
 from backend.utils.latex_text import latex_to_plain_text
 
 
-PRODUCTION_ORIGIN = "https://paperswithcode.co"
 SEARCH_DESCRIPTION_CHARS = 175
 SOCIAL_DESCRIPTION_CHARS = 280
 # Results pages rank for "<model> benchmarks" queries; keep the name and list
-# within what search engines show before " | Papers with Code".
+# within what search engines show before the site-name suffix.
 BENCHMARK_TITLE_NAME_CHARS = 40
 BENCHMARK_TITLE_CHARS = 75
 # Curated classification overrides are deliberately explicit and factual.
@@ -67,7 +68,7 @@ class PaperSeoDocument:
 
     @property
     def canonical_url(self) -> str:
-        return f"{PRODUCTION_ORIGIN}/paper/{self.route_identifier}"
+        return f"{public_origin()}/paper/{self.route_identifier}"
 
 
 def _plain(value: Optional[str]) -> str:
@@ -133,16 +134,16 @@ def _search_title(paper: Paper, title: str, document_type: Optional[str]) -> str
     if not document_type:
         benchmark_title = _benchmark_title(title, paper.evaluated_benchmarks or ())
         if benchmark_title:
-            return f"{benchmark_title} | Papers with Code"
+            return f"{benchmark_title} | {site_name()}"
     if paper.source == "arxiv" and paper.arxiv_id:
         if document_type:
             concise_title = title.split(":", 1)[0].strip()
             return (
                 f"{concise_title} {document_type} "
-                f"(arXiv:{paper.arxiv_id}) | Papers with Code"
+                f"(arXiv:{paper.arxiv_id}) | {site_name()}"
             )
-        return f"{title} (arXiv:{paper.arxiv_id}) | Papers with Code"
-    return f"{title} | Papers with Code"
+        return f"{title} (arXiv:{paper.arxiv_id}) | {site_name()}"
+    return f"{title} | {site_name()}"
 
 
 def build_paper_seo_document(paper: Paper, route_identifier: str) -> PaperSeoDocument:
@@ -305,6 +306,9 @@ def render_initial_paper_document(document: PaperSeoDocument) -> str:
     breadcrumb_year = (
         f'<a href="/papers/archive/{year}">{year}</a>' if year else "Archive"
     )
+    browse_path = "/catalog" if get_settings().discovery_catalog else "/papers/recent"
+    if get_settings().discovery_catalog:
+        breadcrumb_year = str(year) if year else "Research"
     optional_summary = (
         '<section aria-labelledby="tldr-heading"><h2 id="tldr-heading">TL;DR</h2>'
         f"<p>{_escape(document.tldr)}</p></section>"
@@ -340,7 +344,7 @@ def render_initial_paper_document(document: PaperSeoDocument) -> str:
     return (
         '<main hidden class="initial-paper" data-pwc-initial-document="paper">'
         '<nav class="initial-paper-breadcrumb" aria-label="Breadcrumb">'
-        f'<a href="/papers/recent">Papers</a><span aria-hidden="true">›</span>'
+        f'<a href="{browse_path}">Papers</a><span aria-hidden="true">›</span>'
         f'{breadcrumb_year}<span aria-hidden="true">›</span>'
         f"<span>{_escape(document.title)}</span></nav>"
         "<article><header>"
@@ -392,8 +396,8 @@ def build_scholarly_json_ld(document: PaperSeoDocument) -> str:
         "author": [{"@type": "Person", "name": name} for name in document.authors],
         "isPartOf": {
             "@type": "WebSite",
-            "name": "Papers with Code",
-            "url": f"{PRODUCTION_ORIGIN}/",
+            "name": site_name(),
+            "url": f"{public_origin()}/",
         },
     }
     if document.abstract:
@@ -414,7 +418,7 @@ def build_scholarly_json_ld(document: PaperSeoDocument) -> str:
         article["image"] = (
             document.thumbnail
             if document.thumbnail.startswith(("http://", "https://"))
-            else PRODUCTION_ORIGIN + "/" + document.thumbnail.lstrip("/")
+            else public_origin() + "/" + document.thumbnail.lstrip("/")
         )
     if document.repositories:
         article["codeRepository"] = [link.url for link in document.repositories]
@@ -431,16 +435,16 @@ def build_scholarly_json_ld(document: PaperSeoDocument) -> str:
             "@type": "ListItem",
             "position": 1,
             "name": "Papers",
-            "item": f"{PRODUCTION_ORIGIN}/papers/recent",
+            "item": public_origin() + ("/catalog" if get_settings().discovery_catalog else "/papers/recent"),
         }
     ]
-    if year:
+    if year and not get_settings().discovery_catalog:
         items.append(
             {
                 "@type": "ListItem",
                 "position": 2,
                 "name": str(year),
-                "item": f"{PRODUCTION_ORIGIN}/papers/archive/{year}",
+                "item": f"{public_origin()}/papers/archive/{year}",
             }
         )
     items.append(

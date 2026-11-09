@@ -40,10 +40,10 @@ from backend.services.leaderboard_ranking_service import (
 from backend.services.conference_service import ConferenceService
 from backend.services.dataset_service import DatasetService
 from backend.services.sitemap_service import eligible_paper_filter
+from backend.services.public_site_service import public_origin
 from backend.utils.urls import get_paper_route_identifier
 from backend.utils.task_slugs import canonical_task_slug, task_slug_candidates
 
-PRODUCTION_ORIGIN = "https://paperswithcode.co"
 DISCOVERY_PAPER_LIMIT = 20
 
 # Reserved /conferences/{slug}/{listing} paths rendered by ConferenceTaskView
@@ -187,7 +187,7 @@ class DiscoveryPage:
 
     @property
     def canonical_url(self) -> str:
-        return f"{PRODUCTION_ORIGIN}{self.canonical_path}"
+        return f"{public_origin()}{self.canonical_path}"
 
 
 # Index pages that exist for each entity kind's breadcrumb trail.

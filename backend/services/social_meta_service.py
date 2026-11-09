@@ -31,6 +31,7 @@ from urllib.parse import quote, urlsplit, urlunsplit
 from PIL import Image as PILImage
 
 from backend.models.papers import Paper
+from backend.services.public_site_service import site_name
 from backend.services.paper_seo_service import (
     PaperSeoDocument,
     render_bibliographic_meta,
@@ -279,12 +280,12 @@ def _build_description(paper: Paper) -> str:
 
 def _build_title(paper: Paper) -> str:
     paper_title = latex_to_plain_text((paper.title or "").strip()) or "Paper"
-    return f"{paper_title} | Papers with Code"
+    return f"{paper_title} | {site_name()}"
 
 
 def _build_image_alt(paper: Paper, is_fallback: bool) -> str:
     if is_fallback:
-        return "Papers with Code"
+        return site_name()
     paper_title = latex_to_plain_text((paper.title or "").strip())
     if paper_title:
         return f"First page preview of {paper_title}"
@@ -458,7 +459,7 @@ def _render_meta_block(
     lines.extend(
         [
             f'    <meta property="og:image:alt" content="{image_alt}" />',
-            '    <meta property="og:site_name" content="Papers with Code" />',
+            f'    <meta property="og:site_name" content="{site_name()}" />',
             '    <meta name="twitter:card" content="summary_large_image" />',
             f'    <meta name="twitter:title" content="{title}" />',
             f'    <meta name="twitter:description" content="{social_description}" />',

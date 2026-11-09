@@ -9,7 +9,7 @@
 .discovery-list li {border-top:1px solid var(--border);padding:1rem 0;display:grid;gap:.4rem;}
 .discovery-list a {font-size:1.15rem;font-weight:600;}
 .discovery-pager,.discovery-resources {display:flex;gap:1rem;margin:1rem 0;flex-wrap:wrap;}
-.discovery-pager button {border:1px solid var(--border);padding:.35rem .7rem;border-radius:4px;}
+.discovery-pager a {border:1px solid var(--border);padding:.35rem .7rem;border-radius:4px;}
 .discovery-paper {border-block:1px solid var(--border);padding:1rem 0;margin:1.5rem 0;}
 .discovery-paper dl {display:grid;grid-template-columns:max-content 1fr;gap:.3rem .8rem;margin:.8rem 0;}
 .discovery-paper dt {color:var(--ink-muted);}
