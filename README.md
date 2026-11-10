@@ -1,8 +1,8 @@
 # Papers With Code Cyber
 
-Papers With Code Cyber is a curated catalog of cybersecurity papers, engineering posts, and repositories for people building and evaluating security agents. Browse by topic, target, or contribution, find organizations and developers, or connect a personal agent to the read-only MCP.
+Explore cybersecurity papers, code, and benchmarks through the web or MCP. Papers With Code Cyber connects AI pentesting tools and security agent harnesses to research on code audit, vulnerability discovery, fuzzing, reverse engineering, and program repair.
 
-Explore red-team agent harnesses, penetration testing, exploit validation, vulnerability analysis, binary analysis, and security benchmarks with links to the authors' code.
+Browse by topic, target, or contribution, follow original papers and repositories, or query the catalog through read-only MCP.
 
 [Browse the catalog](https://paperswithcode-cyber.com/catalog) · [Connect via MCP](https://paperswithcode-cyber.com/mcp) · [Run the Cyber catalog locally](local-dev/README.md)
 
