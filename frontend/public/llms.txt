@@ -1,8 +1,9 @@
 # Papers With Code Cyber
 
 This site serves reviewed cybersecurity papers, engineering posts, and security
-agent repositories, with read-only access for MCP clients. Topics include red-team
-harnesses, penetration testing, vulnerability research, and security benchmarks.
+agent repositories, with read-only access for MCP clients. Topics include AI
+pentesting tools, security agent harnesses, vulnerability discovery, code audit,
+fuzzing, reverse engineering, and security benchmarks.
 Resolve paths against the origin that served this document.
 
 - Browse the catalog: /catalog

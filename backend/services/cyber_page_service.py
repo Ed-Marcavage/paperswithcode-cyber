@@ -18,8 +18,10 @@ from backend.utils.urls import get_paper_route_identifier
 PAGE_SIZE = 25
 SITEMAP_SIZE = 1000
 AXES = ("topic", "target", "contribution", "kind", "year")
-HOME_TITLE = "Security Agent Harnesses, Papers & Benchmarks | Papers With Code Cyber"
-HOME_DESCRIPTION = "Explore cybersecurity papers, security agent harnesses, code and benchmarks. Browse reviewed research on penetration testing, vulnerability research and AI security."
+HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses | Papers With Code Cyber"
+HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
+CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
+CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
 FEED_DESCRIPTION = "Cyberintel collection · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
 
@@ -78,16 +80,14 @@ def catalog_page(db: Session, params) -> DiscoveryPage | None:
         navigation.append(DiscoveryLink(path(offset - PAGE_SIZE), "Previous"))
     if offset + PAGE_SIZE < data["total"]:
         navigation.append(DiscoveryLink(path(offset + PAGE_SIZE), "Next"))
-    description = (
-        "Filter cybersecurity research by what it studies and what it contributes."
-    )
+    description = CATALOG_DESCRIPTION
     selections = "; ".join(
         f"{axis}: {labels[axis][value]}" for axis, value in filters.items()
     )
     return DiscoveryPage(
         kind="Catalog",
         canonical_path=path(offset),
-        title=f"Cybersecurity Research Catalog{f' — Page {offset // PAGE_SIZE + 1}' if offset else ''} | Papers With Code Cyber",
+        title=f"{CATALOG_TITLE}{f' — Page {offset // PAGE_SIZE + 1}' if offset else ''} | Papers With Code Cyber",
         description=description,
         heading="Browse catalog",
         breadcrumbs=(),

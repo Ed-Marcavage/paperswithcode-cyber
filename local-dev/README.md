@@ -258,7 +258,11 @@ The MCP tools `list_developers` and `get_developer` use the same endpoints.
 
 With `PWC_DISCOVERY_CATALOG=true`, FastAPI serves visible initial HTML at `/`,
 `/catalog` and `/paper/{reference}`. React replaces that initial document when it
-loads. The catalog uses the same filters and 25-row offsets as the API, with
+loads. JavaScript-enabled browsers show a brief loading state to avoid flashing
+the alternate layout. The initial document stays visible without JavaScript and
+is restored if the app bundle fails or takes more than four seconds to load.
+Humans and crawlers receive the same HTML and loading behavior. The catalog uses
+the same filters and 25-row offsets as the API, with
 crawlable pagination links. Filtered selections are `noindex,follow`; each
 unfiltered page has its own canonical. Unknown paths and missing papers return
 404. Other recognized browser routes retain their SPA views and are not included

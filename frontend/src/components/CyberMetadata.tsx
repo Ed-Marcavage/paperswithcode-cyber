@@ -1,9 +1,9 @@
 import { useEffect, useRef } from "react";
 import { useLocation } from "react-router-dom";
 import { usePaper } from "@/hooks/usePapers";
+import { cyberHomeTitle, cyberHomeDescription, cyberCatalogTitle, cyberCatalogDescription } from "@/lib/cyberCopy";
 
 const origin = import.meta.env.VITE_PUBLIC_SITE_URL || "https://paperswithcode-cyber.com";
-const cyberDescription = "Explore cybersecurity papers, security agent harnesses, code and benchmarks. Browse reviewed research on penetration testing, vulnerability research and AI security.";
 
 /** Keep initial server metadata accurate after client-side navigation. */
 export function CyberMetadata() {
@@ -13,6 +13,7 @@ export function CyberMetadata() {
   const paperQuery = usePaper(reference || "", Boolean(reference));
   const paper = paperQuery.data;
   useEffect(() => {
+    window.dispatchEvent(new Event("pwc-app-ready"));
     if (previous.current !== pathname + search) {
       document.querySelectorAll('script[type="application/ld+json"]').forEach(node => node.remove());
       previous.current = pathname + search;
@@ -20,12 +21,12 @@ export function CyberMetadata() {
     // Preserve the server's paper metadata while its cached API query loads.
     if (reference && paperQuery.isPending && document.querySelector('link[rel="canonical"]')?.getAttribute("href") === origin + pathname) return;
     let title = "Papers With Code Cyber";
-    let description = cyberDescription;
+    let description = cyberHomeDescription;
     let path: string | undefined;
     let robots = "noindex,follow";
     const query = new URLSearchParams(search);
     if (pathname === "/") {
-      title = "Security Agent Harnesses, Papers & Benchmarks | Papers With Code Cyber";
+      title = cyberHomeTitle;
       path = "/";
       robots = query.has("start_date") || query.has("end_date") ? "noindex,follow" : "index,follow";
     } else if (pathname === "/catalog") {
@@ -38,8 +39,8 @@ export function CyberMetadata() {
       const offset = Number(query.get("offset"));
       if (Number.isSafeInteger(offset) && offset > 0) canonical.set("offset", String(offset));
       path = "/catalog" + (canonical.size ? "?" + canonical.toString() : "");
-      title = `Cybersecurity Research Catalog${offset > 0 ? ` — Page ${Math.floor(offset / 25) + 1}` : ""} | Papers With Code Cyber`;
-      description = "Filter cybersecurity research by what it studies and what it contributes.";
+      title = `${cyberCatalogTitle}${offset > 0 ? ` — Page ${Math.floor(offset / 25) + 1}` : ""} | Papers With Code Cyber`;
+      description = cyberCatalogDescription;
     } else if (reference && paper) {
       path = "/paper/" + encodeURIComponent(paper.source === "arxiv" && paper.arxiv_id ? paper.arxiv_id : paper.id);
       title = paper.page_title || `${paper.title} | Papers With Code Cyber`;

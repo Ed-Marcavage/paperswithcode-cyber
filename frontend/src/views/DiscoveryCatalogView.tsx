@@ -1,4 +1,5 @@
 import { CatalogFacetSelect } from "@/components/CatalogFacetSelect";
+import { cyberCatalogDescription } from "@/lib/cyberCopy";
 import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
@@ -37,7 +38,7 @@ export default function DiscoveryCatalogView() {
   return <main className="page discovery">
     <header className="feed-header"><div>
       <h1 className="feed-title">Browse <em>catalog</em></h1>
-      <p className="feed-subtitle">Filter cybersecurity research by what it studies and what it contributes.</p>
+      <p className="feed-subtitle">{cyberCatalogDescription}</p>
     </div></header>
     <div className="discovery-filters">
       {(Object.keys(axes) as Axis[]).map(axis => <CatalogFacetSelect key={axis} axis={axis}
