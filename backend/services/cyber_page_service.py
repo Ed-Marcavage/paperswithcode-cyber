@@ -22,7 +22,7 @@ HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses | Papers With Code 
 HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
 CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
-FEED_DESCRIPTION = "Cyberintel collection · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
 
 def homepage(db: Session, params) -> DiscoveryPage:

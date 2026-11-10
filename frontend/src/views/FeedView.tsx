@@ -333,6 +333,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Following defaults to its 30-day match window and trending on X to a month;
   // the trending tab defaults to a week.
+  // Future Cyber intake: check OpenAI, Anthropic, Cloudflare, Ramp and Shopify
+  // engineering blogs hourly; show newly discovered cyber-related posts on the
+  // day they are added. Keep Trending paper-only until that intake exists.
   const localCatalog = isDiscoveryCatalog() && mode === "trending";
   const dateRange = localCatalog
     ? readPaperDateRange(searchParams)
@@ -473,7 +476,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           </h1>
           {localCatalog && <p className="feed-subtitle">{cyberHomeDescription}</p>}
           <div className="feed-subtitle">{localCatalog
-            ? "Cyberintel collection · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+            ? "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
             : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
         </div>
       </div>

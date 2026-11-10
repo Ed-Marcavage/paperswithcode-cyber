@@ -1358,6 +1358,17 @@ class PaperService:
             if mode == "composite"
             else self._TRENDING_SQL_GITHUB
         )
+        if self.settings.discovery_catalog:
+            # Scope before repository deduplication and pagination: a repository
+            # placeholder must not displace its linked research paper. The
+            # optional catalog table does not exist in upstream deployments.
+            sql = text(str(sql).replace(
+                "FROM papers p",
+                """FROM papers p
+                JOIN discovery_works feed_work ON feed_work.paper_id = p.id
+                    AND feed_work.facets @> '{"kind":["paper"]}'::jsonb""",
+                1,
+            ))
         params = {
             "search_term": f"%{search}%" if search else None,
             "published_after": published_after,

@@ -297,3 +297,10 @@ assets, API, MCP browser/transport requests and the reader. Check JS-disabled
 visibility and navigation after React loads. Set `PWC_ENVIRONMENT=staging` for
 preview backends to emit crawl restrictions. Revert backend, frontend mount and
 proxy fragment together if rolling back.
+
+The Cyber homepage's Trending feed includes only records reviewed as `kind=paper`.
+This filter runs before ranking and pagination for both API and initial HTML/
+Markdown; repository-only records and existing posts remain in the full catalog.
+Future intake should poll engineering blogs (including OpenAI, Anthropic,
+Cloudflare, Ramp and Shopify) hourly, detect new cyber-related posts, and feature
+them on the day they are added. That scraper and daily placement are not implemented.
