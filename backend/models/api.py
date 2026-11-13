@@ -53,6 +53,8 @@ from backend.models.papers import (
     AuthorLink as AuthorLink,
     AuthorSummary as AuthorSummary,
     Authors as Authors,
+    CatalogPost as CatalogPost,
+    CatalogPostEntity as CatalogPostEntity,
     FrameworkSummary as FrameworkSummary,
     GithubRepositoryPreview as GithubRepositoryPreview,
     HfArtifactSummary as HfArtifactSummary,

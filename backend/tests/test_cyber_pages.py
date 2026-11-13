@@ -68,7 +68,7 @@ def client(monkeypatch, tmp_path):
     monkeypatch.setattr(
         discovery_catalog,
         "browse",
-        lambda db, filters, limit, offset, include_facet_counts=False: {
+        lambda db, filters, limit, offset, include_facet_counts=False, **post_filters: {
             "total": len(ROWS),
             "results": ROWS[offset : offset + limit],
         },

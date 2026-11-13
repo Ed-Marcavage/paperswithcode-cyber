@@ -17,41 +17,48 @@ def terms(db: Session) -> dict:
 SELECT_WORK = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
            p.title, w.facets, w.source_url, w.artifact_url,
-           w.document_text IS NOT NULL AS has_text
+           w.document_text IS NOT NULL AS has_text, w.post_details AS post
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
 """
 
 
-def _facet_counts(db: Session, axes: list[str], facets: str) -> dict:
+def _facet_counts(db: Session, axes: list[str], params: dict, post_where: str) -> dict:
     """Each option replaces its own filter. The empty value clears that filter."""
     rows = db.execute(text("""
         SELECT axis.name, choice.value, count(DISTINCT w.paper_id)
           FROM unnest(CAST(:axes AS text[])) AS axis(name)
-          JOIN discovery_works w ON w.facets @> (CAST(:facets AS jsonb) - axis.name)
+          JOIN discovery_works w ON w.facets @> (CAST(:facets AS jsonb) - axis.name)""" + post_where + """
           CROSS JOIN LATERAL (
               SELECT '' AS value
               UNION ALL
               SELECT jsonb_array_elements_text(w.facets -> axis.name)
           ) AS choice
          GROUP BY axis.name, choice.value
-    """), {"axes": axes, "facets": facets})
+    """), {**params, "axes": axes})
     counts = {axis: {} for axis in axes}
     for axis, value, count in rows:
         counts[axis][value] = count
     return counts
 
 
-def browse(db: Session, filters: dict, limit: int, offset: int, include_facet_counts: bool = False) -> dict:
-    where = " WHERE w.facets @> CAST(:facets AS jsonb)"
+def browse(db: Session, filters: dict, limit: int, offset: int, include_facet_counts: bool = False,
+           tier: str = "", post_type: str = "", featured_first: bool = False) -> dict:
+    """Facet filters, plus optional industry-post filters (tier, post type) and ordering."""
     params = {"facets": json.dumps({k: [v] for k, v in filters.items() if v}),
-              "limit": limit, "offset": offset}
+              "limit": limit, "offset": offset, "tier": tier, "post_type": post_type}
+    post_where = "".join([
+        " AND w.post_details ->> 'tier' = :tier" if tier else "",
+        " AND w.post_details ->> 'post_type' = :post_type" if post_type else "",
+    ])
+    where = " WHERE w.facets @> CAST(:facets AS jsonb)" + post_where
+    order = "(w.post_details ->> 'tier' = 'featured') DESC NULLS LAST, " if featured_first else ""
     total = db.scalar(text("SELECT count(*) FROM discovery_works w" + where), params)
     rows = db.execute(text(SELECT_WORK + where + """
-        ORDER BY p.date_published DESC NULLS LAST, p.id LIMIT :limit OFFSET :offset
+        ORDER BY """ + order + """p.date_published DESC NULLS LAST, p.id LIMIT :limit OFFSET :offset
     """), params).mappings()
     response = {"total": total, "results": [dict(row) for row in rows]}
     if include_facet_counts:
-        response["facet_counts"] = _facet_counts(db, list(filters), params["facets"])
+        response["facet_counts"] = _facet_counts(db, list(filters), params, post_where)
     return response
 
 

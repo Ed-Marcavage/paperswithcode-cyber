@@ -381,6 +381,7 @@ class PaperService:
             "tasks": tasks,
             "catalog_kind": relations.catalog_kinds.get(db_paper.id),
             "catalog_contributions": relations.catalog_contributions.get(db_paper.id),
+            "catalog_post": relations.catalog_posts.get(db_paper.id),
             "methods": methods,
             "introduced_benchmarks": introduced_benchmarks,
             "introduced_frameworks": introduced_frameworks,

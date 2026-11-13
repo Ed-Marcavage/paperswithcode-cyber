@@ -52,6 +52,33 @@ class PaperBucketCopyResponse(BaseModel):
     errors: List[PaperBucketCopyError]
 
 
+class CatalogPostEntity(BaseModel):
+    """An entity named in a reviewed industry post."""
+
+    type: str
+    name: str
+    role: str
+
+
+class CatalogPost(BaseModel):
+    """Reviewed fields for a catalog industry post (absent for papers and repositories)."""
+
+    tier: Literal["featured", "catalog"] = Field(..., description="Featured posts clear the review's quality bar")
+    post_type: str = Field(..., description="Post type slug, e.g. vulnerability-writeup")
+    tldr: str = Field(..., description="One-sentence summary")
+    original_title: Optional[str] = Field(None, description="Title as published, before translation or cleanup")
+    subtopics: List[str] = Field(default_factory=list, description="Subtopic slugs; free-form ones start with 'other: '")
+    authors: List[str] = Field(default_factory=list, description="Author names given on the post")
+    caveat: Optional[str] = Field(None, description="Main limitation a reader should know")
+    timeliness: Optional[str] = None
+    technical_depth: int = Field(..., ge=0, le=4)
+    originality: int = Field(..., ge=0, le=4)
+    agent_relevance: int = Field(..., ge=0, le=4)
+    reports_benchmark_results: bool = False
+    agent_harness_engineering: bool = False
+    entities: List[CatalogPostEntity] = Field(default_factory=list)
+
+
 class Paper(BaseModel):
     """
     Paper object matching the original PapersWithCode API specification.
@@ -283,6 +310,7 @@ class Paper(BaseModel):
     )
     catalog_kind: Optional[str] = Field(None, description="Reviewed catalog source type")
     catalog_contributions: Optional[List[str]] = Field(None, description="Reviewed discovery catalog contributions")
+    catalog_post: Optional[CatalogPost] = Field(None, description="Reviewed industry-post fields")
     tasks: Optional[List["TaskSummary"]] = Field(
         None, description="AI/ML tasks associated with this paper"
     )

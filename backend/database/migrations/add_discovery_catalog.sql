@@ -19,3 +19,8 @@ CREATE TABLE IF NOT EXISTS discovery_previews (
     digest text NOT NULL,
     jpeg bytea NOT NULL
 );
+
+-- Reviewed fields for industry posts: tier, post type, summary, scores and flags.
+-- NULL for papers and repositories. Loaded by local-dev/import_post_details.py.
+-- Statements are split on semicolons, so keep them out of comments.
+ALTER TABLE discovery_works ADD COLUMN IF NOT EXISTS post_details jsonb;

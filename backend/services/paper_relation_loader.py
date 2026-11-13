@@ -82,6 +82,7 @@ class PaperRelations:
     tasks: dict[int, list[TaskSummary]] = field(default_factory=dict)
     catalog_kinds: dict[int, str] = field(default_factory=dict)
     catalog_contributions: dict[int, list[str]] = field(default_factory=dict)
+    catalog_posts: dict[int, dict] = field(default_factory=dict)
     methods: dict[int, list[MethodSummary]] = field(default_factory=dict)
     organizations: dict[int, list[OrganizationSummary]] = field(default_factory=dict)
     leaderboard_ranks: dict[int, list[LeaderboardRankSummary]] = field(
@@ -496,12 +497,14 @@ class PaperRelationLoader:
     ) -> None:
         if get_settings().discovery_catalog:
             rows = self.db.execute(text(
-                "SELECT paper_id, facets->'contribution', facets->'kind'->>0 "
+                "SELECT paper_id, facets->'contribution', facets->'kind'->>0, post_details "
                 "FROM discovery_works WHERE paper_id = ANY(:ids)"
             ), {"ids": paper_ids})
-            for paper_id, contributions, kind in rows:
+            for paper_id, contributions, kind, post in rows:
                 relations.catalog_contributions[paper_id] = contributions or []
                 relations.catalog_kinds[paper_id] = kind
+                if post is not None and kind == "post":
+                    relations.catalog_posts[paper_id] = post
         author_rows: list[_AuthorRow] = (
             self.db.query(
                 PaperAuthor.paper_id,

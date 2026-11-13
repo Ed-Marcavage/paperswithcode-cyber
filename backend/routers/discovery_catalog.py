@@ -1,3 +1,5 @@
+from typing import Literal
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, Response
 from sqlalchemy.orm import Session
@@ -17,9 +19,13 @@ def filters(db: Session = Depends(get_database_session)):
 def papers(topic: str = "", target: str = "", contribution: str = "", kind: str = "",
            year: str = "", limit: int = Query(25, ge=1, le=100),
            offset: int = Query(0, ge=0), include_facet_counts: bool = False,
+           tier: Literal["", "featured", "catalog"] = Query("", description="Industry post tier"),
+           post_type: str = Query("", max_length=64, description="Industry post type slug"),
+           order: Literal["", "featured"] = Query("", description="`featured` lists featured posts first"),
            db: Session = Depends(get_database_session)):
     facets = dict(topic=topic, target=target, contribution=contribution, kind=kind, year=year)
-    return discovery_catalog.browse(db, facets, limit, offset, include_facet_counts)
+    return discovery_catalog.browse(db, facets, limit, offset, include_facet_counts,
+                                    tier=tier, post_type=post_type, featured_first=order == "featured")
 
 
 @router.get("/papers/{reference}", summary="Get paper facets and artifact")
