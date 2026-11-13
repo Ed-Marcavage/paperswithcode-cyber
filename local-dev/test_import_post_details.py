@@ -1,7 +1,7 @@
 """Validation of reviewed industry-post fields; no database."""
 import unittest
 
-from import_post_details import post_details
+from import_post_details import merge_reviews, post_details
 
 REVIEW = {
     "tier": "featured", "post_type": "vulnerability-writeup", "tldr": " One sentence. ",
@@ -22,6 +22,17 @@ class PostDetailsTest(unittest.TestCase):
         self.assertEqual(details["entities"], [{"type": "cve", "name": "CVE-2026-0001", "role": "subject"}])
         self.assertNotIn("text_sha256", details)
         self.assertNotIn("version_id", details)
+        self.assertNotIn("reviewed_by", details)
+
+    def test_keeps_a_manual_review_marker(self):
+        self.assertEqual(post_details("industry-1", {**REVIEW, "reviewed_by": "manual"})["reviewed_by"], "manual")
+        with self.assertRaises(ValueError):
+            post_details("industry-1", {**REVIEW, "reviewed_by": "someone"})
+
+    def test_merges_review_files_without_repeats(self):
+        self.assertEqual(merge_reviews([{"a": 1}, {"b": 2}]), {"a": 1, "b": 2})
+        with self.assertRaises(ValueError):
+            merge_reviews([{"a": 1}, {"a": 2}])
 
     def test_rejects_values_outside_the_vocabulary(self):
         for field, value in [("tier", "top"), ("post_type", "news"), ("technical_depth", 5),

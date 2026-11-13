@@ -1,7 +1,10 @@
 """Load reviewed industry-post fields into discovery_works.post_details.
 
-Input: a JSON object keyed by catalog ID (`industry-...`), one review per post,
-as written by the industry-intake review (v2-fields.json). Only posts already
+Input: one or more JSON objects keyed by catalog ID (`industry-...`), one review
+per post, as written by the industry-intake review (v2-fields.json); further
+files (e.g. hand-entered reviews) are merged in and may not repeat an ID. A
+review may carry `reviewed_by` (e.g. "manual" for a hand-written review), which
+is stored; bulk reviews omit it. Only posts already
 imported by import_catalog.py are updated; papers and repositories are never
 touched. A post missing from the input has its details cleared, so a rerun with
 the same file changes nothing. Preview rolls back; pass --execute to commit.
@@ -21,6 +24,7 @@ POST_TYPES = {
     "research-summary", "explainer-or-tutorial", "opinion-or-strategy", "other",
 }
 TIMELINESS = {"evergreen", "dated", "time_bound"}
+REVIEWERS = {"manual"}
 SCORES = ("technical_depth", "originality", "agent_relevance")
 FLAGS = ("reports_benchmark_results", "agent_harness_engineering")
 # Set by mark_curated_posts.py from curated_posts.json; a rerun here keeps them.
@@ -59,6 +63,8 @@ def post_details(catalog_id, review):
     for flag in FLAGS:
         if type(review.get(flag)) is not bool:
             raise ValueError(f"Expected a boolean {where(flag)}")
+    if review.get("reviewed_by") not in REVIEWERS | {None}:
+        raise ValueError(f"Unknown {where('reviewed_by')}")
     tldr = optional_text(review.get("tldr"), where("tldr"))
     if tldr is None:
         raise ValueError(f"Missing {where('tldr')}")
@@ -67,7 +73,7 @@ def post_details(catalog_id, review):
         isinstance(e, dict) and all(isinstance(e.get(k), str) for k in ("type", "name", "role")) for e in entities
     ):
         raise ValueError(f"Invalid {where('entities')}")
-    return {
+    details = {
         "tier": review["tier"],
         "post_type": review["post_type"],
         "tldr": tldr,
@@ -80,16 +86,30 @@ def post_details(catalog_id, review):
         **{flag: review[flag] for flag in FLAGS},
         "entities": [{k: e[k] for k in ("type", "name", "role")} for e in entities],
     }
+    if review.get("reviewed_by"):
+        details["reviewed_by"] = review["reviewed_by"]
+    return details
+
+
+def merge_reviews(documents) -> dict:
+    """Merge review files keyed by catalog ID; an ID may appear in only one of them."""
+    merged = {}
+    for document in documents:
+        if not isinstance(document, dict):
+            raise ValueError("Expected an object keyed by catalog ID")
+        repeated = sorted(merged.keys() & document.keys())
+        if repeated:
+            raise ValueError(f"Catalog IDs repeated across input files: {repeated[:5]}")
+        merged.update(document)
+    return merged
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("fields", type=Path)
+    parser.add_argument("fields", type=Path, nargs="+")
     parser.add_argument("--execute", action="store_true")
     args = parser.parse_args()
-    reviews = json.loads(args.fields.read_text())
-    if not isinstance(reviews, dict):
-        raise ValueError("Expected an object keyed by catalog ID")
+    reviews = merge_reviews(json.loads(path.read_text()) for path in args.fields)
     details = {catalog_id: post_details(catalog_id, review) for catalog_id, review in reviews.items()}
     db_manager.engine.echo = False
     with db_manager.session_local() as db:
