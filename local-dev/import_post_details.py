@@ -23,6 +23,8 @@ POST_TYPES = {
 TIMELINESS = {"evergreen", "dated", "time_bound"}
 SCORES = ("technical_depth", "originality", "agent_relevance")
 FLAGS = ("reports_benchmark_results", "agent_harness_engineering")
+# Set by mark_curated_posts.py from curated_posts.json; a rerun here keeps them.
+CURATED_KEYS = ("curated", "curated_company", "curated_title")
 
 
 def strings(value, where):
@@ -102,10 +104,16 @@ def main():
         posts = set(db.scalars(text("SELECT catalog_id FROM discovery_works WHERE facets -> 'kind' ? 'post'")))
         updated = 0
         for catalog_id in sorted(details.keys() & posts):
+            # Keep the curated marker that mark_curated_posts.py manages.
             updated += db.execute(text("""
-                UPDATE discovery_works SET post_details = CAST(:details AS jsonb)
-                 WHERE catalog_id = :id AND post_details IS DISTINCT FROM CAST(:details AS jsonb)
-            """), {"id": catalog_id, "details": json.dumps(details[catalog_id], ensure_ascii=False)}).rowcount
+                UPDATE discovery_works w SET post_details = new.details
+                  FROM (SELECT CAST(:details AS jsonb) || coalesce(
+                               (SELECT jsonb_object_agg(key, value) FROM jsonb_each(post_details)
+                                 WHERE key = ANY(CAST(:keep AS text[]))), '{}'::jsonb) AS details
+                          FROM discovery_works WHERE catalog_id = :id) new
+                 WHERE w.catalog_id = :id AND w.post_details IS DISTINCT FROM new.details
+            """), {"id": catalog_id, "keep": list(CURATED_KEYS),
+                   "details": json.dumps(details[catalog_id], ensure_ascii=False)}).rowcount
         cleared = db.execute(text("""
             UPDATE discovery_works SET post_details = NULL
              WHERE post_details IS NOT NULL AND NOT (catalog_id = ANY(:ids))

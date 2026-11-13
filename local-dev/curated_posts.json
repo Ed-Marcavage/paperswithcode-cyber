@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://accomplish.ai/blog/beltdown2-escaping-the-cursor-cli-sandbox/",
+    "company": "Accomplish",
+    "title": "Beltdown2, Escaping the Cursor CLI Sandbox"
+  },
+  {
+    "url": "https://accomplish.ai/blog/escaping-the-openai-codex-sandbox-twice/",
+    "company": "Accomplish",
+    "title": "Escaping the OpenAI Codex Sandbox, Twice"
+  },
+  {
+    "url": "https://www.anthropic.com/research/how-we-contain-claude",
+    "company": "Anthropic",
+    "title": "How We Contain Claude Across Products"
+  },
+  {
+    "url": "https://www.anthropic.com/research/n-days",
+    "company": "Anthropic",
+    "title": "Measuring LLMs' Impact on N-Day Exploits"
+  },
+  {
+    "url": "https://aws.amazon.com/blogs/security/inside-aws-security-agent-a-multi-agent-architecture-for-automated-penetration-testing/",
+    "company": "AWS",
+    "title": "Inside AWS Security Agent, a Multi-Agent Architecture for Automated Penetration Testing"
+  },
+  {
+    "url": "https://www.elastic.co/security-labs/blog/ai-vulnerability-triage-bug-bounty-hackerone",
+    "company": "Elastic",
+    "title": "AI Vulnerability Triage, Bug Bounty Reports at $2 Each"
+  },
+  {
+    "url": "https://www.endorlabs.com/learn/project-mount-symlink-traversal-in-brig-how-a-sandbox-reaches-host-directories-it-was-never-given",
+    "company": "Endor Labs",
+    "title": "AI Agent Sandbox Flaw in brig, Symlink Traversal (CVSS 8.2)"
+  },
+  {
+    "url": "https://www.endorlabs.com/learn/claude-fable-5-take-two-same-model-different-harness-and-a-very-different-result",
+    "company": "Endor Labs",
+    "title": "Claude Fable 5, Take Two, Same Model, Different Harness, and a Very Different Result"
+  },
+  {
+    "url": "https://www.endorlabs.com/learn/docker-sandboxes-vulnerability-lets-ai-agents-access-sensitive-files-outside-their-sandbox-cve-2026-103916",
+    "company": "Endor Labs",
+    "title": "Docker Sandboxes Vulnerability Lets AI Agents Access Sensitive Files Outside Their Sandbox (CVE-2026-103916)"
+  },
+  {
+    "url": "https://www.endorlabs.com/learn/recall-not-reasoning-how-ai-coding-agents-cheat-security-benchmarks",
+    "company": "Endor Labs",
+    "title": "Recall, Not Reasoning, How AI Coding Agents Cheat Security Benchmarks"
+  },
+  {
+    "url": "https://github.blog/security/how-we-found-24-android-vulnerabilities-using-our-open-source-ai-security-agent/",
+    "company": "GitHub Security Lab",
+    "title": "How We Found 24 Android Vulnerabilities Using Our Open Source AI Security Agent"
+  },
+  {
+    "url": "https://projectzero.google/2026/10/fuzzing-v-AI.html",
+    "company": "Google Project Zero",
+    "title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep on JavaScript Engines"
+  },
+  {
+    "url": "https://projectzero.google/2024/06/project-naptime.html",
+    "company": "Google Project Zero",
+    "title": "Project Naptime, Evaluating Offensive Security Capabilities of Large Language Models"
+  },
+  {
+    "url": "https://www.microsoft.com/en-us/security/blog/2026/11/11/lessons-from-59-linux-kernel-bug-reports/",
+    "company": "Microsoft",
+    "title": "Lessons From 59 Linux Kernel Bug Reports"
+  },
+  {
+    "url": "https://shopify.engineering/building-an-agentic-harness-that-outlasts-the-model",
+    "company": "Shopify",
+    "title": "Building an Agentic Harness That Outlasts the Model"
+  },
+  {
+    "url": "https://xlab.tencent.com/en/2026/07/02/xuanwu-atuin-cybergym/",
+    "company": "Tencent Xuanwu Lab",
+    "title": "Tencent Xuanwu Atuin AI on CyberGym"
+  },
+  {
+    "url": "https://www.wiz.io/blog/cyber-model-arena-ai-benchmark",
+    "company": "Wiz",
+    "title": "How to Evaluate AI Agent Cybersecurity Capabilities"
+  },
+  {
+    "url": "https://xbow.com/blog/alloy-agents",
+    "company": "XBOW",
+    "title": "Agents Built From Alloys"
+  }
+]
