@@ -1,5 +1,5 @@
 import posthog from "posthog-js";
-import { catalogOptions, catalogPrivacySignal } from "./lib/catalogAnalytics";
+import { catalogOptions, catalogPrivacySignal, startCatalogRecording } from "./lib/catalogAnalytics";
 import { isDiscoveryCatalog } from "./lib/apiUrl";
 import React from "react";
 import { createRoot } from "react-dom/client";
@@ -20,7 +20,11 @@ installChunkReloadRecovery();
 const posthogToken = import.meta.env.VITE_POSTHOG_PROJECT_TOKEN;
 
 const catalog = isDiscoveryCatalog();
-if (catalog && posthogToken && !catalogPrivacySignal()) posthog.init(posthogToken, catalogOptions);
+// Do Not Track or Global Privacy Control: no analytics and no session recording.
+if (catalog && posthogToken && !catalogPrivacySignal()) {
+  posthog.init(posthogToken, catalogOptions);
+  void startCatalogRecording();
+}
 
 const app = (
   <ThemeProvider

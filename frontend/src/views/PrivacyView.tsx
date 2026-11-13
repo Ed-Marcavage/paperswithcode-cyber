@@ -9,9 +9,10 @@ const PrivacyView: React.FC = () => {
 
   if (isDiscoveryCatalog()) return <article className="page legal-page">
     <h1>Catalog privacy</h1>
-    <p>This read-only research catalog uses PostHog to count visits, catalog and domain selections, paper opens and links to research resources. A random identifier in browser storage lets us estimate weekly visitors. We do not send search text, full URLs, link destinations or session recordings.</p>
-    <p>Visits through our awesome-list README links include a fixed campaign label and whether the link leads to the catalog or MCP setup. Other campaign values and referring URLs are not collected.</p>
-    <p>To skip browser analytics, enable Do Not Track or Global Privacy Control in your browser. Clearing site storage resets the browser identifier.</p>
+    <p>This read-only research catalog uses PostHog to count visits, catalog and domain selections, paper opens and links to research resources. A random identifier in browser storage lets us estimate weekly visitors.</p>
+    <p>We also record sessions. A recording shows the catalog pages you see and how you move through them: pointer movement, clicks and scrolling. It does not include text you type into the search box or any other field; that text is replaced with asterisks. Recorded page addresses leave out everything after the path, such as filters and search terms. Recordings are kept for 30 days.</p>
+    <p>When you arrive from another site, we record that site&apos;s domain, such as news.ycombinator.com, but not the address of the page that linked here. Visits through our awesome-list README links also include a fixed campaign label and whether the link leads to the catalog or MCP setup. Other campaign values are not collected.</p>
+    <p>If your browser sends Do Not Track or Global Privacy Control, none of this happens: no analytics, no session recording and no referring domain. Clearing site storage resets the browser identifier.</p>
     <p>MCP usage is counted separately by tool name. Analytics does not include tool arguments, results, or client identifiers.</p>
   </article>;
 

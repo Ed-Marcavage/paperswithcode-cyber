@@ -167,7 +167,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
           {chatEnabled && query.trim() && (
             <button type="button" className="search-ask-row" onClick={askAssistant}>
               <span className="search-ask-chip">assistant</span>
-              <span className="search-ask-text">Ask: “{query.trim()}”</span>
+              <span className="search-ask-text ph-mask">Ask: “{query.trim()}”</span>
               <kbd>↵</kbd>
             </button>
           )}
@@ -185,7 +185,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
             </div>
           )}
           {canSearch && !isLoading && !hasResults && (
-            <div className="search-empty">No matches for "{query}"</div>
+            <div className="search-empty ph-mask">No matches for "{query}"</div>
           )}
           {matchedTasks.length > 0 && (
             <>
@@ -311,7 +311,7 @@ const SearchOverlay: React.FC<SearchOverlayProps> = ({ open, onClose }) => {
           {trimmedQuery.length >= TYPEAHEAD_MIN_CHARS && (
             <button
               type="button"
-              className="search-view-all-row"
+              className="search-view-all-row ph-mask"
               onClick={() => go(`/papers?search=${encodeURIComponent(trimmedQuery)}`)}
             >
               View all paper results for “{trimmedQuery}”

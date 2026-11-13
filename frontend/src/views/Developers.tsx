@@ -84,7 +84,7 @@ export function DevelopersIndex() {
         {!query.data ? <Feedback loading={query.isLoading} retry={() => query.refetch()} />
           : query.data.results.length === 0 ? (
             <div className="organizations-empty">{count ? "No developers on this page." :
-              filtered ? "No developers match these filters." : q ? `No developers match “${q}”.` : "No tracked developers yet."}</div>
+              filtered ? "No developers match these filters." : q ? <>No developers match “<span className="ph-mask">{q}</span>”.</> : "No tracked developers yet."}</div>
           ) : (
             <div className="organizations-grid">
               {query.data.results.map(dev => (

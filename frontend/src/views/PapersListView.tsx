@@ -136,7 +136,7 @@ const PapersListView: React.FC = () => {
             {isRepositoryFeed
               ? <>Papers implemented by <em>{headingName || framework || repository}</em></>
               : isSearchMode
-                ? <>Search results for <em>“{urlSearch}”</em></>
+                ? <>Search results for <em className="ph-mask">“{urlSearch}”</em></>
                 : <>All <em>Papers</em></>}
           </h1>
           <div className="feed-subtitle">

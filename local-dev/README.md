@@ -151,7 +151,7 @@ access. The pinned URLs and digests are in
 
 PostHog is off unless you set its public project token. Use the token that starts
 with `phc_` and the ingest host shown by the **manual React** setup for your
-project. A personal API key, GitHub integration and session replay are unnecessary.
+project. A personal API key and GitHub integration are unnecessary.
 Set `VITE_POSTHOG_PROJECT_TOKEN` and `VITE_POSTHOG_HOST` in the ignored
 `.local.env`; Compose passes only those analytics settings to the frontend and
 MCP. Local events are labeled `preview`.
@@ -178,7 +178,52 @@ the browser's CSP to permit connections to the selected ingest host if the
 site has a restrictive `connect-src`. Browser or network blocking can reduce
 these counts. Analytics outages and rate spikes do not block MCP requests.
 
-README referral measurement uses an allowlist, not automatic URL or referrer capture.
+#### Session replay
+
+The catalog build records sessions when the PostHog project has replay switched
+on; with replay off in the project, nothing is recorded. The recorder is bundled
+from `posthog-js/dist/posthog-recorder` as a same-origin chunk
+(`startCatalogRecording` in `frontend/src/lib/catalogAnalytics.ts`), so external
+script loading stays off and no third-party script host is needed. Its
+console-log and network plugins are removed after loading, so project settings
+cannot turn on console or network capture. Settings live in
+`catalogRecordingOptions` (`frontend/src/lib/posthogPrivacy.ts`):
+
+- every input value is masked (the search box shows asterisks); text that echoes
+  a typed search carries the `ph-mask` class and is masked too;
+- page text is recorded unmasked, since it is public catalog content; account UI
+  cannot render in the catalog build (auth is off) and is blocked if it ever does;
+- recorded page addresses keep only origin and path (no query string or fragment);
+- no canvas, cross-origin iframes, request headers or bodies, console logs,
+  autocapture, heatmaps, surveys or feature-flag requests.
+
+Replay needs the project's remote config, so the catalog sets
+`advanced_disable_flags: false` and fetches it as JSON from the PostHog assets
+host (`https://us-assets.i.posthog.com/array/<token>/config` for the US region);
+`advanced_disable_feature_flags` keeps `/flags` requests off. `before_send` lets
+`$snapshot` batches through with the recorder's own fields only. Do Not Track or
+Global Privacy Control still means no `posthog.init`, so no analytics and no
+recording. The privacy page states a 30-day recording retention; keep the
+project's replay retention at 30 days or update the page.
+
+PostHog project settings this code depends on (set at release, not in code):
+**Session replay → Record user sessions** on (the switch); **retention 30 days**;
+**Authorized domains for replay**, if used, must list the production domain;
+leave **Capture console logs**, **Capture network requests**/payloads and
+**Canvas capture** off (the client ignores console and network either way, and
+forces canvas off); keep **Privacy → Discard client IP data** on. If the site
+has a restrictive CSP, `connect-src` must allow the ingest host and the assets
+host; no `script-src` change is needed because the recorder is served from the
+site itself. The local-dev nginx fragment sets no CSP.
+
+#### Referrals
+
+The landing `$pageview` (the first in a page load) carries `referral_domain`:
+the referring site's host without `www.` (for example `news.ycombinator.com`),
+never its path or query, and nothing when the referrer is the catalog itself or
+is not an http(s) URL. SDK referrer properties are still dropped.
+
+README referral measurement uses an allowlist, not automatic URL capture.
 Links with `utm_source=github`, `utm_medium=readme`, and
 `utm_campaign=awesome-security-agent-harnesses` add fixed `referral_source` and
 `referral_campaign` properties to the landing `$pageview`. `utm_content=catalog`
@@ -191,7 +236,8 @@ controls can reduce the measured visits.
 
 | Event | Meaning |
 | --- | --- |
-| `$pageview` | A pathname navigation in the catalog; only its page category is sent. Count distinct browser IDs for weekly visitors. A filter change is not a new pageview. |
+| `$pageview` | A pathname navigation in the catalog; only its page category is sent, plus `referral_domain` on the landing pageview when another site linked here. Count distinct browser IDs for weekly visitors. A filter change is not a new pageview. |
+| `$snapshot` | Session replay data (masked as described above), only when the project has replay switched on. Linked to the other events by `$session_id`. |
 | `catalog_navigation` | A person clicked Browse catalog or MCP in the desktop or mobile top navigation. A direct visit still counts as a pageview. |
 | `taxonomy_selected` | Someone chose a labeled Top Domain, a catalog filter value, or a taxonomy link on a paper. Includes the surface, axis and value. |
 | `paper_link_clicked` | A visitor activated a public paper title or thumbnail. Includes the displayed paper title, ID, source surface and link part; captures keyboard, new-tab and middle-click activation, never hover or prefetch. |

@@ -178,7 +178,7 @@ const OrganizationsIndexView: React.FC = () => {
             </AlertDescription>
           </Alert>
         ) : organizations.length === 0 ? (
-          <div className="organizations-empty">No organizations match “{query}”.</div>
+          <div className="organizations-empty">No organizations match “<span className="ph-mask">{query}</span>”.</div>
         ) : (
           <div className="organizations-grid">
             {organizations.map((organization) => {
