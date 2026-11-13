@@ -1,5 +1,5 @@
 import { taxonomySelected } from "@/lib/catalogAnalytics";
-import { cyberHomeDescription } from "@/lib/cyberCopy";
+import { cyberHomeDescription, cyberTrendingIndustryNote } from "@/lib/cyberCopy";
 import FollowingIntro from "@/components/FollowingIntro";
 import TopicDialog from "@/components/TopicDialog";
 import { isAuthDisabled, isDiscoveryCatalog } from "@/lib/apiUrl";
@@ -486,7 +486,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           <h1 className="feed-title">
             Trending <em>Research</em>
           </h1>
-          {localCatalog && <p className="feed-subtitle">{cyberHomeDescription}</p>}
+          {localCatalog && <p className="feed-subtitle">{cyberHomeDescription} {cyberTrendingIndustryNote}</p>}
           <div className="feed-subtitle">{showPosts
             ? "Industry posts · featured posts ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
             : localCatalog

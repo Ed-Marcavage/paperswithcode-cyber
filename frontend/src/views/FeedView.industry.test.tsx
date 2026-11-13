@@ -56,6 +56,8 @@ it("shows industry posts above the paper feed and switches the feed to posts", a
   </QueryClientProvider>);
 
   expect(await screen.findByRole("heading", { name: "Recent from industry" })).toBeInTheDocument();
+  expect(screen.getByText(/The block at the top shows hand-picked industry engineering posts\./)).toBeInTheDocument();
+  expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Trending Research");
   expect(screen.getByRole("link", { name: "Highlighted post" })).toHaveAttribute("href", "/paper/9");
   expect(await screen.findByText("Trending paper")).toBeInTheDocument();
   expect(papersApi.list).toHaveBeenCalledWith(expect.objectContaining({ order_by: "trending" }));
