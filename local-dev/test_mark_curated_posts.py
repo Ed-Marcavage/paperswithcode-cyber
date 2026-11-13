@@ -19,6 +19,23 @@ class CuratedPostsTest(unittest.TestCase):
         self.assertEqual(matched, {"industry-1": {"curated": True, "curated_company": "Wiz", "curated_title": "Arena"}})
         self.assertEqual(unmatched, ["example.com/missing"])
 
+    def test_pinned_urls_get_their_position(self):
+        entries = load_manifest({
+            "pinned": ["https://b.example/2", "http://www.a.example/1/"],
+            "posts": [{"url": "https://a.example/1", "company": "A", "title": "One"},
+                      {"url": "https://b.example/2", "company": "B", "title": "Two"},
+                      {"url": "https://c.example/3", "company": "C", "title": "Three"}],
+        })
+        self.assertEqual(entries["b.example/2"]["curated_pin"], 1)
+        self.assertEqual(entries["a.example/1"]["curated_pin"], 2)
+        self.assertNotIn("curated_pin", entries["c.example/3"])
+
+    def test_rejects_pins_outside_posts_or_repeated(self):
+        post = {"url": "https://a.example/1", "company": "A", "title": "One"}
+        for pinned in (["https://other.example/"], [post["url"], post["url"]], "https://a.example/1"):
+            with self.subTest(pinned=pinned), self.assertRaises(ValueError):
+                load_manifest({"pinned": pinned, "posts": [post]})
+
     def test_rejects_bad_entries(self):
         for data in [{}, [{"url": "https://a.b", "company": "", "title": "T"}],
                      [{"url": "a.b/x", "company": "C", "title": "T"}],
@@ -28,7 +45,9 @@ class CuratedPostsTest(unittest.TestCase):
                 load_manifest(data)
 
     def test_checked_in_manifest_is_valid(self):
-        self.assertGreater(len(load_manifest(json.loads(MANIFEST.read_text()))), 0)
+        entries = load_manifest(json.loads(MANIFEST.read_text()))
+        self.assertGreater(len(entries), 0)
+        self.assertEqual(sorted(e["curated_pin"] for e in entries.values() if "curated_pin" in e), [1, 2, 3, 4, 5, 6])
 
 
 if __name__ == "__main__":

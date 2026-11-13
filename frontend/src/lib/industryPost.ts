@@ -65,7 +65,11 @@ export function distinctOriginalTitle(title: string, original: string | null | u
 export const TRENDING_INDUSTRY_SURFACE = "trending_industry";
 export const ALL_INDUSTRY_POSTS_HREF = "/catalog?kind=post&order=featured";
 
-/** Trending block heading: "this week" only when at least 3 of its posts are from the last 7 days. */
-export function industryHeading(highlights: { this_week: boolean }): string {
+/**
+ * Trending block heading. The backend sends it ("Editor's picks from industry" when pinned posts
+ * fill the block); the fallback says "this week" only when at least 3 posts are from the last 7 days.
+ */
+export function industryHeading(highlights: { this_week: boolean; heading?: string }): string {
+  if (highlights.heading) return highlights.heading;
   return highlights.this_week ? "From industry this week" : "Recent from industry";
 }

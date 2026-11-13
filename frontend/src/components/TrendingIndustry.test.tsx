@@ -20,6 +20,7 @@ const highlights = (thisWeek: boolean) => ({
       post: { ...post, curated: true, curated_company: "Wiz", curated_title: "Evaluating AI agent cyber capabilities" } },
     { paper_id: "3961", reference: "3961", title: "Help defend against memory poisoning",
       source_url: "https://aws.amazon.com/blogs/security/help-defend", artifact_url: null, has_text: true,
+      publisher: "AWS",
       date_published: "2026-11-09", facets: { kind: ["post"] }, post: { ...post, post_type: "engineering-practice" } },
   ],
 });
@@ -32,9 +33,21 @@ const renderBlock = () => render(
 
 afterEach(() => vi.restoreAllMocks());
 
-it("names the block by how recent its posts are", () => {
+it("names the block by how recent its posts are, unless the backend sends a heading", () => {
   expect(industryHeading({ this_week: true })).toBe("From industry this week");
   expect(industryHeading({ this_week: false })).toBe("Recent from industry");
+  expect(industryHeading({ this_week: false, heading: "Editor's picks from industry" })).toBe("Editor's picks from industry");
+});
+
+it("uses the backend heading for a pinned block and falls back to the host without a publisher", async () => {
+  const data = highlights(false);
+  vi.spyOn(request, "apiRequest").mockResolvedValue({
+    ...data, pinned: 2, heading: "Editor's picks from industry",
+    results: data.results.map(work => ({ ...work, publisher: undefined })),
+  });
+  renderBlock();
+  expect(await screen.findByRole("heading", { name: "Editor's picks from industry" })).toBeInTheDocument();
+  expect(screen.getByText("aws.amazon.com · Engineering practice · Nov 9, 2026")).toBeInTheDocument();
 });
 
 it("shows compact post cards linking to detail pages, with the editor's company and title for curated posts", async () => {
@@ -51,7 +64,7 @@ it("shows compact post cards linking to detail pages, with the editor's company 
   expect(within(card).getByRole("link", { name: "Featured" })).toBeInTheDocument();
 
   const other = screen.getByRole("link", { name: "Help defend against memory poisoning" }).closest("article")!;
-  expect(within(other).getByText("aws.amazon.com · Engineering practice · Nov 9, 2026")).toBeInTheDocument();
+  expect(within(other).getByText("AWS · Engineering practice · Nov 9, 2026")).toBeInTheDocument();
   expect(within(other).queryByText("Editor's pick")).not.toBeInTheDocument();
 
   expect(screen.getByRole("link", { name: "See all industry posts →" })).toHaveAttribute("href", "/catalog?kind=post&order=featured");

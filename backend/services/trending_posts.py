@@ -2,9 +2,12 @@
 
 Two views over reviewed industry posts (discovery_works.post_details):
 
-- ``industry_block``: the short list above the Trending feed. Curated posts
-  come first (newest first), then other featured posts with agent relevance of
-  at least 3, ranked by ``post_score`` and then recency.
+- ``industry_block``: the short list above the Trending feed. Posts the owner
+  pinned (``curated_pin`` in post_details, from the curated manifest's
+  ``pinned`` list) come first in pin order, whatever their date. Remaining
+  slots take curated posts from the date window (newest first), then other
+  featured posts with agent relevance of at least 3, ranked by ``post_score``
+  and then recency.
 - ``posts_feed``: the Trending feed's "Posts" view. Featured posts ranked by
   ``post_score`` halved for every ``DECAY_HALF_LIFE_DAYS`` since publication.
 
@@ -19,6 +22,8 @@ from typing import Optional
 
 from sqlalchemy import text
 from sqlalchemy.orm import Session
+
+from backend.services.publishers import publisher_name
 
 # None anchors to the newest reviewed post's date; set a date to pin it.
 ANCHOR_DATE: Optional[date] = None
@@ -58,8 +63,21 @@ def _published_on(row: dict) -> date:
     return value.date() if hasattr(value, "date") else value
 
 
+def _pin(row: dict) -> Optional[int]:
+    value = row["post"].get("curated_pin")
+    return value if type(value) is int and value > 0 else None
+
+
 def select_block(rows: list[dict], anchor: date, limit: int = BLOCK_LIMIT) -> tuple[list[dict], int]:
-    """Pick the block's posts from candidate rows; return them and the window used (days)."""
+    """Pick the block's posts from candidate rows; return them and the window used (days).
+
+    Pinned posts fill the first slots in pin order regardless of date; the date
+    window only governs the slots left after them."""
+    pinned = sorted((row for row in rows if _pin(row) is not None), key=lambda row: (_pin(row), row["paper_id"]))
+    pinned = pinned[:limit]
+    if len(pinned) >= limit:
+        return pinned, BLOCK_WINDOW_DAYS
+    rows = [row for row in rows if _pin(row) is None]
     window = BLOCK_WINDOW_DAYS
     for window in (BLOCK_WINDOW_DAYS, BLOCK_WIDE_WINDOW_DAYS):
         start = anchor - timedelta(days=window)
@@ -73,7 +91,7 @@ def select_block(rows: list[dict], anchor: date, limit: int = BLOCK_LIMIT) -> tu
             key=lambda row: (post_score(row["post"]), _published_on(row), row["paper_id"]),
             reverse=True,
         )
-        chosen = (curated + others)[:limit]
+        chosen = (pinned + curated + others)[:limit]
         if len(chosen) >= limit:
             break
     return chosen, window
@@ -90,24 +108,40 @@ def rank_feed(rows: list[dict], anchor: date) -> list[dict]:
 
 
 def _serialize(row: dict) -> dict:
-    return {**row, "date_published": _published_on(row).isoformat()}
+    return {**row, "date_published": _published_on(row).isoformat(),
+            "publisher": publisher_name(row["source_url"], row["post"].get("curated_company"))}
+
+
+def block_heading(pinned: int, shown: int, this_week: bool) -> str:
+    """Heading for the block. Only an unpinned block makes a date claim."""
+    if shown and pinned >= shown:
+        return "Editor's picks from industry"
+    if pinned:
+        return "From industry"
+    return "From industry this week" if this_week else "Recent from industry"
 
 
 def industry_block(db: Session, limit: int = BLOCK_LIMIT) -> dict:
     anchor = anchor_date(db)
     if anchor is None:
-        return {"anchor_date": None, "window_days": BLOCK_WINDOW_DAYS, "this_week": False, "results": []}
+        return {"anchor_date": None, "window_days": BLOCK_WINDOW_DAYS, "this_week": False, "pinned": 0,
+                "heading": block_heading(0, 0, False), "results": []}
     rows = [dict(row) for row in db.execute(text(_POSTS + """
-        AND p.date_published > :start AND p.date_published <= :anchor
-        AND (w.post_details ->> 'tier' = 'featured' OR w.post_details ->> 'curated' = 'true')
+        AND ((p.date_published > :start AND p.date_published <= :anchor
+              AND (w.post_details ->> 'tier' = 'featured' OR w.post_details ->> 'curated' = 'true'))
+             OR w.post_details ? 'curated_pin')
     """), {"start": anchor - timedelta(days=BLOCK_WIDE_WINDOW_DAYS), "anchor": anchor}).mappings()]
     chosen, window = select_block(rows, anchor, limit)
-    this_week = sum(1 for row in chosen if _published_on(row) > anchor - timedelta(days=THIS_WEEK_DAYS))
+    pinned = sum(1 for row in chosen if _pin(row) is not None)
+    recent = sum(1 for row in chosen if anchor - timedelta(days=THIS_WEEK_DAYS) < _published_on(row) <= anchor)
+    # "This week" only for an unpinned block with at least 3 posts from the last 7 days.
+    this_week = pinned == 0 and recent >= 3
     return {
         "anchor_date": anchor.isoformat(),
         "window_days": window,
-        # Enough of the chosen posts are from the last 7 days to call the block "this week".
-        "this_week": this_week >= 3,
+        "this_week": this_week,
+        "pinned": pinned,
+        "heading": block_heading(pinned, len(chosen), this_week),
         "results": [_serialize(row) for row in chosen],
     }
 

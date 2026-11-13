@@ -24,7 +24,7 @@ TIMELINESS = {"evergreen", "dated", "time_bound"}
 SCORES = ("technical_depth", "originality", "agent_relevance")
 FLAGS = ("reports_benchmark_results", "agent_harness_engineering")
 # Set by mark_curated_posts.py from curated_posts.json; a rerun here keeps them.
-CURATED_KEYS = ("curated", "curated_company", "curated_title")
+CURATED_KEYS = ("curated", "curated_company", "curated_title", "curated_pin")
 
 
 def strings(value, where):

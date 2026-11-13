@@ -20,6 +20,8 @@ export interface DiscoveryWork {
   post?: CatalogPost | null;
   /** ISO publication date; sent by the Trending industry highlights. */
   date_published?: string | null;
+  /** Company name (curated name, else the backend's host map, else the host); sent by the highlights. */
+  publisher?: string | null;
 }
 /** Industry posts for the top of Trending (backend `trending_posts.industry_block`). */
 export interface IndustryHighlights {
@@ -27,8 +29,12 @@ export interface IndustryHighlights {
   anchor_date: string | null;
   /** 14, or 30 when 14 days held too few posts. */
   window_days: number;
-  /** At least 3 of the results are from the 7 days before the anchor. */
+  /** No pinned posts, and at least 3 of the results are from the 7 days before the anchor. */
   this_week: boolean;
+  /** How many results are owner-pinned (curated manifest `pinned`); they come first. */
+  pinned?: number;
+  /** Heading chosen by the backend; it only makes a date claim when nothing is pinned. */
+  heading?: string;
   results: DiscoveryWork[];
 }
 export const filtersQuery = queryOptions({

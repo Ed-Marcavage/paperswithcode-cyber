@@ -7,16 +7,20 @@ from backend.config import get_settings
 from backend.database.connection import get_database_session
 from backend.main import create_app
 from backend.services import trending_posts
-from backend.services.trending_posts import decayed_score, post_score, rank_feed, select_block
+from backend.services.publishers import publisher_name
+from backend.services.trending_posts import block_heading, decayed_score, post_score, rank_feed, select_block
 
 ANCHOR = date(2026, 11, 12)
 
 
-def row(paper_id, days_old, tier="featured", depth=2, originality=2, relevance=3, harness=False, curated=False):
+def row(paper_id, days_old, tier="featured", depth=2, originality=2, relevance=3, harness=False, curated=False,
+        pin=None):
     post = {"tier": tier, "technical_depth": depth, "originality": originality,
             "agent_relevance": relevance, "agent_harness_engineering": harness}
-    if curated:
+    if curated or pin:
         post["curated"] = True
+    if pin:
+        post["curated_pin"] = pin
     return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post}
 
 
@@ -51,6 +55,34 @@ def test_block_widens_to_30_days_when_14_give_too_few():
     chosen, window = select_block(rows, ANCHOR)
     assert window == 30
     assert ids(chosen) == ["1", "2", "3", "4", "5"]
+
+
+def test_pinned_posts_come_first_in_pin_order_whatever_their_date():
+    rows = [row(1, 0, depth=4, originality=4), row(2, 90, pin=2), row(3, 3, pin=1), row(4, 1, curated=True)]
+    chosen, _ = select_block(rows, ANCHOR, limit=3)
+    assert ids(chosen) == ["3", "2", "4"]
+
+
+def test_pins_alone_can_fill_the_block():
+    rows = [row(i, 40 + i, pin=7 - i) for i in range(1, 7)] + [row(9, 0, curated=True)]
+    chosen, _ = select_block(rows, ANCHOR)
+    assert ids(chosen) == ["6", "5", "4", "3", "2", "1"]
+
+
+def test_heading_makes_a_date_claim_only_without_pins():
+    assert block_heading(6, 6, False) == "Editor's picks from industry"
+    assert block_heading(2, 6, False) == "From industry"
+    assert block_heading(0, 6, True) == "From industry this week"
+    assert block_heading(0, 6, False) == "Recent from industry"
+
+
+def test_publisher_name_prefers_curated_then_map_then_host():
+    assert publisher_name("https://www.endorlabs.com/learn/x", "Endor Labs") == "Endor Labs"
+    assert publisher_name("https://www.elastic.co/security-labs/blog/x") == "Elastic"
+    assert publisher_name("https://projectzero.google/2026/10/x.html") == "Google Project Zero"
+    assert publisher_name("https://security.microsoft.com/x") == "Microsoft"
+    assert publisher_name("https://unknown.example/post") == "unknown.example"
+    assert publisher_name(None) is None
 
 
 def test_posts_view_halves_score_every_seven_days():

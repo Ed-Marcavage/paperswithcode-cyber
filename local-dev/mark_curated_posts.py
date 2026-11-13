@@ -1,10 +1,13 @@
 """Mark hand-picked industry posts as curated ("Editor's pick").
 
-Input: local-dev/curated_posts.json, a list of {url, company, title} objects
-edited by hand. Each URL is matched to a reviewed post (one with post_details)
-after normalising scheme, `www.`, fragment and trailing slash. Matched posts get
-`curated: true`, `curated_company` and `curated_title` in post_details; posts no
-longer listed lose those keys. A rerun with the same file changes nothing.
+Input: local-dev/curated_posts.json, edited by hand: {"pinned": [url, ...],
+"posts": [{url, company, title}, ...]} (a bare list of posts is also accepted).
+Each URL is matched to a reviewed post (one with post_details) after normalising
+scheme, `www.`, fragment and trailing slash. Matched posts get `curated: true`,
+`curated_company` and `curated_title` in post_details; a post listed in
+`pinned` also gets `curated_pin` (1 for the first URL), which fixes its place
+in Trending's industry block. Every pinned URL must also be in `posts`. Posts
+no longer listed lose those keys. A rerun with the same file changes nothing.
 import_post_details.py keeps these keys when it rewrites post_details.
 Preview rolls back; pass --execute to commit.
 """
@@ -28,10 +31,19 @@ def normalize_url(url: str) -> str:
     return value.rstrip("/")
 
 
+def manifest_posts(data) -> list:
+    """The manifest's post list, from either the object or the bare-list form."""
+    return data.get("posts") if isinstance(data, dict) else data
+
+
 def load_manifest(data) -> dict[str, dict]:
     """Validate the manifest and key it by normalised URL."""
+    pinned = data.get("pinned", []) if isinstance(data, dict) else []
+    data = manifest_posts(data)
     if not isinstance(data, list):
         raise ValueError("Expected a list of {url, company, title} objects")
+    if not isinstance(pinned, list) or not all(isinstance(url, str) and url.strip() for url in pinned):
+        raise ValueError("Expected pinned to be a list of URLs")
     entries = {}
     for index, entry in enumerate(data):
         if not isinstance(entry, dict) or not all(
@@ -45,6 +57,13 @@ def load_manifest(data) -> dict[str, dict]:
             raise ValueError(f"Duplicate url in entry {index}: {entry['url']}")
         entries[key] = {"curated": True, "curated_company": entry["company"].strip(),
                         "curated_title": entry["title"].strip()}
+    for position, url in enumerate(pinned, start=1):
+        key = normalize_url(url)
+        if key not in entries:
+            raise ValueError(f"Pinned url is not in posts: {url}")
+        if "curated_pin" in entries[key]:
+            raise ValueError(f"Duplicate pinned url: {url}")
+        entries[key]["curated_pin"] = position
     return entries
 
 
@@ -66,7 +85,7 @@ def main():
     args = parser.parse_args()
     data = json.loads(args.manifest.read_text())
     entries = load_manifest(data)
-    original_urls = {normalize_url(entry["url"]): entry["url"] for entry in data}
+    original_urls = {normalize_url(entry["url"]): entry["url"] for entry in manifest_posts(data)}
     db_manager.engine.echo = False
     with db_manager.session_local() as db:
         database, user = db.execute(text("SELECT current_database(), current_user")).one()

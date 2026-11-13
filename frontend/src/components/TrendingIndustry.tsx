@@ -20,7 +20,7 @@ function shortDate(iso: string | null | undefined): string | null {
 
 function IndustryPostCard({ work }: { work: DiscoveryWork }) {
   const post = work.post;
-  const company = post?.curated_company || publisherHost(work.source_url);
+  const company = work.publisher || post?.curated_company || publisherHost(work.source_url);
   const title = post?.curated_title || work.title;
   const meta = [company, post && postTypeLabel(post.post_type), shortDate(work.date_published)].filter(Boolean);
   return (
