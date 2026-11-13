@@ -7,7 +7,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "@/components/Icon";
 import { PaperPreview } from "@/components/PaperPreview";
 import { SotaBadges } from "@/components/SotaBadges";
-import { BenchmarkChip, FeaturedChip } from "@/components/Chips";
+import { BenchmarkChip, EditorsPickChip, FeaturedChip } from "@/components/Chips";
 import { distinctOriginalTitle } from "@/lib/industryPost";
 import LatexTitle from "@/components/LatexTitle";
 import { evaluationsApi } from "@/lib/api/evaluations";
@@ -614,6 +614,7 @@ const PaperDetailView: React.FC = () => {
           </div>
 
           {paper.catalog_kind === "post" && paper.catalog_post?.tier === "featured" && <FeaturedChip />}
+          {paper.catalog_kind === "post" && paper.catalog_post?.curated && <EditorsPickChip />}
           {paper.catalog_contributions?.includes("benchmark") && <BenchmarkChip />}
           {paper.leaderboard_ranks && paper.leaderboard_ranks.length > 0 && (
             <SotaBadges

@@ -1,5 +1,6 @@
 import { queryOptions } from "@tanstack/react-query";
-import type { CatalogPost } from "./papers.types";
+import type { CatalogPost, Paper } from "./papers.types";
+import type { PaginatedResponse } from "./shared.types";
 import { apiRequest } from "./request";
 
 export const axes = {
@@ -17,6 +18,18 @@ export interface DiscoveryWork {
   has_text: boolean;
   /** Reviewed industry-post fields; null for papers and repositories. */
   post?: CatalogPost | null;
+  /** ISO publication date; sent by the Trending industry highlights. */
+  date_published?: string | null;
+}
+/** Industry posts for the top of Trending (backend `trending_posts.industry_block`). */
+export interface IndustryHighlights {
+  /** Newest reviewed post's date; windows count back from it. */
+  anchor_date: string | null;
+  /** 14, or 30 when 14 days held too few posts. */
+  window_days: number;
+  /** At least 3 of the results are from the 7 days before the anchor. */
+  this_week: boolean;
+  results: DiscoveryWork[];
 }
 export const filtersQuery = queryOptions({
   queryKey: ["discovery", "filters"],
@@ -33,6 +46,19 @@ export function browseQuery(params: URLSearchParams) {
       facet_counts?: Record<Axis, Record<string, number>>;
     }>("/catalog/papers?" + query),
   });
+}
+export const industryHighlightsQuery = queryOptions({
+  queryKey: ["discovery", "industry-highlights"],
+  queryFn: () => apiRequest<IndustryHighlights>("/catalog/trending-posts/highlights"),
+  staleTime: 300_000,
+});
+/** Featured industry posts ranked for Trending's "posts" view, as paper records for PaperCard. */
+export function trendingPosts(params: {
+  page: number; page_size: number; include_resources?: boolean; start_date?: string; end_date?: string;
+}): Promise<PaginatedResponse<Paper>> {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) if (value !== undefined && value !== "") query.set(key, String(value));
+  return apiRequest<PaginatedResponse<Paper>>("/catalog/trending-posts?" + query);
 }
 export function discoveryPaperQuery(id: string) {
   return queryOptions({

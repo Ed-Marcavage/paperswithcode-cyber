@@ -11,6 +11,8 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { PaperFeedList, type PaperFeedCard } from "@/components/PaperFeed";
 import { McpShowcase } from "@/components/McpShowcase";
+import { TrendingIndustry } from "@/components/TrendingIndustry";
+import { trendingPosts } from "@/lib/api/discovery";
 import { PaperDateFilter } from "@/components/PaperDateFilter";
 import { ArrowUpIcon } from "@/components/chat/icons";
 import { PaperMentionHighlights } from "@/components/chat/PaperMentionHighlights";
@@ -333,10 +335,10 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Following defaults to its 30-day match window and trending on X to a month;
   // the trending tab defaults to a week.
-  // Future Cyber intake: check OpenAI, Anthropic, Cloudflare, Ramp and Shopify
-  // engineering blogs hourly; show newly discovered cyber-related posts on the
-  // day they are added. Keep Trending paper-only until that intake exists.
+  // The local catalog's Trending also shows reviewed industry posts: a block
+  // above the feed, and a papers/posts switch for the feed itself.
   const localCatalog = isDiscoveryCatalog() && mode === "trending";
+  const showPosts = localCatalog && searchParams.get("kind") === "post";
   const dateRange = localCatalog
     ? readPaperDateRange(searchParams)
     : readHomepagePaperDateRange(searchParams, undefined, mode === "trending" ? "week" : "month");
@@ -347,8 +349,15 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
     const next = new URLSearchParams(searchParams);
     next.delete("order_by");
     next.delete("only");
+    next.delete("kind");
     const query = next.toString();
     navigate(query ? `${path}?${query}` : path);
+  };
+  const showKind = (kind: "paper" | "post") => {
+    const next = new URLSearchParams(searchParams);
+    if (kind === "post") next.set("kind", "post");
+    else next.delete("kind");
+    setSearchParams(next);
   };
 
   const topicFilterHref = (active: boolean) => {
@@ -382,7 +391,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const infinite = usePaperFeedQuery<FeedPage>(
     following
       ? [...paperQueryKeys.feeds.following, user?.hf_subject, followingFilters]
-      : [...(mode === "x" ? paperQueryKeys.feeds.xTrending : paperQueryKeys.feeds.trending), dateFilters],
+      : showPosts
+        ? [...paperQueryKeys.feeds.trending, dateFilters, "post"]
+        : [...(mode === "x" ? paperQueryKeys.feeds.xTrending : paperQueryKeys.feeds.trending), dateFilters],
     async (page) => {
       if (following) {
         const entries = await researchApi.following(page, followingFilters);
@@ -390,6 +401,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
         return { results: entries, next_page };
       }
       const params = { ...dateFilters, page, page_size: FEED_PAGE_SIZE, include_resources: true };
+      if (showPosts) return toFeedPage(trendingPosts(params));
       return toFeedPage(mode === "x"
         ? papersApi.xTrending(params)
         : papersApi.list({ ...params, order_by: "trending", order_dir: "desc", latest_only: true }));
@@ -475,7 +487,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
             Trending <em>Research</em>
           </h1>
           {localCatalog && <p className="feed-subtitle">{cyberHomeDescription}</p>}
-          <div className="feed-subtitle">{localCatalog
+          <div className="feed-subtitle">{showPosts
+            ? "Industry posts · featured posts ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
+            : localCatalog
             ? "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
             : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
         </div>
@@ -586,6 +600,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           )}
 
           <div className="feed-content">
+            {localCatalog && <TrendingIndustry />}
             <div className="sort-bar home-feed-sort-bar">
               <div className="paper-feed-toolbar-controls">
                 <div className="sort-options">
@@ -595,6 +610,12 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
                   <button className={`sort-btn ${following ? "active" : ""}`} onClick={() => showTab("/following")}>following</button>
                   </>}
                 </div>
+                {localCatalog && (
+                  <div className="sort-options feed-kind-options" role="group" aria-label="Show">
+                    <button type="button" className={`sort-btn ${showPosts ? "" : "active"}`} aria-pressed={!showPosts} onClick={() => showKind("paper")}>papers</button>
+                    <button type="button" className={`sort-btn ${showPosts ? "active" : ""}`} aria-pressed={showPosts} onClick={() => showKind("post")}>posts</button>
+                  </div>
+                )}
               </div>
               <PaperDateFilter
                 startDate={dateRange.startDate}
@@ -656,7 +677,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
                 cards={cards}
                 skeleton="card"
                 rootMargin="400px"
-                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : "No papers in this window."}
+                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : showPosts ? "No featured posts in this window." : "No papers in this window."}
               />
             )}
           </div>

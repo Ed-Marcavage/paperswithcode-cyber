@@ -1,5 +1,5 @@
 import { CatalogFacetSelect } from "@/components/CatalogFacetSelect";
-import { FeaturedChip } from "@/components/Chips";
+import { EditorsPickChip, FeaturedChip } from "@/components/Chips";
 import { cyberCatalogDescription } from "@/lib/cyberCopy";
 import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
@@ -99,6 +99,7 @@ function PostSummary({ work, details }: { work: DiscoveryWork; details: string[]
   return <>
     <span className="discovery-post-meta">
       {post?.tier === "featured" && <FeaturedChip />}
+      {post?.curated && <EditorsPickChip />}
       <small>{meta.join(" · ")}</small>
     </span>
     {post?.tldr && <p className="discovery-tldr">{post.tldr}</p>}

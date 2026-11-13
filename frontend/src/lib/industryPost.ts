@@ -60,3 +60,12 @@ export function distinctOriginalTitle(title: string, original: string | null | u
   if (!original) return null;
   return comparable(original).startsWith(comparable(title)) ? null : original;
 }
+
+/** Analytics `surface` for clicks in Trending's industry block. */
+export const TRENDING_INDUSTRY_SURFACE = "trending_industry";
+export const ALL_INDUSTRY_POSTS_HREF = "/catalog?kind=post&order=featured";
+
+/** Trending block heading: "this week" only when at least 3 of its posts are from the last 7 days. */
+export function industryHeading(highlights: { this_week: boolean }): string {
+  return highlights.this_week ? "From industry this week" : "Recent from industry";
+}

@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { BenchmarkChip, FeaturedChip, MethodChip, TagChip } from "@/components/Chips";
+import { BenchmarkChip, EditorsPickChip, FeaturedChip, MethodChip, TagChip } from "@/components/Chips";
 import { Icon } from "@/components/Icon";
 import LatexTitle, { LatexText } from "@/components/LatexTitle";
 import { PaperPreview } from "@/components/PaperPreview";
@@ -145,6 +145,7 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   const visibleMethods = visibleFeedMethods(paper);
   const post = paper.catalogPost;
   const featured = post?.tier === "featured";
+  const curated = !!post?.curated;
   return (
     <article className="paper-card">
       {(!isDiscoveryCatalog() || paper.thumbnailUrl) && <Link
@@ -214,9 +215,10 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
             </p>
           )}
           {paper.sotaRanks.length > 0 && <SotaBadges ranks={paper.sotaRanks} paperHref={paperHref} />}
-          {(paper.tags.length > 0 || visibleMethods.length > 0 || paper.isBenchmark || featured) && (
+          {(paper.tags.length > 0 || visibleMethods.length > 0 || paper.isBenchmark || featured || curated) && (
             <div className="paper-tags paper-tags--clamped">
               {featured && <FeaturedChip />}
+              {curated && <EditorsPickChip />}
               {paper.isBenchmark && <BenchmarkChip />}
               {paper.tags.map((slug) => (
                 <TagChip key={slug} slug={slug} />

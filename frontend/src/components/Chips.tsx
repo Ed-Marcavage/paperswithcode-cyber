@@ -53,6 +53,16 @@ export function FeaturedChip() {
   );
 }
 
+/** Marks an industry post the catalog editor hand-picked (local-dev/curated_posts.json). */
+export function EditorsPickChip() {
+  const colors = chipColors(160);
+  return (
+    <span className="tag-chip" style={{ background: colors.bg, color: colors.text, cursor: "default" }}>
+      <span className="dot" style={{ background: colors.dot }} />Editor's pick
+    </span>
+  );
+}
+
 // Method chip — link to /methods/:slug
 
 interface MethodChipProps {
