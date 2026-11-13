@@ -8,9 +8,14 @@
 .discovery-list {list-style:none;padding:0;}
 .discovery-list li {border-top:1px solid var(--border);padding:1rem 0;display:grid;gap:.4rem;}
 .discovery-list a {font-size:1.15rem;font-weight:600;}
+.discovery-list .tag-chip {font-size:11px;font-weight:500;text-decoration:none;}
+.discovery-post-meta {display:flex;flex-wrap:wrap;align-items:center;gap:.5rem;}
+.discovery-tldr {margin:0;color:var(--ink);line-height:1.5;}
 .discovery-pager,.discovery-resources {display:flex;gap:1rem;margin:1rem 0;flex-wrap:wrap;}
 .discovery-pager a {border:1px solid var(--border);padding:.35rem .7rem;border-radius:4px;}
 .discovery-paper {border-block:1px solid var(--border);padding:1rem 0;margin:1.5rem 0;}
 .discovery-paper dl {display:grid;grid-template-columns:max-content 1fr;gap:.3rem .8rem;margin:.8rem 0;}
 .discovery-paper dt {color:var(--ink-muted);}
 .discovery-paper dd a + a {margin-left:.5rem;}
+.discovery-post-tldr {margin:.8rem 0;}
+.discovery-post-scores {display:flex;flex-wrap:wrap;gap:.3rem 1rem;}

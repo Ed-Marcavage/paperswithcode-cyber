@@ -5,6 +5,15 @@
   gap: 56px;
   align-items: start;
 }
+.detail-original-title {
+  margin: -4px 0 12px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--ink-muted);
+}
+.detail-original-title span {
+  color: var(--ink);
+}
 .detail-meta {
   display: flex;
   align-items: center;

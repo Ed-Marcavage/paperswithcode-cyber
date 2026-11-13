@@ -43,6 +43,16 @@ export function BenchmarkChip() {
   );
 }
 
+/** Marks an industry post the review placed in the featured tier. */
+export function FeaturedChip() {
+  const colors = chipColors(75);
+  return (
+    <Link to="/catalog?kind=post&tier=featured" className="tag-chip" style={{ background: colors.bg, color: colors.text }}>
+      <span className="dot" style={{ background: colors.dot }} />Featured
+    </Link>
+  );
+}
+
 // Method chip — link to /methods/:slug
 
 interface MethodChipProps {

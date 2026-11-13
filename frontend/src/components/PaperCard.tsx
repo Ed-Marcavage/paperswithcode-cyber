@@ -4,7 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 
 import { AuthorAvatar } from "@/components/AuthorAvatar";
-import { BenchmarkChip, MethodChip, TagChip } from "@/components/Chips";
+import { BenchmarkChip, FeaturedChip, MethodChip, TagChip } from "@/components/Chips";
 import { Icon } from "@/components/Icon";
 import LatexTitle, { LatexText } from "@/components/LatexTitle";
 import { PaperPreview } from "@/components/PaperPreview";
@@ -14,6 +14,7 @@ import { papersApi } from "@/lib/api/papers";
 import { paperQueryKeys } from "@/lib/paperQueryKeys";
 import { safeExternalHref } from "@/lib/safeExternalHref";
 import { formatStarCount } from "@/lib/frameworks";
+import { postTypeLabel } from "@/lib/industryPost";
 import type { PaperCardProps } from "@/lib/transform";
 import { TEN_MINUTES } from "@/lib/api/queryKeys";
 
@@ -142,6 +143,8 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   });
   const totalAuthors = paper.authors.length;
   const visibleMethods = visibleFeedMethods(paper);
+  const post = paper.catalogPost;
+  const featured = post?.tier === "featured";
   return (
     <article className="paper-card">
       {(!isDiscoveryCatalog() || paper.thumbnailUrl) && <Link
@@ -175,6 +178,11 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
           <div className="paper-authors">
             {(paper.catalogKind === "post" || paper.catalogKind === "repository") && <>
               <Link to={`/catalog?kind=${paper.catalogKind}`}>{paper.catalogKind === "post" ? "Engineering post" : "Repository"}</Link>
+              {post && <>
+                {" · "}
+                <Link to={`/catalog?kind=post&post_type=${encodeURIComponent(post.post_type)}`}>{postTypeLabel(post.post_type)}</Link>
+              </>}
+              {paper.publisherHost && <>{" · "}<span>{paper.publisherHost}</span></>}
               {(totalAuthors > 0 || paper.date) && " · "}
             </>}
             {visibleAuthors}
@@ -196,14 +204,19 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
               </>
             )}
           </div>
-          {paper.abstract && (
+          {post ? (
+            <p className="paper-abstract">
+              <LatexText text={post.tldr} highlight={highlightQuery} />
+            </p>
+          ) : paper.abstract && (
             <p className="paper-abstract">
               <LatexText text={paper.abstract} highlight={highlightQuery} />
             </p>
           )}
           {paper.sotaRanks.length > 0 && <SotaBadges ranks={paper.sotaRanks} paperHref={paperHref} />}
-          {(paper.tags.length > 0 || visibleMethods.length > 0 || paper.isBenchmark) && (
+          {(paper.tags.length > 0 || visibleMethods.length > 0 || paper.isBenchmark || featured) && (
             <div className="paper-tags paper-tags--clamped">
+              {featured && <FeaturedChip />}
               {paper.isBenchmark && <BenchmarkChip />}
               {paper.tags.map((slug) => (
                 <TagChip key={slug} slug={slug} />

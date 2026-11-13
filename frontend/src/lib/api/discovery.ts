@@ -1,4 +1,5 @@
 import { queryOptions } from "@tanstack/react-query";
+import type { CatalogPost } from "./papers.types";
 import { apiRequest } from "./request";
 
 export const axes = {
@@ -14,6 +15,8 @@ export interface DiscoveryWork {
   source_url: string;
   artifact_url: string | null;
   has_text: boolean;
+  /** Reviewed industry-post fields; null for papers and repositories. */
+  post?: CatalogPost | null;
 }
 export const filtersQuery = queryOptions({
   queryKey: ["discovery", "filters"],

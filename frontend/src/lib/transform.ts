@@ -11,7 +11,8 @@
 
 import { format, parseISO } from "date-fns";
 
-import type { LeaderboardRankSummary, Paper, Repository } from "./api/papers.types";
+import type { CatalogPost, LeaderboardRankSummary, Paper, Repository } from "./api/papers.types";
+import { publisherHost } from "./industryPost";
 import { assetUrl } from "./apiUrl";
 
 export interface PaperCardProps {
@@ -29,6 +30,10 @@ export interface PaperCardProps {
   /** paper.tasks[*].slug, used by TagChip */
   tags: string[];
   catalogKind?: string | null;
+  /** Reviewed industry-post fields; set only for catalog posts. */
+  catalogPost?: CatalogPost | null;
+  /** Publisher host for catalog posts, e.g. "wiz.io". */
+  publisherHost?: string | null;
   isBenchmark?: boolean;
   /** paper.methods[*] reduced to the fields MethodChip needs */
   methods: { id?: string; name: string; slug?: string }[];
@@ -179,6 +184,8 @@ export function transformPaperForCard(paper: Paper): PaperCardProps {
     ),
     tags,
     catalogKind: paper.catalog_kind,
+    catalogPost: paper.catalog_kind === "post" ? paper.catalog_post ?? null : null,
+    publisherHost: paper.catalog_kind === "post" ? publisherHost(paper.source_url) : null,
     isBenchmark: paper.catalog_contributions?.includes("benchmark"),
     methods,
     organizations: (paper.organizations || []).map((organization) => ({

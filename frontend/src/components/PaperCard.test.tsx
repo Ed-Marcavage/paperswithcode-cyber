@@ -161,3 +161,32 @@ describe("PaperCard thumbnails", () => {
     expect(container.querySelector(".paper-thumb-wrap img")).toBeNull();
   });
 });
+
+describe("PaperCard industry posts", () => {
+  const post = {
+    tier: "featured" as const, post_type: "vulnerability-writeup", tldr: "One-sentence summary.",
+    subtopics: [], authors: [], technical_depth: 3, originality: 2, agent_relevance: 0,
+    reports_benchmark_results: false, agent_harness_engineering: false, entities: [],
+  };
+  const renderWith = (card: PaperCardProps) => render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter><PaperCard paper={card} /></MemoryRouter>
+    </QueryClientProvider>,
+  );
+
+  it("shows the featured marker, post type, publisher and TL;DR instead of the abstract", () => {
+    renderWith({ ...paper, abstract: "Long abstract", catalogKind: "post", catalogPost: post, publisherHost: "wiz.io" });
+    expect(screen.getByRole("link", { name: "Featured" })).toHaveAttribute("href", "/catalog?kind=post&tier=featured");
+    expect(screen.getByRole("link", { name: "Vulnerability write-up" })).toHaveAttribute(
+      "href", "/catalog?kind=post&post_type=vulnerability-writeup");
+    expect(screen.getByText("wiz.io")).toBeInTheDocument();
+    expect(screen.getByText("One-sentence summary.")).toBeInTheDocument();
+    expect(screen.queryByText("Long abstract")).not.toBeInTheDocument();
+  });
+
+  it("leaves papers unchanged", () => {
+    renderWith({ ...paper, abstract: "Long abstract" });
+    expect(screen.getByText("Long abstract")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Featured" })).not.toBeInTheDocument();
+  });
+});

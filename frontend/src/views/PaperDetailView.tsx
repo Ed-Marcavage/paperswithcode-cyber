@@ -7,7 +7,8 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { Icon } from "@/components/Icon";
 import { PaperPreview } from "@/components/PaperPreview";
 import { SotaBadges } from "@/components/SotaBadges";
-import { BenchmarkChip } from "@/components/Chips";
+import { BenchmarkChip, FeaturedChip } from "@/components/Chips";
+import { distinctOriginalTitle } from "@/lib/industryPost";
 import LatexTitle from "@/components/LatexTitle";
 import { evaluationsApi } from "@/lib/api/evaluations";
 import { papersApi } from "@/lib/api/papers";
@@ -352,6 +353,9 @@ const PaperDetailView: React.FC = () => {
   const visibleAuthors = showAllAuthors || authorEntries.length <= authorLimit
     ? authorEntries
     : authorEntries.slice(0, authorLimit);
+  const originalTitle = paper.catalog_kind === "post"
+    ? distinctOriginalTitle(paper.title, paper.catalog_post?.original_title)
+    : null;
   return (
     <div className="page">
       <div className="breadcrumb">
@@ -395,6 +399,7 @@ const PaperDetailView: React.FC = () => {
               </button>}
             </span>
           </h1>
+          {originalTitle && <p className="detail-original-title">Original title: <span>{originalTitle}</span></p>}
           <div className="detail-meta">
             <span>Submitted {formatLongDate(paper.published)}</span>
             {numPages && (
@@ -608,6 +613,7 @@ const PaperDetailView: React.FC = () => {
             {!isDiscoveryCatalog() && <SavePaperButton paperId={paper.id} />}
           </div>
 
+          {paper.catalog_kind === "post" && paper.catalog_post?.tier === "featured" && <FeaturedChip />}
           {paper.catalog_contributions?.includes("benchmark") && <BenchmarkChip />}
           {paper.leaderboard_ranks && paper.leaderboard_ranks.length > 0 && (
             <SotaBadges

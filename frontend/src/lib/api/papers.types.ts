@@ -187,6 +187,8 @@ export interface Paper {
   tasks?: Task[];
   catalog_kind?: string | null;
   catalog_contributions?: string[] | null;
+  /** Reviewed industry-post fields; null for papers and repositories. */
+  catalog_post?: CatalogPost | null;
   methods?: Method[];
   introduced_benchmarks?: BenchmarkSummary[];
   introduced_frameworks?: FrameworkSummary[];
@@ -318,4 +320,23 @@ export interface ResolvedPaperReference {
 
 export interface PaperLookupResponse {
   references: ResolvedPaperReference[];
+}
+
+/** Reviewed fields for a catalog industry post (backend `CatalogPost`). */
+export interface CatalogPost {
+  tier: "featured" | "catalog";
+  post_type: string;
+  tldr: string;
+  original_title?: string | null;
+  /** Subtopic slugs; free-form ones are written "other: <name>". */
+  subtopics: string[];
+  authors: string[];
+  caveat?: string | null;
+  timeliness?: string | null;
+  technical_depth: number;
+  originality: number;
+  agent_relevance: number;
+  reports_benchmark_results: boolean;
+  agent_harness_engineering: boolean;
+  entities: { type: string; name: string; role: string }[];
 }
