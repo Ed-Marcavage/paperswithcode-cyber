@@ -111,12 +111,34 @@ def render_discovery_document(page: DiscoveryPage) -> str:
         for paper in page.paper_links
     )
     empty = "<p>No eligible public papers are currently linked to this page.</p>"
+    highlights = "".join(
+        "<li><article><h3>"
+        f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
+        f"{escape(paper.title)}</a></h3><p>"
+        + " · ".join(
+            value
+            for value in (
+                escape(paper.context_label),
+                paper.published.isoformat() if paper.published else "",
+            )
+            if value
+        )
+        + "</p></article></li>"
+        for paper in page.highlight_links
+    )
     return (
         '<main hidden data-pwc-initial-document="discovery">'
         + (f'<nav aria-label="Breadcrumb">{breadcrumbs}</nav>' if breadcrumbs else "")
         + f"<header><p>{escape(page.kind)}</p><h1>{escape(page.heading)}</h1>"
         + markdown_html(page.body_markdown or page.description)
         + "</header>"
+        + (
+            '<section aria-labelledby="highlights-heading">'
+            f'<h2 id="highlights-heading">{escape(page.highlight_heading or "")}</h2>'
+            f"<ul>{highlights}</ul></section>"
+            if highlights
+            else ""
+        )
         + (_top_models_section(page) if page.top_models else "")
         + (
             '<section aria-labelledby="trends-heading">'

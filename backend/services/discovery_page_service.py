@@ -184,6 +184,9 @@ class DiscoveryPage:
     leaderboard: Optional[DiscoveryLeaderboard] = None
     top_models: tuple[DiscoveryTopModel, ...] = ()
     top_models_as_of: Optional[date] = None
+    # A short list shown above the page's papers, e.g. Trending's industry posts.
+    highlight_heading: Optional[str] = None
+    highlight_links: tuple[DiscoveryPaperLink, ...] = ()
 
     @property
     def canonical_url(self) -> str:

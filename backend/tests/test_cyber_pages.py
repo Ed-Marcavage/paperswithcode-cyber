@@ -13,7 +13,7 @@ from backend.database.connection import get_database_session
 from backend.main import create_app
 from backend.models.papers import Paper
 from backend.services import cyber_page_service as pages
-from backend.services import discovery_catalog
+from backend.services import discovery_catalog, trending_posts
 from backend.services.paper_service import PaperService
 from backend.services.spa_shell_service import reset_cache
 from backend.utils.exceptions import PaperNotFoundError
@@ -38,6 +38,17 @@ ROWS = [
     }
     for n in range(51)
 ]
+
+BLOCK = {
+    "heading": "Editor's picks from industry",
+    "results": [
+        {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
+         "date_published": "2026-10-27", "publisher": "Google Project Zero",
+         "post": {"curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
+        {"reference": "77", "title": "Plain post", "date_published": "2026-11-09",
+         "publisher": "Endor Labs", "post": {}},
+    ],
+}
 
 
 @pytest.fixture
@@ -73,6 +84,7 @@ def client(monkeypatch, tmp_path):
             "results": ROWS[offset : offset + limit],
         },
     )
+    monkeypatch.setattr(trending_posts, "industry_block", lambda db: BLOCK)
     monkeypatch.setattr(pages, "catalog_count", lambda db: len(ROWS))
     monkeypatch.setattr(pages, "sitemap_papers", lambda db, page: ROWS)
     app = create_app()
@@ -300,3 +312,17 @@ def test_existing_catalog_api_is_not_intercepted(client):
     response = client.get("/api/v1/catalog/papers?limit=2")
     assert response.status_code == 200
     assert len(response.json()["results"]) == 2
+
+
+def test_homepage_lists_the_industry_block_in_html_and_markdown(client):
+    html = BeautifulSoup(client.get("/").text, "html.parser")
+    section = html.select_one('#root main section[aria-labelledby="highlights-heading"]')
+    assert section.h2.text == "Editor's picks from industry"
+    links = [(a["href"], a.text) for a in section.select("a")]
+    assert links == [("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"), ("/paper/77", "Plain post")]
+    assert "Google Project Zero · 2026-10-27" in section.text
+    assert "hand-picked industry engineering posts" in html.select_one("#root main header").text
+    markdown = client.get("/index.md").text
+    assert "## Editor's picks from industry" in markdown
+    assert f"- [Plain post]({ORIGIN}/paper/77) — Endor Labs · 2026-11-09" in markdown
+    assert markdown.index("Editor's picks") < markdown.index("## Relevant papers")

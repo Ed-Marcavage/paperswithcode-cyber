@@ -347,6 +347,10 @@ proxy fragment together if rolling back.
 The Cyber homepage's Trending feed includes only records reviewed as `kind=paper`.
 This filter runs before ranking and pagination for both API and initial HTML/
 Markdown; repository-only records and existing posts remain in the full catalog.
+The industry block above the feed (`GET /api/v1/catalog/trending-posts/highlights`)
+is also in the initial HTML and Markdown, as a list of up to six post links under
+the same heading React shows. Owner-pinned posts (`pinned` in
+`curated_posts.json`, applied by `mark_curated_posts.py`) fill it first.
 Future intake should poll engineering blogs (including OpenAI, Anthropic,
 Cloudflare, Ramp and Shopify) hourly, detect new cyber-related posts, and feature
 them on the day they are added. That scraper and daily placement are not implemented.

@@ -103,6 +103,21 @@ def render_discovery_markdown(page: DiscoveryPage) -> str:
             _markdown_text(markdown_plain_text(page.body_markdown or page.description)),
         ]
     )
+    if page.highlight_links:
+        lines.extend(["", f"## {_markdown_text(page.highlight_heading or '')}", ""])
+        for paper in page.highlight_links:
+            rendered = _link(paper.title, f"/paper/{paper.route_identifier}")
+            if rendered is None:
+                continue
+            details = [
+                value
+                for value in (
+                    _markdown_text(paper.context_label),
+                    paper.published.isoformat() if paper.published else "",
+                )
+                if value
+            ]
+            lines.append(f"- {rendered}" + (f" — {' · '.join(details)}" if details else ""))
     if page.trends_markdown:
         lines.extend(["", "## Current research directions", ""])
         lines.extend(

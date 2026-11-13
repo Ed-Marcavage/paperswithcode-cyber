@@ -6,7 +6,7 @@ from urllib.parse import quote, urlencode
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.services import discovery_catalog
+from backend.services import discovery_catalog, trending_posts
 from backend.services.discovery_page_service import (
     DiscoveryLink,
     DiscoveryPage,
@@ -22,6 +22,8 @@ HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses | Papers With Code 
 HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
 CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
+# Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote).
+INDUSTRY_NOTE = "The block at the top shows hand-picked industry engineering posts."
 FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
 
@@ -34,13 +36,26 @@ def homepage(db: Session, params) -> DiscoveryPage:
     papers = PaperService(db).get_papers(
         page=1, page_size=20, order_by="trending", latest_only=True, **dates
     )
+    # The same industry block React shows above the feed, so the links are crawlable.
+    block = trending_posts.industry_block(db)
+    highlights = tuple(
+        DiscoveryPaperLink(
+            quote(row["reference"], safe=""),
+            row["post"].get("curated_title") or row["title"],
+            date.fromisoformat(row["date_published"]),
+            row.get("publisher") or "",
+        )
+        for row in block["results"]
+    )
     return DiscoveryPage(
         kind="Cybersecurity research",
         canonical_path="/",
         title=HOME_TITLE,
         description=HOME_DESCRIPTION,
         heading="Trending Research",
-        body_markdown=HOME_DESCRIPTION + "\n\n" + FEED_DESCRIPTION,
+        body_markdown=HOME_DESCRIPTION + " " + INDUSTRY_NOTE + "\n\n" + FEED_DESCRIPTION,
+        highlight_heading=block["heading"],
+        highlight_links=highlights,
         breadcrumbs=(),
         entity_links=(
             DiscoveryLink("/catalog", "Browse catalog"),
