@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { assistantApi, assistantKeys, AssistantError, type AssistantConversation, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
 import { AssistantContext } from "./context";
 import "./assistant.css";
+import { useAvailability } from "./useAvailability";
 
 const OPEN_KEY = "pwc:assistant:open";
 const ID_KEY = "pwc:assistant:conversation";
@@ -16,6 +17,7 @@ function empty(): AssistantConversation {
 
 export function AssistantProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const availability = useAvailability();
   const [open, updateOpen] = useState(() => stored(OPEN_KEY) === "true");
   const [currentId, updateId] = useState<string | null>(() => stored(ID_KEY));
   const [conversation, setConversation] = useState(empty);
@@ -54,14 +56,14 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     setBusy(false); setLoading(false); setError(null); setDraft(""); setConversation(empty()); setId(null);
   }, [setId]);
 
-  const send = useCallback(async (question: string, surface: AssistantSurface, path: string) => {
-    if (active.current || !question.trim() || question.length > 1000 || loading) return;
+  const send = useCallback(async (question: string, surface: AssistantSurface, path: string, fresh = false) => {
+    if (active.current || !question.trim() || question.length > 1000 || (loading && !fresh)) return;
     const controller = new AbortController();
     active.current = controller;
     const version = revision.current;
     const answerId = crypto.randomUUID();
     const answer: AssistantMessage = { id: answerId, role: "assistant", content: "", status: "running", tool_steps: [] };
-    const priorId = currentId;
+    const priorId = fresh ? null : currentId;
     setBusy(true); setError(null); setDraft("");
     setConversation(previous => ({ ...previous, messages: [...previous.messages,
       { id: crypto.randomUUID(), role: "user", content: question, status: "done", tool_steps: [] }, answer] }));
@@ -102,6 +104,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
   }, [currentId, loading, queryClient, setId]);
 
+  const launch = (question: string, path: string) => { newChat(); void send(question, "landing", path, true); };
+
   return <AssistantContext.Provider value={{ open, setOpen, currentId, conversation, draft, setDraft, busy, loading, error,
-    send, selectConversation, newChat, stop }}>{children}</AssistantContext.Provider>;
+    availability, launch, send, selectConversation, newChat, stop }}>{children}</AssistantContext.Provider>;
 }

@@ -2,7 +2,8 @@ import { taxonomySelected } from "@/lib/catalogAnalytics";
 import { cyberHomeDescription, cyberTrendingIndustryNote } from "@/lib/cyberCopy";
 import FollowingIntro from "@/components/FollowingIntro";
 import TopicDialog from "@/components/TopicDialog";
-import { isAuthDisabled, isDiscoveryCatalog } from "@/lib/apiUrl";
+import { isAuthDisabled, isDiscoveryCatalog, isAssistantEnabled } from "@/lib/apiUrl";
+import { AssistantLanding } from "@/components/assistant/AssistantLanding";
 import { clearPendingTopic, readPendingFollows, readPendingTopic, useResearchFollows, useSaveFollows, useSaveTopic } from "@/lib/researchTopic";
 import { useOptionalAuth } from "@/lib/authContext";
 import { researchApi, type FollowKind } from "@/lib/api/research";
@@ -593,6 +594,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
         </aside>
 
         <div className="feed-main">
+          {isAssistantEnabled() && <div className="feed-chat"><AssistantLanding /></div>}
           {(isChatEnabled() || isChatMirror()) && (
             <div className="feed-chat">
               <AskAssistant />

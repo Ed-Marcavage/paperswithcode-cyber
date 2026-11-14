@@ -14,7 +14,7 @@ function mount() {
       <AssistantPanel /></AssistantProvider></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { localStorage.clear(); vi.spyOn(assistantApi, "list").mockResolvedValue([]); });
+beforeEach(() => { localStorage.clear(); vi.spyOn(assistantApi, "status").mockResolvedValue({ available: true, code: null, reason: null, retry_at: null }); vi.spyOn(assistantApi, "list").mockResolvedValue([]); });
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); });
 
 it("keeps an active stream through navigation, panel close and reopen", async () => {

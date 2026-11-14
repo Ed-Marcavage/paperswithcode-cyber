@@ -14,7 +14,7 @@ function mount(path = "/chat") {
     <MemoryRouter initialEntries={[path]}><AssistantProvider><Routes><Route path="/chat/:sessionId?" element={<AssistantPage />} /></Routes></AssistantProvider></MemoryRouter>
   </QueryClientProvider>);
 }
-beforeEach(() => { localStorage.clear(); vi.spyOn(assistantApi, "list").mockResolvedValue([saved]); vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved); });
+beforeEach(() => { localStorage.clear(); vi.spyOn(assistantApi, "status").mockResolvedValue({ available: true, code: null, reason: null, retry_at: null }); vi.spyOn(assistantApi, "list").mockResolvedValue([saved]); vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved); });
 afterEach(() => vi.restoreAllMocks());
 it("opens history by route, renames, confirms deletion and starts a new chat", async () => {
   const rename = vi.spyOn(assistantApi, "rename").mockResolvedValue({ ...saved, title: "New title" });

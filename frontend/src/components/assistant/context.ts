@@ -1,11 +1,13 @@
 import { createContext, useContext } from "react";
-import type { AssistantConversation, AssistantError, AssistantSurface } from "@/lib/api/assistant";
+import type { AssistantConversation, AssistantError, AssistantSurface, AssistantStatus } from "@/lib/api/assistant";
 
 export interface AssistantContextValue {
   open: boolean; setOpen: (open: boolean) => void;
   conversation: AssistantConversation; currentId: string | null;
   draft: string; setDraft: (draft: string) => void;
   busy: boolean; loading: boolean; error: AssistantError | null;
+  availability: AssistantStatus;
+  launch: (question: string, path: string) => void;
   send: (question: string, surface: AssistantSurface, path: string) => Promise<void>;
   selectConversation: (id: string) => void; newChat: () => void; stop: () => void;
 }

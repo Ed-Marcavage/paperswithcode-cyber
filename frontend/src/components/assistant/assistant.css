@@ -52,3 +52,10 @@
   .assistant-history.is-open { display: block; }
   .assistant-drawer-backdrop { display: block; position: fixed; z-index: 81; inset: 0; background: #0005; }
 }
+.assistant-landing { margin-bottom: 16px; }
+.assistant-landing label { display: block; margin-bottom: 6px; font-size: 13px; font-weight: 600; }
+.assistant-landing > div { display: flex; gap: 8px; align-items: center; border: 1px solid hsl(var(--border)); border-radius: 8px; padding: 8px 12px; }
+.assistant-landing textarea { flex: 1; min-width: 0; resize: none; height: 44px; font: inherit; font-size: 14px; line-height: 22px; background: transparent; border: 0; }
+.assistant-landing button { padding: 5px 10px; font-size: 13px; font-weight: 600; }
+.assistant-landing button:disabled { opacity: .45; }
+@media (max-width: 640px) { .assistant-landing { margin-bottom: 10px; } }
