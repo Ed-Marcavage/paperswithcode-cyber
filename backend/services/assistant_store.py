@@ -7,7 +7,10 @@ from uuid import uuid4
 
 from sqlalchemy import delete, select, update
 
-from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall
+from backend.models.database.assistant import (
+    AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep,
+)
+from backend.services.assistant_loop import SYSTEM_PROMPT, PROMPT_VERSION
 
 QUESTION_LIMIT = 10
 
@@ -34,9 +37,10 @@ class SavedTurn:
     message_id: str
     question_count: int
     history: list[dict]
+    run_id: str
 
     def metadata(self) -> dict:
-        return {"conversation_id": self.conversation_id, "message_id": self.message_id,
+        return {"conversation_id": self.conversation_id, "message_id": self.message_id, "run_id": self.run_id,
                 "question_count": self.question_count, "question_limit": QUESTION_LIMIT}
 
 
@@ -53,7 +57,9 @@ class AssistantStore:
             raise ConversationNotFound()
         return row
 
-    def begin(self, visitor: str, conversation_id: str | None, question: str) -> SavedTurn:
+    def begin(self, visitor: str, conversation_id: str | None, question: str, *,
+              model: str = "glm-5.3-flash", surface: str = "panel", site_path: str = "/",
+              analytics_session_id: str | None = None) -> SavedTurn:
         now = datetime.now(UTC)
         with self.sessions.begin() as db:
             if conversation_id is None:
@@ -83,8 +89,21 @@ class AssistantStore:
                 AssistantMessage(id=answer_id, conversation_id=conversation_id,
                                  position=count * 2, role="assistant", content="", status="running", created_at=now),
             ])
+            db.flush()
+            run_id = identifier()
+            db.add(AssistantRun(id=run_id, conversation_id=conversation_id, message_id=answer_id,
+                               question=question, started_at=now, status="running", model=model,
+                               prompt_hash=hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
+                               prompt_version=PROMPT_VERSION, surface=surface, site_path=site_path,
+                               analytics_session_id=analytics_session_id))
             history.append({"role": "user", "content": question})
-            return SavedTurn(conversation_id, answer_id, count, history)
+            return SavedTurn(conversation_id, answer_id, count, history, run_id)
+
+    def record_step(self, saved: SavedTurn, position: int, step: dict):
+        with self.sessions.begin() as db:
+            if db.get(AssistantRun, saved.run_id) is not None:
+                db.add(AssistantRunStep(id=identifier(), run_id=saved.run_id, position=position,
+                                       kind=step["kind"], detail=step))
 
     def finish(self, saved: SavedTurn, turn):
         with self.sessions.begin() as db:
@@ -93,11 +112,62 @@ class AssistantStore:
                 return  # The visitor may delete a chat while it is streaming.
             message.content = turn.text
             message.status = turn.status
+            run = db.get(AssistantRun, saved.run_id)
+            run.status, run.error, run.ended_at = turn.status, turn.error, datetime.now(UTC)
+            positions = set(db.scalars(select(AssistantRunStep.position).where(AssistantRunStep.run_id == saved.run_id)))
+            for position, step in enumerate(turn.steps):
+                if position not in positions:
+                    db.add(AssistantRunStep(id=identifier(), run_id=saved.run_id, position=position,
+                                           kind=step["kind"], detail=step))
             db.execute(update(AssistantConversation).where(
                 AssistantConversation.id == saved.conversation_id).values(updated_at=datetime.now(UTC)))
             for position, step in enumerate(s for s in turn.steps if s["kind"] == "tool"):
                 db.add(AssistantToolCall(id=identifier(), message_id=saved.message_id,
                                         position=position, detail=step))
+
+    def feedback(self, visitor, run_id, rating, note):
+        with self.sessions.begin() as db:
+            run = db.get(AssistantRun, run_id)
+            if run is None:
+                raise ConversationNotFound()
+            self.owned(db, run.conversation_id, visitor)
+            run.feedback_rating, run.feedback_note = rating, note
+
+    @staticmethod
+    def trace(db, run):
+        steps = [s.detail for s in db.scalars(select(AssistantRunStep).where(
+            AssistantRunStep.run_id == run.id).order_by(AssistantRunStep.position))]
+        model_steps = [s for s in steps if s["kind"] == "model"]
+        tokens = {}
+        for key in ("input_tokens", "output_tokens"):
+            values = [s.get(key) for s in model_steps]
+            tokens[key] = sum(values) if values and all(v is not None for v in values) else None
+        answer = db.get(AssistantMessage, run.message_id)
+        return {"id": run.id, "conversation_id": run.conversation_id, "question": run.question,
+                "answer": answer.content, "started_at": run.started_at.isoformat(),
+                "ended_at": run.ended_at.isoformat() if run.ended_at else None,
+                "duration_ms": round((run.ended_at - run.started_at).total_seconds() * 1000) if run.ended_at else None,
+                "status": run.status, "error": run.error, "model": run.model,
+                "prompt_hash": run.prompt_hash, "prompt_version": run.prompt_version,
+                "surface": run.surface, "site_path": run.site_path,
+                "feedback": {"rating": run.feedback_rating, "note": run.feedback_note},
+                "tokens": tokens, "steps": steps}
+
+    def show_run(self, run_id):
+        with self.sessions() as db:
+            run = db.get(AssistantRun, run_id)
+            if run is None:
+                raise ConversationNotFound()
+            return self.trace(db, run)
+
+    def runs(self, days):
+        cutoff = datetime.now(UTC) - timedelta(days=days)
+        with self.sessions() as db:
+            rows = db.scalars(select(AssistantRun).where(AssistantRun.started_at >= cutoff)
+                              .order_by(AssistantRun.started_at.desc(), AssistantRun.id)
+                              .execution_options(yield_per=100))
+            for row in rows:
+                yield self.trace(db, row)
 
     def purge(self, retention_days: int, *, now: datetime | None = None) -> int:
         cutoff = (now or datetime.now(UTC)) - timedelta(days=retention_days)

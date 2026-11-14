@@ -89,7 +89,7 @@ def test_cancelled_route_saves_partial_answer(store, monkeypatch):
         async def __aexit__(self, *args):
             pass
     monkeypatch.setattr(assistant, "model_client", lambda _: Context())
-    async def fake_loop(client, mcp, model, history, turn):
+    async def fake_loop(client, mcp, model, history, turn, **kwargs):
         turn.text = "Partial"
         yield {"type": "text_delta", "text": "Partial"}
         await asyncio.Event().wait()

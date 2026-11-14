@@ -4,6 +4,9 @@ import json
 import asyncio
 import re
 import secrets
+import logging
+import time
+from uuid import UUID
 from contextlib import aclosing
 
 import anyio
@@ -14,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 
 from backend.assistant_config import AssistantSettings, get_assistant_settings
 from backend.config import get_settings
-from backend.models.assistant import AssistantTurnRequest
+from backend.models.assistant import AssistantTurnRequest, AssistantFeedbackRequest
 from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
 from backend.services.assistant_store import (
@@ -23,6 +26,7 @@ from backend.services.assistant_store import (
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 COOKIE_NAME = "pwc_assistant_visitor"
+logger = logging.getLogger(__name__)
 
 
 def visitor_cookie(request: Request) -> str:
@@ -82,10 +86,14 @@ class AssistantStreamResponse(StreamingResponse):
 
 async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings, saved: SavedTurn, store):
     turn = Turn()
+    began = time.monotonic()
+    async def record(step):
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(store.record_step, saved, len(turn.steps) - 1, step)
     try:
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
-            events = run_turn(client, CatalogMcp(http, settings.mcp_url), settings.model, saved.history, turn)
+            events = run_turn(client, CatalogMcp(http, settings.mcp_url), settings.model, saved.history, turn, on_step=record)
             async with aclosing(events):
                 async for event in events:
                     if event["type"] in {"done", "error"}:
@@ -100,6 +108,11 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
         # Disconnect cancellation must not interrupt the short save transaction.
         with anyio.CancelScope(shield=True):
             await run_in_threadpool(store.finish, saved, turn)
+        logger.info("assistant_run id=%s status=%s model_steps=%d tool_steps=%d duration_ms=%d",
+                    saved.run_id, turn.status,
+                    sum(s["kind"] == "model" for s in turn.steps),
+                    sum(s["kind"] == "tool" for s in turn.steps),
+                    round((time.monotonic() - began) * 1000))
 
 
 @router.post("/turn")
@@ -108,7 +121,10 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     try:
         saved = await run_in_threadpool(store.begin, visitor,
                                        str(payload.conversation_id) if payload.conversation_id else None,
-                                       payload.question)
+                                       payload.question, model=settings.model, surface=payload.surface,
+                                       site_path=payload.site_path,
+                                       analytics_session_id=str(payload.analytics_session_id)
+                                       if settings.store_analytics_session and payload.analytics_session_id else None)
     except ConversationNotFound:
         raise HTTPException(404, "Chat not found.") from None
     except QuestionLimitReached:
@@ -120,3 +136,13 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     )
     set_visitor_cookie(response, visitor, settings)
     return response
+
+
+@router.post("/runs/{run_id}/feedback")
+def feedback(run_id: UUID, payload: AssistantFeedbackRequest, settings=Depends(require_assistant),
+             visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    try:
+        store.feedback(visitor, str(run_id), payload.rating, payload.note)
+    except ConversationNotFound:
+        raise HTTPException(404, "Answer not found.") from None
+    return {"saved": True}

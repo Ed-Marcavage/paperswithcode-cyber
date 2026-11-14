@@ -41,3 +41,35 @@ class AssistantToolCall(Base):
     message_id = Column(String(36), ForeignKey("assistant_messages.id", ondelete="CASCADE"), nullable=False, index=True)
     position = Column(Integer, nullable=False)
     detail = Column(JSON, nullable=False)
+
+
+class AssistantRun(Base):
+    __tablename__ = "assistant_runs"
+
+    id = Column(String(36), primary_key=True)
+    conversation_id = Column(String(36), ForeignKey("assistant_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
+    message_id = Column(String(36), ForeignKey("assistant_messages.id", ondelete="CASCADE"), nullable=False, unique=True)
+    question = Column(Text, nullable=False)
+    started_at = Column(DateTime(timezone=True), nullable=False, index=True)
+    ended_at = Column(DateTime(timezone=True))
+    status = Column(String(24), nullable=False)
+    error = Column(Text)
+    model = Column(String(200), nullable=False)
+    prompt_hash = Column(String(64), nullable=False)
+    prompt_version = Column(String(80), nullable=False)
+    surface = Column(String(20), nullable=False)
+    site_path = Column(String(500), nullable=False)
+    analytics_session_id = Column(String(36))
+    feedback_rating = Column(String(8))
+    feedback_note = Column(String(500))
+
+
+class AssistantRunStep(Base):
+    __tablename__ = "assistant_run_steps"
+    __table_args__ = (UniqueConstraint("run_id", "position"),)
+
+    id = Column(String(36), primary_key=True)
+    run_id = Column(String(36), ForeignKey("assistant_runs.id", ondelete="CASCADE"), nullable=False, index=True)
+    position = Column(Integer, nullable=False)
+    kind = Column(String(16), nullable=False)
+    detail = Column(JSON, nullable=False)

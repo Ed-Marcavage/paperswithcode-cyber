@@ -3,13 +3,15 @@
 import asyncio
 import json
 import time
+from contextlib import aclosing
 from dataclasses import dataclass, field
-from typing import Callable
+from typing import Awaitable, Callable
 
+import anyio
 from openai import APIError, AsyncOpenAI
 
 from backend.assistant_config import AssistantSettings
-from backend.services.assistant_mcp import AssistantMcpError, CatalogMcp, ToolResult
+from backend.services.assistant_mcp import AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
 
 PROMPT_VERSION = "cyber-assistant-v1"
 SYSTEM_PROMPT = """You are the assistant for Papers with Code Cyber, a curated
@@ -119,12 +121,13 @@ async def model_pass(client, model, messages, tools, result, room):
     finally:
         # Preserve partial output for cancellation/error traces too.
         result.calls = list(calls.values())
-        await stream.close()
+        with anyio.CancelScope(shield=True):
+            await stream.close()
 
 
 async def run_turn(
     client, mcp: CatalogMcp, model: str, history: list[dict], turn: Turn,
-    *, limits: TurnLimits = TurnLimits(), on_step: Callable[[dict], None] | None = None,
+    *, limits: TurnLimits = TurnLimits(), on_step: Callable[[dict], Awaitable[None]] | None = None,
 ):
     """Yield UI events; keep bounded results and partial answers on ``turn``.
 
@@ -136,28 +139,30 @@ async def run_turn(
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
     tools_used = 0
 
-    def record(step):
+    async def record(step):
         turn.steps.append(step)
         if on_step:
-            on_step(step)
+            await on_step(step)
 
     async def generate(tools, room):
         result = ModelPass()
         began = time.monotonic()
         status = "done"
         try:
-            async for event in model_pass(client, model, messages, tools, result, room):
-                turn.text += event["text"]
-                yield event
+            async with aclosing(model_pass(client, model, messages, tools, result, room)) as stream:
+                async for event in stream:
+                    turn.text += event["text"]
+                    yield event
         except (APIError, AssistantProviderError, TimeoutError):
             status = "failed"
             raise
-        except asyncio.CancelledError:
+        except (asyncio.CancelledError, GeneratorExit):
             status = "cancelled"
             raise
         finally:
-            record({"kind": "model", "latency_ms": round((time.monotonic() - began) * 1000),
+            await record({"kind": "model", "latency_ms": round((time.monotonic() - began) * 1000),
                     "status": status, "text": result.text, "tool_calls": result.calls,
+                    "error": PROVIDER_ERROR if status == "failed" else None,
                     "finish_reason": result.finish_reason,
                     "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
         yield {"type": "model_result", "result": result}
@@ -169,11 +174,12 @@ async def run_turn(
             room = limits.output_chars - limits.final_chars - len(turn.text)
             if room <= 0:
                 return
-            async for event in generate(tools, room):
-                if event["type"] != "model_result":
-                    yield event
-                else:
-                    result = event["result"]
+            async with aclosing(generate(tools, room)) as stream:
+                async for event in stream:
+                    if event["type"] != "model_result":
+                        yield event
+                    else:
+                        result = event["result"]
             selected = result.calls[:max(0, limits.tool_calls - tools_used)]
             assistant = {"role": "assistant", "content": result.text or None}
             if selected:
@@ -195,8 +201,9 @@ async def run_turn(
                     error = "The catalog tool failed. Try a narrower query."
                     tool_result = ToolResult(error, len(error.encode()), False, True)
                 finally:
-                    record({"kind": "tool", "name": name, "call_id": call["id"],
+                    await record({"kind": "tool", "name": name, "call_id": call["id"],
                             "arguments": arguments, "result": tool_result.text if tool_result else "",
+                            "limit_bytes": READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES,
                             "full_bytes": tool_result.full_bytes if tool_result else 0,
                             "truncated": tool_result.truncated if tool_result else False,
                             "latency_ms": round((time.monotonic() - began) * 1000),
@@ -215,8 +222,9 @@ async def run_turn(
     try:
         try:
             async with asyncio.timeout(max(0, limits.seconds - limits.final_seconds)):
-                async for event in research():
-                    yield event
+                async with aclosing(research()) as stream:
+                    async for event in stream:
+                        yield event
         except TimeoutError:
             # A timed-out model/tool step must not leave unmatched tool calls
             # in the finalizer request. Rebuild from completed evidence below.
@@ -236,16 +244,17 @@ async def run_turn(
                 messages.append({"role": "user", "content": "Finish the answer briefly without repeating it."})
             try:
                 async with asyncio.timeout(max(0.001, deadline - time.monotonic())):
-                    async for event in generate([], limits.output_chars - len(turn.text)):
-                        if event["type"] != "model_result":
-                            yield event
+                    async with aclosing(generate([], limits.output_chars - len(turn.text))) as stream:
+                        async for event in stream:
+                            if event["type"] != "model_result":
+                                yield event
             except TimeoutError:
                 text = "\nThe time limit was reached. Please narrow your question."
                 text = text[:limits.output_chars - len(turn.text)]
                 turn.text += text
                 yield {"type": "text_delta", "text": text}
         yield {"type": "done", "status": turn.status}
-    except asyncio.CancelledError:
+    except (asyncio.CancelledError, GeneratorExit):
         turn.status = "cancelled"
         raise
     except (APIError, AssistantProviderError, AssistantMcpError):

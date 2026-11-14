@@ -15,6 +15,7 @@ class AssistantSettings(BaseSettings):
     base_url: str = "https://ollama.com/v1"
     model: str = "glm-5.3-flash"
     retention_days: int = Field(default=90, ge=1)
+    store_analytics_session: bool = False
 
 
 @lru_cache

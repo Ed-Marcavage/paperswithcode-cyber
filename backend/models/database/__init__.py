@@ -12,6 +12,8 @@ from backend.models.database.assistant import (
     AssistantConversation,
     AssistantMessage,
     AssistantToolCall,
+    AssistantRun,
+    AssistantRunStep,
 )
 from backend.models.database.autonomous import (
     AutonomousSubmissionClaim,
