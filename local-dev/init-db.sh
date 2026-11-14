@@ -25,6 +25,7 @@ for migration in \
   add_entity_search_indexes.sql \
   add_paper_embeddings.sql \
   add_discovery_catalog.sql \
+  add_discovery_post_links.sql \
   add_discovery_developers.sql \
   add_paper_redirects.sql \
   update_trending_view_for_ema.sql

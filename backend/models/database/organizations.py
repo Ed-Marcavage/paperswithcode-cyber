@@ -111,6 +111,8 @@ class PaperOrganization(Base):
         BigInteger, ForeignKey("organizations.id", ondelete="CASCADE"), primary_key=True
     )
     source: Mapped[str] = mapped_column(String(32), nullable=False, default="manual")
+    # publisher, research affiliation or repository owner (NULL when unreviewed).
+    role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     added_by_hf_subject: Mapped[Optional[str]] = mapped_column(String(255))
     added_by_hf_username: Mapped[Optional[str]] = mapped_column(String(255))
 

@@ -314,6 +314,13 @@ class Paper(BaseModel):
     catalog_kind: Optional[str] = Field(None, description="Reviewed catalog source type")
     catalog_contributions: Optional[List[str]] = Field(None, description="Reviewed discovery catalog contributions")
     catalog_post: Optional[CatalogPost] = Field(None, description="Reviewed industry-post fields")
+    publisher: Optional[str] = Field(
+        None,
+        description=(
+            "Industry posts: the publisher organization's name (the post's host when "
+            "no organization is mapped)"
+        ),
+    )
     tasks: Optional[List["TaskSummary"]] = Field(
         None, description="AI/ML tasks associated with this paper"
     )
@@ -734,6 +741,22 @@ class Repository(BaseModel):
     source: str = Field(
         default="unknown",
         description="Source of the repository data (pwc_archive, ai_extraction, manual, etc.)",
+    )
+    num_stars_updated_at: Optional[datetime] = Field(
+        None, description="When num_stars was observed; null means the star count is unknown"
+    )
+    role: Optional[str] = Field(
+        None,
+        description=(
+            "Reviewed relation of the work to this repository, when listed for a work: "
+            "original, target, supporting or dependency"
+        ),
+    )
+    evidence: Optional[str] = Field(
+        None, description="The review's sentence supporting the role, when listed for a work"
+    )
+    link_url: Optional[str] = Field(
+        None, description="The exact link the work cites (may be a path inside the repository)"
     )
 
     # Trending metrics
@@ -1227,13 +1250,18 @@ class OrganizationSummary(BaseModel):
     name: str = Field(..., description="Organization name (e.g., 'NVIDIA')")
     slug: str = Field(..., description="URL-friendly slug (e.g., 'nvidia')")
     logo_url: Optional[str] = Field(None, description="Organization logo image URL")
-    source: Literal["manual", "hf_org_papers", "curation", "openalex"] = Field(
+    source: Literal["manual", "hf_org_papers", "curation", "openalex", "publisher_host"] = Field(
         ...,
         description=(
             "Association provenance: 'manual', 'hf_org_papers', 'curation' "
-            "(read from the paper by the enrichment curator), or 'openalex' "
-            "(OpenAlex author affiliations)"
+            "(read from the paper by the enrichment curator), 'openalex' "
+            "(OpenAlex author affiliations), or 'publisher_host' (an industry "
+            "post's publisher, from its host)"
         ),
+    )
+    role: Optional[str] = Field(
+        None,
+        description="Reviewed role: publisher, research affiliation or repository owner",
     )
     added_by_hf_username: Optional[str] = Field(
         None,

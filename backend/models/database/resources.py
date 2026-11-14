@@ -501,9 +501,17 @@ class PaperRepository(Base):
         BigInteger, ForeignKey("repositories.id", ondelete="CASCADE"), primary_key=True
     )
     is_official: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Reviewed relation (migrations/add_discovery_post_links.sql): original,
+    # target, supporting or dependency; the review's evidence sentence; the
+    # exact link the work cites; and the loader that owns the link.
+    role: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    evidence: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    link_url: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    source: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Indexes
     __table_args__ = (
         Index("idx_paper_repositories_paper_id", "paper_id"),
         Index("idx_paper_repositories_repository_id", "repository_id"),
+        Index("idx_paper_repositories_repository_role", "repository_id", "role"),
     )
