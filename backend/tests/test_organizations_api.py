@@ -565,3 +565,21 @@ def test_organization_search_matches_name_and_ranks_prefix_first(org_client):
     response = org_client.get("/api/v1/organizations/?q=ACM")
     assert [org["slug"] for org in response.json()["results"]] == ["acme"]
     assert response.json()["results"][0]["paper_count"] == 4
+
+
+def test_papers_sort_ranks_papers_plus_posts_and_trending_ties_use_the_sum():
+    from backend.models.organizations import Organization, Organizations
+    from backend.routers.organizations import sort_organizations
+
+    def org(slug, papers, posts, repos=0, score=0.0):
+        return Organization(id=slug, name=slug, slug=slug, paper_count=papers, post_count=posts,
+                            repository_count=repos, organization_trending_score=score)
+
+    result = Organizations(count=4, results=[
+        org("two-papers", 2, 0), org("many-repos", 1, 0, repos=50), org("posts-only", 0, 24),
+        org("mixed", 3, 3),
+    ])
+    assert [o.slug for o in sort_organizations(result, "papers").results] == [
+        "posts-only", "mixed", "two-papers", "many-repos"]
+    tied = Organizations(count=2, results=[org("two-papers", 2, 0, score=1.0), org("posts-only", 0, 24, score=1.0)])
+    assert [o.slug for o in sort_organizations(tied, "trending").results] == ["posts-only", "two-papers"]

@@ -11,6 +11,10 @@ import { catalogQueryKeys, TEN_MINUTES } from "@/lib/api/queryKeys";
 
 type SortMode = "trending" | "papers" | "stars" | "name";
 
+/** Linked papers plus industry posts (repositories not counted), as the backend's "papers" sort. */
+const papersAndPosts = (organization: Organization): number =>
+  (organization.paper_count ?? 0) + (organization.post_count ?? 0);
+
 const parseSort = (value: string | null): SortMode =>
   value === "papers" || value === "stars" || value === "name" ? value : "trending";
 
@@ -70,7 +74,7 @@ const OrganizationsIndexView: React.FC = () => {
     if (sort === "papers") {
       return [...filtered].sort(
         (a, b) =>
-          (b.paper_count ?? 0) - (a.paper_count ?? 0) ||
+          papersAndPosts(b) - papersAndPosts(a) ||
           a.name.localeCompare(b.name) ||
           a.slug.localeCompare(b.slug),
       );
@@ -107,7 +111,7 @@ const OrganizationsIndexView: React.FC = () => {
             {sort === "trending"
               ? "Ranked by 30-day momentum"
               : sort === "papers"
-                ? "Sorted by linked papers"
+                ? "Sorted by linked papers and posts"
                 : sort === "stars" ? "Stars across cataloged repositories" : "Sorted A–Z"}
           </span>
         </div>
@@ -125,7 +129,7 @@ const OrganizationsIndexView: React.FC = () => {
             {(
               [
                 ["trending", "Trending"],
-                ["papers", "Most papers"],
+                ["papers", "Most papers and posts"],
                 ...(discovery ? [["stars", "Most stars"]] as const : []),
                 ["name", "A–Z"],
               ] as const

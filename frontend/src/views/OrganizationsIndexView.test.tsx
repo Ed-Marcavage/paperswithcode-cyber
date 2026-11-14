@@ -117,13 +117,28 @@ describe("OrganizationsIndexView", () => {
     );
     expect(screen.getByRole("link", { name: "Browse 40 Meta AI papers" })).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "Browse 12 Qwen papers" })).not.toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Most papers" }));
+    await user.click(screen.getByRole("button", { name: "Most papers and posts" }));
     await waitFor(() =>
       expect(screen.getByTestId("location")).toHaveTextContent(
         "?q=facebook&sort=papers",
       ),
     );
     expect(screen.queryByText("#2")).not.toBeInTheDocument();
+  });
+
+  it("ranks Most papers and posts by papers plus posts, not repositories", async () => {
+    const org = (id: string, name: string, paper_count: number, post_count: number, repository_count = 0) => ({
+      ...payload.results[2], id, name, slug: name.toLowerCase(), hf_slug: null, paper_count, post_count, repository_count,
+    });
+    vi.spyOn(catalogApi, "organizationIndex").mockResolvedValue({
+      count: 3,
+      results: [org("1", "Twopapers", 2, 0), org("2", "Manyrepos", 1, 0, 50), org("3", "Postsonly", 0, 24)],
+    });
+    renderView("/organizations?sort=papers");
+    await screen.findByRole("heading", { name: "Postsonly" });
+    expect(screen.getByText("Sorted by linked papers and posts")).toBeInTheDocument();
+    const names = screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+    expect(names).toEqual(["Postsonly", "Twopapers", "Manyrepos"]);
   });
 
   it("uses a styled fallback when an image fails", async () => {
