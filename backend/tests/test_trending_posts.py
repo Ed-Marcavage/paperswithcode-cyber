@@ -8,7 +8,9 @@ from backend.database.connection import get_database_session
 from backend.main import create_app
 from backend.services import trending_posts
 from backend.services.publishers import publisher_name
-from backend.services.trending_posts import block_heading, decayed_score, post_score, rank_feed, select_block
+from backend.services.trending_posts import (
+    MIN_AGENT_RELEVANCE, agent_related, block_heading, decayed_score, post_score, rank_feed, select_block,
+)
 
 ANCHOR = date(2026, 11, 12)
 
@@ -90,6 +92,40 @@ def test_posts_view_halves_score_every_seven_days():
     rows = [row(1, 14, depth=4, originality=4), row(2, 0, depth=1, originality=2), row(3, 7, depth=3, originality=3)]
     # 8/4 = 2.0, 3/1 = 3.0, 6/2 = 3.0 (tie broken by newer date)
     assert ids(rank_feed(rows, ANCHOR)) == ["2", "3", "1"]
+
+
+class FakeSession:
+    """Answers anchor_date's scalar and the Posts view's row query."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def scalar(self, statement):
+        return ANCHOR
+
+    def execute(self, statement, params=None):
+        return type("Result", (), {"mappings": lambda _: iter(self.rows)})()
+
+
+def test_threshold_is_three():
+    assert MIN_AGENT_RELEVANCE == 3
+    assert [agent_related({"agent_relevance": n}) for n in range(5)] == [False, False, False, True, True]
+    assert not agent_related({})
+
+
+def test_posts_view_lists_only_agent_related_posts():
+    rows = [row(n, n, relevance=n % 5, depth=4) for n in range(10)]
+    page, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=3)
+    assert total == 4  # relevance 3 or 4: papers 3, 4, 8, 9
+    assert ids(page) == ["3", "4", "8"]
+    assert trending_posts.posts_feed_ids(FakeSession(rows), page=2, page_size=3) == ([9], 4)
+
+
+def test_block_keeps_hand_picked_posts_whatever_their_relevance():
+    rows = [row(1, 0, relevance=0, pin=1), row(2, 1, relevance=1, curated=True),
+            row(3, 2, relevance=2, depth=4, originality=4), row(4, 3, relevance=3)]
+    chosen, _ = select_block(rows, ANCHOR)
+    assert ids(chosen) == ["1", "2", "4"]
 
 
 def make_client(monkeypatch):

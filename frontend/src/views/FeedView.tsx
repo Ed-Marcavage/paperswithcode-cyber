@@ -488,7 +488,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           </h1>
           {localCatalog && <p className="feed-subtitle">{cyberHomeDescription} {cyberTrendingIndustryNote}</p>}
           <div className="feed-subtitle">{showPosts
-            ? "Industry posts · featured posts ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
+            ? "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
             : localCatalog
             ? "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
             : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
@@ -677,7 +677,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
                 cards={cards}
                 skeleton="card"
                 rootMargin="400px"
-                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : showPosts ? "No featured posts in this window." : "No papers in this window."}
+                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : showPosts ? "No featured posts about AI agents in this window." : "No papers in this window."}
               />
             )}
           </div>

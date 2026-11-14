@@ -46,7 +46,8 @@ def trending_posts_feed(page: int = Query(1, ge=1), page_size: int = Query(30, g
                         include_resources: bool = False,
                         date_range: PaperDateRange = Depends(get_paper_date_range),
                         db: Session = Depends(get_database_session)):
-    """Featured posts ranked by review score, halved for every 7 days since publication."""
+    """Featured posts whose agent relevance meets Trending's threshold, ranked by review score,
+    halved for every 7 days since publication."""
     ids, total = trending_posts.posts_feed_ids(db, page, page_size, date_range.start_date, date_range.end_date)
     by_id = {paper.id: paper for paper in db.query(DBPaper).filter(DBPaper.id.in_(ids))} if ids else {}
     service = PaperService(db)

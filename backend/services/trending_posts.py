@@ -6,10 +6,14 @@ Two views over reviewed industry posts (discovery_works.post_details):
   pinned (``curated_pin`` in post_details, from the curated manifest's
   ``pinned`` list) come first in pin order, whatever their date. Remaining
   slots take curated posts from the date window (newest first), then other
-  featured posts with agent relevance of at least 3, ranked by ``post_score``
-  and then recency.
-- ``posts_feed``: the Trending feed's "Posts" view. Featured posts ranked by
-  ``post_score`` halved for every ``DECAY_HALF_LIFE_DAYS`` since publication.
+  featured posts with agent relevance of at least ``MIN_AGENT_RELEVANCE``,
+  ranked by ``post_score`` and then recency.
+- ``posts_feed``: the Trending feed's "Posts" view. Featured posts with agent
+  relevance of at least ``MIN_AGENT_RELEVANCE``, ranked by ``post_score``
+  halved for every ``DECAY_HALF_LIFE_DAYS`` since publication.
+
+Only hand-picked posts (curated or pinned) skip the agent-relevance rule.
+Everything else stays in the catalog and search; it is just not on Trending.
 
 Ages and windows count back from ``ANCHOR_DATE``. The preview catalog is a
 static snapshot, so the default anchor is the newest reviewed post's
@@ -32,6 +36,7 @@ BLOCK_LIMIT = 6
 BLOCK_WINDOW_DAYS = 14
 BLOCK_WIDE_WINDOW_DAYS = 30
 THIS_WEEK_DAYS = 7
+# Trending lists posts that are not hand-picked only at this agent relevance (0-4) or above.
 MIN_AGENT_RELEVANCE = 3
 DECAY_HALF_LIFE_DAYS = 7
 
@@ -57,6 +62,11 @@ def anchor_date(db: Session) -> Optional[date]:
 def post_score(post: dict) -> int:
     """Technical depth + originality, plus 1 for agent-harness engineering (0-9)."""
     return post["technical_depth"] + post["originality"] + (1 if post.get("agent_harness_engineering") else 0)
+
+
+def agent_related(post: dict) -> bool:
+    """Agent relevance high enough for Trending's non-curated posts."""
+    return (post.get("agent_relevance") or 0) >= MIN_AGENT_RELEVANCE
 
 
 def _published_on(row: dict) -> date:
@@ -88,7 +98,7 @@ def select_block(rows: list[dict], anchor: date, limit: int = BLOCK_LIMIT) -> tu
         others = sorted(
             (row for row in in_window if not row["post"].get("curated")
              and row["post"].get("tier") == "featured"
-             and row["post"].get("agent_relevance", 0) >= MIN_AGENT_RELEVANCE),
+             and agent_related(row["post"])),
             key=lambda row: (post_score(row["post"]), _published_on(row), row["paper_id"]),
             reverse=True,
         )
@@ -149,9 +159,9 @@ def industry_block(db: Session, limit: int = BLOCK_LIMIT) -> dict:
     }
 
 
-def posts_feed_ids(db: Session, page: int, page_size: int, start_date: Optional[date] = None,
-                   end_date: Optional[date] = None) -> tuple[list[int], int]:
-    """Featured post IDs for one page of the Posts view, and the total count."""
+def posts_feed(db: Session, page: int, page_size: int, start_date: Optional[date] = None,
+               end_date: Optional[date] = None) -> tuple[list[dict], int]:
+    """Rows for one page of the Posts view (featured, agent-related, ranked), and the total count."""
     anchor = anchor_date(db)
     if anchor is None:
         return [], 0
@@ -160,6 +170,12 @@ def posts_feed_ids(db: Session, page: int, page_size: int, start_date: Optional[
         AND (CAST(:start AS date) IS NULL OR p.date_published >= :start)
         AND (CAST(:end AS date) IS NULL OR p.date_published <= :end)
     """), {"start": start_date, "end": end_date}).mappings()]
-    ranked = rank_feed(rows, anchor)
-    window = ranked[(page - 1) * page_size: page * page_size]
-    return [int(row["paper_id"]) for row in window], len(ranked)
+    ranked = rank_feed([row for row in rows if agent_related(row["post"])], anchor)
+    return ranked[(page - 1) * page_size: page * page_size], len(ranked)
+
+
+def posts_feed_ids(db: Session, page: int, page_size: int, start_date: Optional[date] = None,
+                   end_date: Optional[date] = None) -> tuple[list[int], int]:
+    """Post IDs for one page of the Posts view, and the total count."""
+    rows, total = posts_feed(db, page, page_size, start_date, end_date)
+    return [int(row["paper_id"]) for row in rows], total

@@ -65,6 +65,7 @@ it("shows industry posts above the paper feed and switches the feed to posts", a
 
   fireEvent.click(screen.getByRole("button", { name: "posts" }));
   expect(await screen.findByText("Ranked post")).toBeInTheDocument();
+  expect(screen.getByText(/featured posts about AI agents, ranked by review scores/)).toBeInTheDocument();
   expect(screen.queryByText("Trending paper")).not.toBeInTheDocument();
   await waitFor(() => expect(calls.some(path => path.startsWith("/catalog/trending-posts?") && path.includes("page=1"))).toBe(true));
 });
