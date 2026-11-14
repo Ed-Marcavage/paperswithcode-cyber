@@ -155,6 +155,11 @@ export function isChatEnabled(): boolean {
   return !isDiscoveryCatalog() && enabledBuildFlag(import.meta.env.VITE_CHAT_ENABLED);
 }
 
+/** Independent anonymous assistant, also supported by the discovery catalog. */
+export function isAssistantEnabled(): boolean {
+  return enabledBuildFlag(import.meta.env.VITE_ASSISTANT_ENABLED);
+}
+
 /**
  * Canonical chat page for builds that can't host chat themselves. The Hugging
  * Face Space mirror can't carry the HF session cookie that chat requires, so

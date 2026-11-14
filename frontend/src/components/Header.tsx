@@ -13,6 +13,8 @@ import {
   isChatMirror,
 } from "@/lib/apiUrl";
 import { useAuth } from "@/lib/authContext";
+import { isAssistantEnabled } from "@/lib/apiUrl";
+import { AssistantAskButton } from "@/components/assistant/AssistantPanel";
 
 type HeaderIconName = "search" | "bookmark" | "menu" | "close" | "github";
 
@@ -194,6 +196,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
             />
           </nav>
           <div className="header-spacer"></div>
+          {isAssistantEnabled() && <AssistantAskButton />}
           {!isDiscoveryCatalog() && <>
           <a
             className="feedback-link header-feedback-link"

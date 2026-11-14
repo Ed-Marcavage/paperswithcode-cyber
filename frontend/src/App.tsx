@@ -34,6 +34,9 @@ import {
   shouldUseHashRouter,
 } from "@/lib/apiUrl";
 import { AuthProvider, useAuth } from "@/lib/authContext";
+import { isAssistantEnabled } from "@/lib/apiUrl";
+import { AssistantProvider } from "@/components/assistant/AssistantProvider";
+import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 
 // HF Static Spaces (a) boot the iframe at `/index.html` and (b) return a
 // hard 404 for any deep link, so on those builds we switch to `HashRouter`.
@@ -255,6 +258,7 @@ const SiteLayout: React.FC<{ reader?: boolean }> = ({ reader = false }) => {
         {header}
         <div className="reader-route-content">{page}</div>
         {search}
+        {isAssistantEnabled() && <AssistantPanel />}
       </div>
     );
   }
@@ -264,6 +268,7 @@ const SiteLayout: React.FC<{ reader?: boolean }> = ({ reader = false }) => {
       <main>{page}</main>
       <SiteFooter />
       {search}
+      {isAssistantEnabled() && <AssistantPanel />}
     </>
   );
 };
@@ -362,7 +367,7 @@ const App: React.FC = () => (
     <AuthProvider>
       <Router>
         {isDiscoveryCatalog() && <CyberMetadata />}
-        <Shell />
+        {isAssistantEnabled() ? <AssistantProvider><Shell /></AssistantProvider> : <Shell />}
       </Router>
       <Toaster />
       {import.meta.env.DEV && !isDiscoveryCatalog() && <ReactQueryDevtools initialIsOpen={false} />}
