@@ -3,5 +3,8 @@ export const cyberHomeTitle = "AI Pentesting Tools & Security Agent Harnesses | 
 export const cyberHomeDescription = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering.";
 /** Shown after the home description on Trending, above the industry block. */
 export const cyberTrendingIndustryNote = "The block at the top shows hand-picked industry engineering posts.";
+/** Trending's feed descriptions; Posts is the default view (`?kind=paper` shows papers). */
+export const cyberTrendingPostsDescription = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication.";
+export const cyberTrendingPapersDescription = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality.";
 export const cyberCatalogTitle = "AI Pentesting Tools & Cybersecurity Research";
 export const cyberCatalogDescription = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution.";

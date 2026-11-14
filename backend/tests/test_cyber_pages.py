@@ -50,6 +50,14 @@ BLOCK = {
     ],
 }
 
+FEED = [
+    {"reference": "301", "title": "Agent harness for code audit", "date_published": "2026-11-10",
+     "publisher": "Endor Labs", "post": {"agent_relevance": 4}},
+    {"reference": "302", "title": "Raw title", "date_published": "2026-11-09",
+     "publisher": "Wiz", "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3}},
+]
+
+
 
 @pytest.fixture
 def client(monkeypatch, tmp_path):
@@ -85,6 +93,10 @@ def client(monkeypatch, tmp_path):
         },
     )
     monkeypatch.setattr(trending_posts, "industry_block", lambda db: BLOCK)
+    monkeypatch.setattr(
+        trending_posts, "posts_feed",
+        lambda db, page, page_size, start_date=None, end_date=None: (FEED, len(FEED)),
+    )
     monkeypatch.setattr(pages, "catalog_count", lambda db: len(ROWS))
     monkeypatch.setattr(pages, "sitemap_papers", lambda db, page: ROWS)
     app = create_app()
@@ -327,3 +339,26 @@ def test_homepage_lists_the_industry_block_in_html_and_markdown(client):
     assert "## Editor's picks from industry" in markdown
     assert f"- [Plain post]({ORIGIN}/paper/77) — Endor Labs · 2026-11-09" in markdown
     assert markdown.index("Editor's picks") < markdown.index("## Relevant papers")
+
+
+def test_homepage_feed_defaults_to_posts_and_kind_paper_lists_papers(client):
+    html = BeautifulSoup(client.get("/").text, "html.parser")
+    feed = html.select_one('#root main section[aria-labelledby="papers-heading"]')
+    assert [(a["href"], a.text) for a in feed.select("a")] == [
+        ("/paper/301", "Agent harness for code audit"), ("/paper/302", "Evaluating security agents")]
+    assert "Security agents & harnesses" not in feed.text
+    assert "featured posts about AI agents" in html.select_one("#root main header").text
+    assert html.select_one('meta[name="robots"]')["content"] == "index,follow"
+    assert client.get("/?kind=post").text == client.get("/").text
+    markdown = client.get("/index.md").text
+    assert f"[Agent harness for code audit]({ORIGIN}/paper/301)" in markdown
+    assert "featured posts about AI agents" in markdown
+
+    papers = client.get("/?kind=paper")
+    html = BeautifulSoup(papers.text, "html.parser")
+    feed = html.select_one('#root main section[aria-labelledby="papers-heading"]')
+    assert [a.text for a in feed.select("a")] == ["Security agents & harnesses"]
+    assert "GitHub star growth" in html.select_one("#root main header").text
+    assert html.select_one('link[rel="canonical"]')["href"] == ORIGIN + "/"
+    assert papers.headers["x-robots-tag"] == "noindex,follow"
+    assert "Security agents & harnesses" in client.get("/index.md?kind=paper").text

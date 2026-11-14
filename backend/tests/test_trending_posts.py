@@ -23,7 +23,8 @@ def row(paper_id, days_old, tier="featured", depth=2, originality=2, relevance=3
         post["curated"] = True
     if pin:
         post["curated_pin"] = pin
-    return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post}
+    return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post,
+            "source_url": f"https://example.com/{paper_id}"}
 
 
 def ids(rows):
@@ -118,6 +119,8 @@ def test_posts_view_lists_only_agent_related_posts():
     page, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=3)
     assert total == 4  # relevance 3 or 4: papers 3, 4, 8, 9
     assert ids(page) == ["3", "4", "8"]
+    assert page[0]["publisher"] == "example.com"
+    assert page[0]["date_published"] == (ANCHOR - timedelta(days=3)).isoformat()
     assert trending_posts.posts_feed_ids(FakeSession(rows), page=2, page_size=3) == ([9], 4)
 
 

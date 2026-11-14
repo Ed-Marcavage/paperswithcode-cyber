@@ -171,7 +171,7 @@ def posts_feed(db: Session, page: int, page_size: int, start_date: Optional[date
         AND (CAST(:end AS date) IS NULL OR p.date_published <= :end)
     """), {"start": start_date, "end": end_date}).mappings()]
     ranked = rank_feed([row for row in rows if agent_related(row["post"])], anchor)
-    return ranked[(page - 1) * page_size: page * page_size], len(ranked)
+    return [_serialize(row) for row in ranked[(page - 1) * page_size: page * page_size]], len(ranked)
 
 
 def posts_feed_ids(db: Session, page: int, page_size: int, start_date: Optional[date] = None,

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
@@ -50,22 +50,42 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-it("shows industry posts above the paper feed and switches the feed to posts", async () => {
-  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-    <MemoryRouter initialEntries={["/"]}><FeedView /></MemoryRouter>
-  </QueryClientProvider>);
+const renderFeed = (entry: string) => render(
+  <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={[entry]}><FeedView /></MemoryRouter>
+  </QueryClientProvider>,
+);
+
+it("shows industry posts above the feed, lists posts by default and switches to papers", async () => {
+  renderFeed("/");
 
   expect(await screen.findByRole("heading", { name: "Recent from industry" })).toBeInTheDocument();
   expect(screen.getByText(/The block at the top shows hand-picked industry engineering posts\./)).toBeInTheDocument();
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Trending Research");
   expect(screen.getByRole("link", { name: "Highlighted post" })).toHaveAttribute("href", "/paper/9");
+  expect(await screen.findByText("Ranked post")).toBeInTheDocument();
+  expect(screen.getByText(/featured posts about AI agents, ranked by review scores/)).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "posts" })).toHaveAttribute("aria-pressed", "true");
+  await waitFor(() => expect(calls.some(path => path.startsWith("/catalog/trending-posts?") && path.includes("page=1"))).toBe(true));
+  expect(papersApi.list).not.toHaveBeenCalled();
+
+  fireEvent.click(screen.getByRole("button", { name: "papers" }));
   expect(await screen.findByText("Trending paper")).toBeInTheDocument();
+  expect(screen.queryByText("Ranked post")).not.toBeInTheDocument();
   expect(papersApi.list).toHaveBeenCalledWith(expect.objectContaining({ order_by: "trending" }));
   expect(screen.getByRole("button", { name: "papers" })).toHaveAttribute("aria-pressed", "true");
 
   fireEvent.click(screen.getByRole("button", { name: "posts" }));
   expect(await screen.findByText("Ranked post")).toBeInTheDocument();
-  expect(screen.getByText(/featured posts about AI agents, ranked by review scores/)).toBeInTheDocument();
-  expect(screen.queryByText("Trending paper")).not.toBeInTheDocument();
-  await waitFor(() => expect(calls.some(path => path.startsWith("/catalog/trending-posts?") && path.includes("page=1"))).toBe(true));
+});
+
+it("keeps the kind URL parameter working", async () => {
+  renderFeed("/?kind=paper");
+  expect(await screen.findByText("Trending paper")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "papers" })).toHaveAttribute("aria-pressed", "true");
+  cleanup();
+
+  renderFeed("/?kind=post");
+  expect(await screen.findByText("Ranked post")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "posts" })).toHaveAttribute("aria-pressed", "true");
 });

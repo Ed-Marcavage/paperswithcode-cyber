@@ -1,5 +1,7 @@
 import { taxonomySelected } from "@/lib/catalogAnalytics";
-import { cyberHomeDescription, cyberTrendingIndustryNote } from "@/lib/cyberCopy";
+import {
+  cyberHomeDescription, cyberTrendingIndustryNote, cyberTrendingPapersDescription, cyberTrendingPostsDescription,
+} from "@/lib/cyberCopy";
 import FollowingIntro from "@/components/FollowingIntro";
 import TopicDialog from "@/components/TopicDialog";
 import { isAuthDisabled, isDiscoveryCatalog } from "@/lib/apiUrl";
@@ -336,9 +338,10 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   // Following defaults to its 30-day match window and trending on X to a month;
   // the trending tab defaults to a week.
   // The local catalog's Trending also shows reviewed industry posts: a block
-  // above the feed, and a papers/posts switch for the feed itself.
+  // above the feed, and a papers/posts switch for the feed itself. Posts is the
+  // default; `?kind=paper` shows papers (`?kind=post` still selects posts).
   const localCatalog = isDiscoveryCatalog() && mode === "trending";
-  const showPosts = localCatalog && searchParams.get("kind") === "post";
+  const showPosts = localCatalog && searchParams.get("kind") !== "paper";
   const dateRange = localCatalog
     ? readPaperDateRange(searchParams)
     : readHomepagePaperDateRange(searchParams, undefined, mode === "trending" ? "week" : "month");
@@ -355,7 +358,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   };
   const showKind = (kind: "paper" | "post") => {
     const next = new URLSearchParams(searchParams);
-    if (kind === "post") next.set("kind", "post");
+    if (kind === "paper") next.set("kind", "paper");
     else next.delete("kind");
     setSearchParams(next);
   };
@@ -488,9 +491,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           </h1>
           {localCatalog && <p className="feed-subtitle">{cyberHomeDescription} {cyberTrendingIndustryNote}</p>}
           <div className="feed-subtitle">{showPosts
-            ? "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
+            ? cyberTrendingPostsDescription
             : localCatalog
-            ? "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+            ? cyberTrendingPapersDescription
             : mode === "x" ? "Papers people share most on X, picked daily" : "Curated daily from arXiv and Hugging Face"}</div>
         </div>
       </div>
