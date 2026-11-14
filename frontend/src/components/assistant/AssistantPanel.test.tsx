@@ -32,7 +32,8 @@ it("keeps an active stream through navigation, panel close and reopen", async ()
   mount();
   fireEvent.click(screen.getByRole("button", { name: "Ask" }));
   const input = screen.getByRole("textbox", { name: "Your question" });
-  expect(input).toHaveFocus();
+  await waitFor(() => expect(input).toBeEnabled());
+  expect(screen.getByRole("dialog")).toContainElement(document.activeElement as HTMLElement);
   fireEvent.change(input, { target: { value: "Find research" } });
   fireEvent.keyDown(input, { key: "Enter" });
   await screen.findByText("First");

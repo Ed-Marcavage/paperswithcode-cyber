@@ -32,7 +32,7 @@ async function check(response: Response) {
   const detail = body.detail;
   const message = typeof detail === "string" ? detail : detail?.reason || detail?.message;
   throw new AssistantError(message || "The assistant could not respond. Please try again.",
-    typeof detail === "object" ? detail?.code : response.status === 404 ? "disabled" : undefined,
+    typeof detail === "object" ? detail?.code : response.status === 404 ? "disabled" : response.status === 503 ? "not_configured" : undefined,
     response.status, typeof detail === "object" ? detail?.retry_at : null);
 }
 async function request<T>(path: string, options?: RequestInit): Promise<T> {

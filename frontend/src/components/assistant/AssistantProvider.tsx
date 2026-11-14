@@ -57,7 +57,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   }, [setId]);
 
   const send = useCallback(async (question: string, surface: AssistantSurface, path: string, fresh = false) => {
-    if (active.current || !question.trim() || question.length > 1000 || (loading && !fresh)) return;
+    if (active.current || !availability.available || !question.trim() || question.length > 1000 || (loading && !fresh)) return;
     const controller = new AbortController();
     active.current = controller;
     const version = revision.current;
@@ -96,13 +96,17 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       else {
         const problem = failure instanceof AssistantError ? failure : new AssistantError("The assistant could not respond. Please try again.");
         setError(problem); setDraft(question);
+        if (["usage_limit", "disabled", "not_configured"].includes(problem.code)) {
+          queryClient.setQueryData(assistantKeys.status, { available: false, code: problem.code, reason: problem.message, retry_at: problem.retryAt });
+        }
+        if (problem.code === "question_limit") setConversation(previous => ({ ...previous, question_count: previous.question_limit }));
         updateAnswer(m => ({ ...m, status: "failed", error: problem.message }));
       }
     } finally {
       if (version === revision.current) { active.current = null; setBusy(false); }
       void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
     }
-  }, [currentId, loading, queryClient, setId]);
+  }, [currentId, loading, queryClient, setId, availability.available]);
 
   const launch = (question: string, path: string) => { newChat(); void send(question, "landing", path, true); };
 
