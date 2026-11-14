@@ -1,6 +1,6 @@
 import { useEffect, useId, useRef, useState, type CSSProperties, type PointerEvent } from "react";
 
-import type { PdfOutlineEntry } from "./pdfOutline";
+import type { PdfOutlineEntry } from "./pdfOutlineData";
 
 interface PdfOutlineProps {
   entries: PdfOutlineEntry[];

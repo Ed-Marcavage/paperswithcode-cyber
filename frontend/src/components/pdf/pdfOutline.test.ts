@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PDFDocumentProxy } from "pdfjs-dist/types/src/display/api";
 
-import { activeSectionIndex, loadPdfOutline, pdfSectionFromHash } from "./pdfOutline";
+import { activeSectionIndex, loadPdfOutline, pdfSectionFromHash } from "./pdfOutlineData";
 
 const pageRef = (page: number) => ({ num: page * 10, gen: 0 });
 

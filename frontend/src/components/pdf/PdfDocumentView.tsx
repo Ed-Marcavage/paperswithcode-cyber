@@ -15,7 +15,7 @@ import type { PdfPaperAuthor } from "./PdfAuthorLink";
 import { PdfOutline } from "./PdfOutline";
 import { PdfCitationSteps } from "./PdfCitationSteps";
 import { LazyPdfPage } from "./PdfPage";
-import { activeSectionIndex, loadPdfOutline, pdfSectionFromHash, type PdfOutlineEntry } from "./pdfOutline";
+import { activeSectionIndex, loadPdfOutline, pdfSectionFromHash, type PdfOutlineEntry } from "./pdfOutlineData";
 import type { PdfHighlight, PdfHighlightBox } from "./pdfCitations";
 import { usePdfSearch, type PdfSearch } from "./usePdfSearch";
 import { usePdfZoom } from "./usePdfZoom";
