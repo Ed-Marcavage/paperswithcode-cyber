@@ -75,7 +75,7 @@ class RefreshIntegration(unittest.TestCase):
     def setUp(self):
         from sqlalchemy import text
         self.db = self.enterContext(catalog.local_session())
-        for table in ('repositories', 'repository_star_history'):
+        for table in ('repositories', 'repository_star_history', 'paper_repositories'):
             self.db.execute(text(f'CREATE TEMP TABLE {table} AS SELECT * FROM public.{table} WITH NO DATA'))
         self.db.execute(text('ALTER TABLE repository_star_history ALTER COLUMN id SET NOT NULL, '
                              'ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY'))
@@ -87,10 +87,12 @@ class RefreshIntegration(unittest.TestCase):
         self.clock.now.return_value = self.at
         self.fetch = self.enterContext(patch.object(catalog, 'fetch_repository', side_effect=self.observation))
 
-    def seed(self, id, observed, source='cyberintel-local'):
-        from backend.models.database import Repository
+    def seed(self, id, observed, source='cyberintel-local', credited=True):
+        from backend.models.database import PaperRepository, Repository
         self.db.add(Repository(id=id, owner='test', name=str(id), url=f'https://github.com/test/{id}',
                                num_stars_updated_at=observed, source=source))
+        # Refresh spends the budget only on credited (official) links.
+        self.db.add(PaperRepository(paper_id=id, repository_id=id, is_official=credited))
 
     def observation(self, name):
         return dict(full_name=name, url=f'https://github.com/{name}', stars=10, archived=False,
@@ -101,6 +103,7 @@ class RefreshIntegration(unittest.TestCase):
             self.seed(id, {81: None, 2: self.at-timedelta(hours=5), 1: self.at-timedelta(minutes=1)}.get(
                 id, self.at-timedelta(hours=3)), 'cyberintel-local-archived' if id == 80 else 'cyberintel-local')
         self.seed(82, None, 'unmanaged')
+        self.seed(83, None, credited=False)  # cited by a post as target/dependency only
         self.db.flush()
         cycles = []
         for hour in range(3):

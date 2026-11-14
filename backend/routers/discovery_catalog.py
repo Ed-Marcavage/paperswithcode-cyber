@@ -55,6 +55,18 @@ def trending_posts_feed(page: int = Query(1, ge=1), page_size: int = Query(30, g
                                            include_resources=include_resources)
 
 
+@router.get("/repositories/{owner}/{name}", summary="Catalog works citing one repository, by role")
+def repository_references(owner: str, name: str, db: Session = Depends(get_database_session)):
+    """Papers and industry posts linked to the GitHub repository `owner/name` (any case),
+    grouped by the reviewed role: original (the work's own code), target, supporting,
+    dependency; links without a reviewed role are `unspecified`. Each work carries the
+    review's evidence sentence and the exact link it cites."""
+    result = discovery_catalog.repository_references(db, owner, name)
+    if result is None:
+        raise HTTPException(404, "Repository is not in the catalog")
+    return result
+
+
 @router.get("/papers/{reference}", summary="Get paper facets and artifact")
 def paper(reference: str, db: Session = Depends(get_database_session)):
     row = discovery_catalog.work(db, reference)

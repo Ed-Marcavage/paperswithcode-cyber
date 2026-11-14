@@ -262,7 +262,7 @@ class RepositoryService:
             raise PaperNotFoundError(f"Paper with ID {paper_id} not found")
 
         rows = (
-            self.db.query(DBPaperRepository.is_official, DBRepository)
+            self.db.query(DBPaperRepository, DBRepository)
             .join(DBRepository, DBPaperRepository.repository_id == DBRepository.id)
             .filter(DBPaperRepository.paper_id == db_paper_id)
             .order_by(
@@ -274,9 +274,14 @@ class RepositoryService:
         )
         return [
             self._db_repository_to_api(repository).model_copy(
-                update={"is_official": bool(is_official)}
+                update={
+                    "is_official": bool(link.is_official),
+                    "role": link.role,
+                    "evidence": link.evidence,
+                    "link_url": link.link_url,
+                }
             )
-            for is_official, repository in rows
+            for link, repository in rows
         ]
 
     def create_or_update_repository(
@@ -512,6 +517,7 @@ class RepositoryService:
             owner=db_repository.owner,
             name=db_repository.name,
             num_stars=db_repository.num_stars,
+            num_stars_updated_at=db_repository.num_stars_updated_at,
             is_official=False,  # Default to False since is_official is now in junction table
             source=db_repository.source,
             trending_score=(

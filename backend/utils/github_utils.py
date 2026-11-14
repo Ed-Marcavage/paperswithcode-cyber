@@ -1,8 +1,11 @@
 """
 GitHub utility functions for URL parsing and repository operations.
+
+Standard library only: the industry-intake export loads this file by path.
 """
 
 import logging
+import re
 from typing import Optional, Tuple
 from urllib.parse import urlparse
 
@@ -93,3 +96,59 @@ def normalize_github_url(url: str) -> Optional[str]:
         return f"https://github.com/{owner.lower()}/{name.lower()}"
 
     return None
+
+
+# First path segments on github.com that are GitHub pages, not an owner.
+RESERVED_OWNERS = frozenset({
+    "about", "account", "advisories", "apps", "blog", "codespaces", "collections", "contact",
+    "customer-stories", "dashboard", "enterprise", "events", "explore", "features", "github-copilot",
+    "issues", "join", "login", "marketplace", "new", "notifications", "organizations", "orgs",
+    "pricing", "pulls", "readme", "search", "security", "settings", "site", "solutions", "sponsors",
+    "stars", "topics", "trending", "users",
+})
+_OWNER = re.compile(r"[A-Za-z0-9][A-Za-z0-9_-]{0,38}", re.ASCII)
+_NAME = re.compile(r"[A-Za-z0-9_.-]{1,100}", re.ASCII)
+
+
+def github_repository(url: Optional[str]) -> Optional[Tuple[str, str]]:
+    """The one repository a link names, as ``(owner, name)`` written in the link.
+
+    Stricter than ``parse_github_url`` for reviewed links of any shape: it also
+    reads ``www.github.com``, ``api.github.com/repos/...`` and raw file URLs,
+    and rejects profiles, gists and GitHub's own pages (``/orgs/``,
+    ``/advisories/``, ...). Sub-paths, queries and ``.git`` are dropped::
+
+        >>> github_repository("https://github.com/Org/Repo.git/tree/main/sub?x=1")
+        ("Org", "Repo")
+        >>> github_repository("https://github.com/advisories/GHSA-xxxx") is None
+        True
+    """
+    if not url or not url.strip():
+        return None
+    value = url.strip()
+    if "://" not in value:
+        value = f"https://{value}"
+    parsed = urlparse(value)
+    host = (parsed.hostname or "").lower()
+    path = parsed.path
+    if parsed.scheme not in ("http", "https"):
+        return None
+    if host == "api.github.com" and path.startswith("/repos/"):
+        path = path[len("/repos"):]
+    elif host not in ("github.com", "www.github.com", "raw.githubusercontent.com"):
+        return None
+    owner, name = parse_github_url(f"https://github.com{path}")
+    if (not owner or not name or owner.lower() in RESERVED_OWNERS
+            or not _OWNER.fullmatch(owner) or not _NAME.fullmatch(name) or name in (".", "..")):
+        return None
+    return owner, name
+
+
+def repository_key(url: Optional[str]) -> Optional[str]:
+    """Case-insensitive repository identity, ``"org/repo"``, or None."""
+    found = github_repository(url)
+    return f"{found[0]}/{found[1]}".lower() if found else None
+
+
+def canonical_repository_url(owner: str, name: str) -> str:
+    return f"https://github.com/{owner}/{name}"

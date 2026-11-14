@@ -4,6 +4,8 @@ import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+from backend.services.publishers import PUBLISHER_ORGANIZATION_SQL, publisher_name
+
 
 def terms(db: Session) -> dict:
     result = {}
@@ -17,9 +19,19 @@ def terms(db: Session) -> dict:
 SELECT_WORK = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
            p.title, w.facets, w.source_url, w.artifact_url,
-           w.document_text IS NOT NULL AS has_text, w.post_details AS post
+           w.document_text IS NOT NULL AS has_text, w.post_details AS post,
+           """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
 """
+
+
+def _with_publisher(row) -> dict:
+    """A work row for the API: posts get `publisher` (organization, else host)."""
+    row = dict(row)
+    organization = row.pop("publisher_organization", None)
+    if "post" in (row.get("facets") or {}).get("kind", []):
+        row["publisher"] = publisher_name(row["source_url"], organization=organization)
+    return row
 
 
 def _facet_counts(db: Session, axes: list[str], params: dict, post_where: str) -> dict:
@@ -56,17 +68,51 @@ def browse(db: Session, filters: dict, limit: int, offset: int, include_facet_co
     rows = db.execute(text(SELECT_WORK + where + """
         ORDER BY """ + order + """p.date_published DESC NULLS LAST, p.id LIMIT :limit OFFSET :offset
     """), params).mappings()
-    response = {"total": total, "results": [dict(row) for row in rows]}
+    response = {"total": total, "results": [_with_publisher(row) for row in rows]}
     if include_facet_counts:
         response["facet_counts"] = _facet_counts(db, list(filters), params, post_where)
     return response
 
 
 def work(db: Session, reference: str):
-    return db.execute(text(SELECT_WORK + """
+    row = db.execute(text(SELECT_WORK + """
         WHERE p.id::text = :ref OR p.arxiv_id = :ref
         ORDER BY p.is_latest_version DESC, p.id DESC LIMIT 1
     """), {"ref": reference}).mappings().first()
+    return _with_publisher(row) if row is not None else None
+
+
+REFERENCE_ROLES = ("original", "target", "supporting", "dependency", "unspecified")
+
+
+def repository_references(db: Session, owner: str, name: str) -> dict | None:
+    """One repository (owner/name, any case) and the catalog works citing it, grouped by role."""
+    repository = db.execute(text("""
+        SELECT r.id::text AS id, r.url, r.owner, r.name, r.num_stars, r.num_stars_updated_at
+          FROM repositories r WHERE lower(r.url) = lower(:url) ORDER BY r.id LIMIT 1
+    """), {"url": f"https://github.com/{owner}/{name}"}).mappings().first()
+    if repository is None:
+        return None
+    rows = db.execute(text("""
+        SELECT coalesce(pr.role, 'unspecified') AS role, pr.is_official, pr.evidence, pr.link_url,
+               p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference, p.title,
+               p.date_published, w.facets -> 'kind' ->> 0 AS kind, w.source_url,
+               """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
+          FROM paper_repositories pr JOIN discovery_works w USING (paper_id) JOIN papers p ON p.id = pr.paper_id
+         WHERE pr.repository_id = CAST(:id AS bigint)
+         ORDER BY p.date_published DESC NULLS LAST, p.id
+    """), {"id": repository["id"]}).mappings()
+    groups: dict[str, list] = {}
+    for row in rows:
+        row = dict(row)
+        organization = row.pop("publisher_organization")
+        if row["kind"] == "post":
+            row["publisher"] = publisher_name(row["source_url"], organization=organization)
+        groups.setdefault(row.pop("role"), []).append(row)
+    order = {role: index for index, role in enumerate(REFERENCE_ROLES)}
+    references = {role: groups[role] for role in sorted(groups, key=lambda r: (order.get(r, len(order)), r))}
+    return {"repository": dict(repository), "total": sum(len(v) for v in groups.values()),
+            "references": references}
 
 
 def paper_text(db: Session, reference: str) -> str | None:

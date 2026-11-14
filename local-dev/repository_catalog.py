@@ -101,7 +101,9 @@ def import_repositories(manifest, execute=False):
                 paper = db.query(Paper).filter(or_(*predicates), Paper.is_latest_version).one()
                 old = db.get(PaperRepository, (paper.id, repo.id))
                 if old is None:
-                    db.add(PaperRepository(paper_id=paper.id, repository_id=repo.id, is_official=link['is_official']))
+                    db.add(PaperRepository(paper_id=paper.id, repository_id=repo.id, is_official=link['is_official'],
+                                           role='original' if link['is_official'] else None,
+                                           evidence=link['evidence_note'], link_url=link['evidence_url']))
                     counts['new_links'] += 1
                 elif old.is_official != link['is_official']:
                     raise ValueError('Existing association disagrees with reviewed manifest')
@@ -147,11 +149,15 @@ def refresh():
 
 
 def refresh_due(db):
-    from sqlalchemy import or_
-    from backend.models.database import Repository
+    from sqlalchemy import or_, select
+    from backend.models.database import PaperRepository, Repository
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=55)
+    # Only credited repositories: a post citing a repository as target or dependency
+    # does not spend the shared GitHub budget on it.
+    credited = select(PaperRepository.repository_id).where(PaperRepository.is_official.is_(True))
     managed = db.query(Repository.id, Repository.owner, Repository.name).filter(
-        Repository.source.in_(('cyberintel-local', 'cyberintel-local-archived')))
+        Repository.source.in_(('cyberintel-local', 'cyberintel-local-archived')),
+        Repository.id.in_(credited))
     updated = Repository.num_stars_updated_at
     not_due = managed.filter(updated > cutoff).count()
     due = managed.filter(or_(updated.is_(None), updated <= cutoff))

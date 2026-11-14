@@ -59,11 +59,14 @@ def test_paper_repositories_returns_repository_objects():
         source="ai_extraction",
         trending_score=Decimal("0.2500"),
         trending_score_updated_at=stamp,
+        num_stars_updated_at=stamp,
         created_at=stamp,
         updated_at=stamp,
     )
 
-    with _client(_FakeSession(True, rows=[(True, repository)])) as client:
+    link = SimpleNamespace(is_official=True, role="original", evidence="Code release.",
+                           link_url="https://github.com/zero-4869/confidencemattersgs/tree/main")
+    with _client(_FakeSession(True, rows=[(link, repository)])) as client:
         response = client.get("/api/v1/papers/109353/repositories")
 
     assert response.status_code == 200
@@ -76,6 +79,10 @@ def test_paper_repositories_returns_repository_objects():
             "num_stars": 11,
             "is_official": True,
             "source": "ai_extraction",
+            "num_stars_updated_at": "2026-10-12T14:17:00Z",
+            "role": "original",
+            "evidence": "Code release.",
+            "link_url": "https://github.com/zero-4869/confidencemattersgs/tree/main",
             "trending_score": 0.25,
             "trending_score_updated_at": "2026-10-12T14:17:00Z",
             "created_at": "2026-10-12",

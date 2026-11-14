@@ -9,6 +9,7 @@ from sqlalchemy import Integer, and_, cast, desc, func, or_, text
 from sqlalchemy.orm import Session, aliased
 
 from backend.config import get_settings
+from backend.services.publishers import PUBLISHER_ORGANIZATION_SQL
 from backend.models.evaluations import (
     BenchmarkSummary,
     LeaderboardRankSummary,
@@ -83,6 +84,7 @@ class PaperRelations:
     catalog_kinds: dict[int, str] = field(default_factory=dict)
     catalog_contributions: dict[int, list[str]] = field(default_factory=dict)
     catalog_posts: dict[int, dict] = field(default_factory=dict)
+    catalog_publishers: dict[int, str] = field(default_factory=dict)
     methods: dict[int, list[MethodSummary]] = field(default_factory=dict)
     organizations: dict[int, list[OrganizationSummary]] = field(default_factory=dict)
     leaderboard_ranks: dict[int, list[LeaderboardRankSummary]] = field(
@@ -337,6 +339,9 @@ class PaperRelationLoader:
             self.db.query(
                 requested.id,
                 DBPaperRepository.is_official,
+                DBPaperRepository.role,
+                DBPaperRepository.evidence,
+                DBPaperRepository.link_url,
                 DBRepository,
             )
             .select_from(requested)
@@ -355,7 +360,7 @@ class PaperRelationLoader:
             .all()
         )
         seen_repositories: dict[int, set[int]] = {}
-        for paper_id, is_official, repository in repository_rows:
+        for paper_id, is_official, role, evidence, link_url, repository in repository_rows:
             seen = seen_repositories.setdefault(int(paper_id), set())
             if repository.id in seen or (
                 repository_limit is not None and len(seen) >= repository_limit
@@ -371,7 +376,11 @@ class PaperRelationLoader:
                     owner=repository.owner,
                     name=repository.name,
                     num_stars=repository.num_stars,
+                    num_stars_updated_at=repository.num_stars_updated_at,
                     is_official=is_official,
+                    role=role,
+                    evidence=evidence,
+                    link_url=link_url,
                     source=repository.source,
                     trending_score=(
                         float(repository.trending_score)
@@ -497,14 +506,17 @@ class PaperRelationLoader:
     ) -> None:
         if get_settings().discovery_catalog:
             rows = self.db.execute(text(
-                "SELECT paper_id, facets->'contribution', facets->'kind'->>0, post_details "
-                "FROM discovery_works WHERE paper_id = ANY(:ids)"
+                "SELECT w.paper_id, w.facets->'contribution', w.facets->'kind'->>0, w.post_details, "
+                + PUBLISHER_ORGANIZATION_SQL.format(paper_id="w.paper_id")
+                + " FROM discovery_works w WHERE w.paper_id = ANY(:ids)"
             ), {"ids": paper_ids})
-            for paper_id, contributions, kind, post in rows:
+            for paper_id, contributions, kind, post, publisher in rows:
                 relations.catalog_contributions[paper_id] = contributions or []
                 relations.catalog_kinds[paper_id] = kind
                 if post is not None and kind == "post":
                     relations.catalog_posts[paper_id] = post
+                if publisher is not None and kind == "post":
+                    relations.catalog_publishers[paper_id] = publisher
         author_rows: list[_AuthorRow] = (
             self.db.query(
                 PaperAuthor.paper_id,
@@ -679,6 +691,7 @@ class PaperRelationLoader:
                         else organization.logo_url
                     ),
                     source=link.source,
+                    role=link.role,
                     added_by_hf_username=link.added_by_hf_username,
                 ),
             )

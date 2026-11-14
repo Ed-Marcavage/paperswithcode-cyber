@@ -78,6 +78,7 @@ from backend.services.paper_feed_executor import PaperFeedExecutor, GENERAL_ORDE
 from backend.services.paper_citation_refresh_service import PaperCitationRefreshService
 from backend.services.paper_seo_service import build_paper_seo_document
 from backend.services.paper_relation_loader import PaperRelationLoader, PaperRelations
+from backend.services.publishers import publisher_name
 from backend.services.paper_retrieval_service import PaperRetrievalService
 from backend.services.paper_version_refresh_service import (
     ArxivPaperRefreshResult,
@@ -382,6 +383,14 @@ class PaperService:
             "catalog_kind": relations.catalog_kinds.get(db_paper.id),
             "catalog_contributions": relations.catalog_contributions.get(db_paper.id),
             "catalog_post": relations.catalog_posts.get(db_paper.id),
+            "publisher": (
+                publisher_name(
+                    db_paper.source_url,
+                    organization=relations.catalog_publishers.get(db_paper.id),
+                )
+                if relations.catalog_kinds.get(db_paper.id) == "post"
+                else None
+            ),
             "methods": methods,
             "introduced_benchmarks": introduced_benchmarks,
             "introduced_frameworks": introduced_frameworks,
