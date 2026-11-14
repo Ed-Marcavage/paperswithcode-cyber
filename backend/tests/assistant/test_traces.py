@@ -128,7 +128,7 @@ def test_retention_cascades_to_runs_and_steps(store):
     saved = store.begin("owner", None, "Old")
     store.finish(saved, Turn(status="done", steps=[{"kind": "model", "text": "Old answer"}]))
     with store.sessions.begin() as db:
-        db.execute(update(AssistantConversation).values(created_at=datetime.now(UTC) - timedelta(days=91)))
+        db.execute(update(AssistantConversation).values(updated_at=datetime.now(UTC) - timedelta(days=91)))
     assert store.purge(90) == 1
     with store.sessions() as db:
         assert db.scalar(select(AssistantRun)) is None

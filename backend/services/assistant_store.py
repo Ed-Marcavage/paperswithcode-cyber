@@ -175,7 +175,7 @@ class AssistantStore:
         cutoff = (now or datetime.now(UTC)) - timedelta(days=retention_days)
         with self.sessions.begin() as db:
             return db.execute(delete(AssistantConversation).where(
-                AssistantConversation.created_at < cutoff)).rowcount
+                AssistantConversation.updated_at < cutoff)).rowcount
 
     def provider_status(self, *, now=None):
         now = now or datetime.now(UTC)

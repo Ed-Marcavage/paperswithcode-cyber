@@ -111,7 +111,10 @@ def test_retention_command_deletes_cascading_history(store, capsys):
     store.finish(old, Turn(text="Answer", status="done", steps=[{"kind": "tool", "name": "search_papers"}]))
     with store.sessions.begin() as db:
         db.execute(update(AssistantConversation).where(AssistantConversation.id == old.conversation_id)
-                   .values(created_at=datetime.now(UTC) - timedelta(days=91)))
+                   .values(updated_at=datetime.now(UTC) - timedelta(days=91)))
+        # An old conversation with recent activity must survive retention.
+        db.execute(update(AssistantConversation).where(AssistantConversation.id == current.conversation_id)
+                   .values(created_at=datetime.now(UTC) - timedelta(days=180)))
     main(["purge"], store=store)
     assert "Deleted 1" in capsys.readouterr().out
     with store.sessions() as db:
