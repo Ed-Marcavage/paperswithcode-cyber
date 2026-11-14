@@ -73,6 +73,24 @@ def test_cancelled_trace_records_partial_model_step(store, monkeypatch):
     assert run["steps"][0]["text"] == "Partial answer"
 
 
+def test_client_closing_at_done_cannot_change_completed_trace(store, monkeypatch):
+    fake_services(monkeypatch, [[text_chunk("Completed answer")]])
+    saved = store.begin("owner", None, "Question")
+    async def go():
+        events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(), saved, store)
+        async with aclosing(events):
+            async for event in events:
+                if event.startswith("event: done"):
+                    # The database must already be committed before this event.
+                    assert store.show_run(saved.run_id)["status"] == "done"
+                    break
+    asyncio.run(go())
+    run = store.show_run(saved.run_id)
+    assert run["status"] == "done"
+    assert run["answer"] == "Completed answer"
+    assert len(run["steps"]) == 1
+
+
 def test_feedback_requires_owner(client, store, monkeypatch):
     fake_services(monkeypatch, [[text_chunk()]])
     response = client.post("/api/v1/assistant/turn", json={"question": "Hi"})

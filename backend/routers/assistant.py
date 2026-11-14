@@ -89,6 +89,7 @@ class AssistantStreamResponse(StreamingResponse):
 async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings, saved: SavedTurn, store):
     turn = Turn()
     began = time.monotonic()
+    finalized = False
     async def record(step):
         with anyio.CancelScope(shield=True):
             await run_in_threadpool(store.record_step, saved, len(turn.steps) - 1, step)
@@ -106,17 +107,24 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
             async with aclosing(events):
                 async for event in events:
                     if event["type"] in {"done", "error"}:
+                        # Commit before announcing completion: the browser may
+                        # close the SSE connection as soon as it sees this event.
+                        with anyio.CancelScope(shield=True):
+                            await run_in_threadpool(store.finish, saved, turn)
+                        finalized = True
                         event = {**event, **saved.metadata()}
                     yield sse(event)
     except (asyncio.CancelledError, GeneratorExit):
-        turn.status = "cancelled"
+        if not finalized:
+            turn.status = "cancelled"
         raise
     finally:
         if turn.status == "running":
             turn.status = "failed"
         # Disconnect cancellation must not interrupt the short save transaction.
-        with anyio.CancelScope(shield=True):
-            await run_in_threadpool(store.finish, saved, turn)
+        if not finalized:
+            with anyio.CancelScope(shield=True):
+                await run_in_threadpool(store.finish, saved, turn)
         logger.info("assistant_run id=%s status=%s model_steps=%d tool_steps=%d duration_ms=%d",
                     saved.run_id, turn.status,
                     sum(s["kind"] == "model" for s in turn.steps),

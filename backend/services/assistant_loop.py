@@ -141,6 +141,7 @@ async def run_turn(
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
     tools_used = 0
     model_attempts = 0
+    terminal = False
 
     async def record(step):
         turn.steps.append(step)
@@ -273,9 +274,11 @@ async def run_turn(
                 text = text[:limits.output_chars - len(turn.text)]
                 turn.text += text
                 yield {"type": "text_delta", "text": text}
+        terminal = True
         yield {"type": "done", "status": turn.status}
     except (asyncio.CancelledError, GeneratorExit):
-        turn.status = "cancelled"
+        if not terminal:
+            turn.status = "cancelled"
         raise
     except APIError as error:
         if is_usage_limit(error):
