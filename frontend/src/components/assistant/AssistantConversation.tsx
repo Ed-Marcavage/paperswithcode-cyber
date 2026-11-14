@@ -4,6 +4,7 @@ import { useAssistant } from "./context";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { AssistantToolSteps } from "./AssistantToolSteps";
 import { evidenceLinks } from "./markdown";
+import { ASSISTANT_PROMPTS } from "./prompts";
 
 export function AssistantConversationView({ surface = "panel" }: { surface?: AssistantSurface }) {
   const chat = useAssistant();
@@ -15,7 +16,9 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
   return <div className="assistant-conversation">
     <div className="assistant-transcript ph-mask" aria-label="Conversation" aria-live="polite" aria-busy={chat.busy}>
       {chat.loading ? <p>Loading your chat…</p> : chat.conversation.messages.length === 0 ?
-        <p className="assistant-empty">Ask about papers, security research, repositories, organizations, or developers in the catalog.</p> :
+        <div className="assistant-empty"><p>Ask about papers, security research, repositories, organizations, or developers in the catalog.</p>
+          <div className="assistant-examples">{ASSISTANT_PROMPTS.map(prompt => <button key={prompt} type="button" onClick={() => chat.setDraft(prompt)}>{prompt}</button>)}</div>
+        </div> :
         chat.conversation.messages.map(message => <article key={message.id} className={`assistant-message assistant-message-${message.role}`}>
           <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
           {message.role === "user" ? <div className="assistant-text">{message.content}</div> :

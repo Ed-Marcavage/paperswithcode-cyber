@@ -60,6 +60,7 @@ const DiscoveryCatalogView = React.lazy(() => import("@/views/DiscoveryCatalogVi
 const RepositoryReferencesView = React.lazy(() => import("@/views/RepositoryReferencesView"));
 const FeedView = React.lazy(() => import("@/views/FeedView"));
 const ChatView = React.lazy(() => import("@/views/ChatView"));
+const AssistantPage = React.lazy(() => import("@/components/assistant/AssistantPage"));
 const SharedChatView = React.lazy(() => import("@/views/SharedChatView"));
 const PapersListView = React.lazy(() => import("@/views/PapersListView"));
 const PaperDetailView = React.lazy(() => import("@/views/PaperDetailView"));
@@ -312,7 +313,7 @@ const Shell: React.FC = () => {
             that turn's active SSE request. */}
         <Route
           path="/chat/:sessionId?"
-          element={isChatEnabled() ? <ChatView /> : <Navigate to="/" replace />}
+          element={isChatEnabled() ? <ChatView /> : isAssistantEnabled() ? <AssistantPage /> : <Navigate to="/" replace />}
         />
         <Route
           path="/share/:shareId"

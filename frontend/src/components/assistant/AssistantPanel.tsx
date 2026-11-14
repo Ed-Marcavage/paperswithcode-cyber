@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { Link } from "react-router-dom";
 import { useAssistant } from "./context";
 import { AssistantConversationView } from "./AssistantConversation";
 
@@ -9,7 +10,7 @@ export function AssistantAskButton() {
 }
 
 export function AssistantPanel() {
-  const { open, setOpen } = useAssistant();
+  const { open, setOpen, currentId, newChat } = useAssistant();
   const panel = useRef<HTMLElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -28,6 +29,8 @@ export function AssistantPanel() {
     <div className="assistant-panel-header"><h2>Ask the catalog</h2>
       <button type="button" aria-label="Close assistant" onClick={() => setOpen(false)}>×</button>
     </div>
+    <nav className="assistant-panel-actions" aria-label="Chat navigation"><button type="button" onClick={newChat}>New chat</button>
+      <Link to={currentId ? `/chat/${currentId}` : "/chat"} onClick={() => setOpen(false)}>All chats</Link></nav>
     <AssistantConversationView />
   </aside>;
 }
