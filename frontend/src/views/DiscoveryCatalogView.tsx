@@ -95,7 +95,7 @@ export default function DiscoveryCatalogView() {
 /** List-row extras for an industry post: featured marker, post type, publisher and TL;DR. */
 function PostSummary({ work, details }: { work: DiscoveryWork; details: string[] }) {
   const post = work.post;
-  const meta = [post && postTypeLabel(post.post_type), publisherHost(work.source_url), ...details].filter(Boolean);
+  const meta = [post && postTypeLabel(post.post_type), work.publisher || publisherHost(work.source_url), ...details].filter(Boolean);
   return <>
     <span className="discovery-post-meta">
       {post?.tier === "featured" && <FeaturedChip />}

@@ -20,7 +20,7 @@ export interface DiscoveryWork {
   post?: CatalogPost | null;
   /** ISO publication date; sent by the Trending industry highlights. */
   date_published?: string | null;
-  /** Company name (curated name, else the backend's host map, else the host); sent by the highlights. */
+  /** Industry posts: company name (highlights: curated name first; then the publisher organization, else the host). */
   publisher?: string | null;
 }
 /** Industry posts for the top of Trending (backend `trending_posts.industry_block`). */

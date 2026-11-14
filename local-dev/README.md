@@ -288,7 +288,31 @@ sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.
 
 The import applies the Developers migration to an existing local catalog. A
 replay skips snapshots already applied. Profiles list work only while its repo
-remains linked to a catalog entry. Read the directory at `/api/v1/developers/`
+remains linked to a catalog entry by a credited (`is_official`) link. The
+collector reads only credited repositories, and the same snapshot carries each
+repo's star observation, which the import stores like `repository_catalog.py`.
+
+### Industry-post links
+
+`import_post_links.py` links every industry post to its publisher organization
+and to every repository its review cites. The publisher comes from the post's
+host through the reviewable file `backend/config/publisher_organizations.json`
+(one flat organization per company; an existing record with the same name or a
+website on a mapped host is reused). Repository links keep the review's role
+(`original`, `target`, `supporting`, `dependency`), evidence sentence and cited
+URL; one repository record per GitHub owner/name, compared case-insensitively.
+Only roles in `CREDITED_ROLES` (default `original`) set `is_official`, which is
+what the Developers tab and star-based Trending count. Run it after the review
+fields are loaded, then the developer collector above:
+
+```sh
+sh local-dev/compose.sh cp bundle/v2-fields.json backend:/tmp/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json --execute
+```
+
+`/api/v1/catalog/repositories/{owner}/{name}` lists the papers and posts citing
+a repository, grouped by role. Read the directory at `/api/v1/developers/`
 and profiles at `/api/v1/developers/{github_id}`.
 
 The Developers directory accepts `q` (GitHub username), `repository` (exact

@@ -11,6 +11,12 @@ export interface Repository {
   trending_score_updated_at?: string | null;
   is_official: boolean;
   source: string;
+  /** When num_stars was observed; null means the star count is unknown. */
+  num_stars_updated_at?: string | null;
+  /** Listed for a work: reviewed role (original, target, supporting, dependency), evidence and cited link. */
+  role?: string | null;
+  evidence?: string | null;
+  link_url?: string | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -189,6 +195,8 @@ export interface Paper {
   catalog_contributions?: string[] | null;
   /** Reviewed industry-post fields; null for papers and repositories. */
   catalog_post?: CatalogPost | null;
+  /** Industry posts: the publisher organization's name, else the post's host. */
+  publisher?: string | null;
   methods?: Method[];
   introduced_benchmarks?: BenchmarkSummary[];
   introduced_frameworks?: FrameworkSummary[];

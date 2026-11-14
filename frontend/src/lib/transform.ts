@@ -185,7 +185,7 @@ export function transformPaperForCard(paper: Paper): PaperCardProps {
     tags,
     catalogKind: paper.catalog_kind,
     catalogPost: paper.catalog_kind === "post" ? paper.catalog_post ?? null : null,
-    publisherHost: paper.catalog_kind === "post" ? publisherHost(paper.source_url) : null,
+    publisherHost: paper.catalog_kind === "post" ? paper.publisher || publisherHost(paper.source_url) : null,
     isBenchmark: paper.catalog_contributions?.includes("benchmark"),
     methods,
     organizations: (paper.organizations || []).map((organization) => ({
