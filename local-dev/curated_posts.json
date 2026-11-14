@@ -1,10 +1,10 @@
 {
   "pinned": [
+    "https://blog.talosintelligence.com/artex-and-beyond/",
+    "https://aws.amazon.com/blogs/security/amazon-threat-intelligence-observes-threat-actors-running-cybercrime-campaigns-with-artex-ai-agents/",
+    "https://shopify.engineering/cyber-chaos-monkey",
     "https://www.microsoft.com/en-us/security/blog/2026/11/11/lessons-from-59-linux-kernel-bug-reports/",
     "https://www.wiz.io/blog/cyber-model-arena-ai-benchmark",
-    "https://www.elastic.co/security-labs/blog/ai-vulnerability-triage-bug-bounty-hackerone",
-    "https://github.blog/security/how-we-found-24-android-vulnerabilities-using-our-open-source-ai-security-agent/",
-    "https://projectzero.google/2026/10/fuzzing-v-AI.html",
     "https://www.endorlabs.com/learn/2x-the-findings-12x-fewer-tokens"
   ],
   "posts": [
@@ -32,6 +32,16 @@
       "url": "https://aws.amazon.com/blogs/security/inside-aws-security-agent-a-multi-agent-architecture-for-automated-penetration-testing/",
       "company": "AWS",
       "title": "Inside AWS Security Agent, a Multi-Agent Architecture for Automated Penetration Testing"
+    },
+    {
+      "url": "https://aws.amazon.com/blogs/security/amazon-threat-intelligence-observes-threat-actors-running-cybercrime-campaigns-with-artex-ai-agents/",
+      "company": "AWS",
+      "title": "Threat Actors Running Cybercrime Campaigns With ARTEX AI Agents"
+    },
+    {
+      "url": "https://blog.talosintelligence.com/artex-and-beyond/",
+      "company": "Cisco Talos",
+      "title": "ARTEX and Beyond, AI-Enabled Penetration Testing Platforms"
     },
     {
       "url": "https://www.elastic.co/security-labs/blog/ai-vulnerability-triage-bug-bounty-hackerone",
@@ -87,6 +97,11 @@
       "url": "https://shopify.engineering/building-an-agentic-harness-that-outlasts-the-model",
       "company": "Shopify",
       "title": "Building an Agentic Harness That Outlasts the Model"
+    },
+    {
+      "url": "https://shopify.engineering/cyber-chaos-monkey",
+      "company": "Shopify",
+      "title": "Cyber Chaos Monkey, Staying Ahead of Security Threats With AI Agents"
     },
     {
       "url": "https://xlab.tencent.com/en/2026/07/02/xuanwu-atuin-cybergym/",
