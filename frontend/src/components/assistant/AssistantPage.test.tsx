@@ -21,15 +21,15 @@ it("opens history by route, renames, confirms deletion and starts a new chat", a
   const remove = vi.spyOn(assistantApi, "delete").mockResolvedValue();
   mount("/chat/saved");
   await screen.findByText("Saved answer");
-  fireEvent.click(screen.getByRole("button", { name: "Rename Old title" }));
+  fireEvent.click(screen.getByRole("button", { name: "Rename chat" }));
   fireEvent.change(screen.getByLabelText("Chat title"), { target: { value: "New title" } });
   fireEvent.click(screen.getByRole("button", { name: "Save title" }));
   await waitFor(() => expect(rename).toHaveBeenCalledWith("saved", "New title"));
-  fireEvent.click(screen.getByRole("button", { name: "Delete Old title" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete chat" }));
   expect(remove).not.toHaveBeenCalled();
   fireEvent.click(within(screen.getByRole("alertdialog")).getByText("Cancel"));
   expect(remove).not.toHaveBeenCalled();
-  fireEvent.click(screen.getByRole("button", { name: "Delete Old title" }));
+  fireEvent.click(screen.getByRole("button", { name: "Delete chat" }));
   fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete chat" }));
   await waitFor(() => expect(remove).toHaveBeenCalledWith("saved", expect.anything()));
   await screen.findByText(ASSISTANT_PROMPTS[0]);

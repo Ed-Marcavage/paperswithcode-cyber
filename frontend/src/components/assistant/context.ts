@@ -9,7 +9,7 @@ export interface AssistantContextValue {
   availability: AssistantStatus;
   launch: (question: string, path: string) => void;
   send: (question: string, surface: AssistantSurface, path: string) => Promise<void>;
-  selectConversation: (id: string) => void; newChat: () => void; stop: () => void;
+  selectConversation: (id: string) => void; newChat: (surface?: AssistantSurface) => void; stop: () => void;
 }
 export const AssistantContext = createContext<AssistantContextValue | null>(null);
 export function useAssistant() {

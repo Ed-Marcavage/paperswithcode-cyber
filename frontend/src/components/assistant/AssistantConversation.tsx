@@ -25,15 +25,15 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
         chat.conversation.messages.map(message => <article key={message.id} className={`assistant-message assistant-message-${message.role}`}>
           <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
           {message.role === "user" ? <div className="assistant-text">{message.content}</div> :
-            <AssistantMarkdown text={message.content} streaming={message.status === "running"} evidence={evidence} />}
+            <AssistantMarkdown text={message.content} streaming={message.status === "running"} evidence={evidence} surface={surface} />}
           <AssistantToolSteps steps={message.tool_steps} />
           {message.status === "cancelled" && <small>Stopped. Your partial answer is saved.</small>}
-          {message.role === "assistant" && <AssistantFeedback message={message} />}
+          {message.role === "assistant" && <AssistantFeedback message={message} surface={surface} />}
           {message.tool_steps.some(step => step.pending) && <span role="status">Searching the catalog…</span>}
         </article>)}
     </div>
     {!chat.availability.available && <p role="status" className="assistant-error">{chat.availability.reason}</p>}
-    {atLimit && !chat.busy && <div className="assistant-error" role="status">This chat has reached 10 questions. <button type="button" onClick={() => { chat.newChat(); if (surface === "chat_page") navigate("/chat"); }}>New chat</button></div>}
+    {atLimit && !chat.busy && <div className="assistant-error" role="status">This chat has reached 10 questions. <button type="button" onClick={() => { chat.newChat(surface); if (surface === "chat_page") navigate("/chat"); }}>New chat</button></div>}
     {chat.error && !["usage_limit", "question_limit", "disabled", "not_configured"].includes(chat.error.code) &&
       <p role="alert" className="assistant-error">{chat.error.message} <button type="button" disabled={disabled || !chat.draft.trim()} onClick={send}>Try again</button></p>}
     <form className="assistant-composer ph-mask" onSubmit={event => { event.preventDefault(); send(); }}>

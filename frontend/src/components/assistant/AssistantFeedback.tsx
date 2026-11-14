@@ -1,14 +1,15 @@
 import { useId, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { assistantApi, assistantKeys, type AssistantMessage } from "@/lib/api/assistant";
+import { assistantApi, assistantKeys, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
+import { assistantEvent } from "@/lib/catalogAnalytics";
 
-export function AssistantFeedback({ message }: { message: AssistantMessage }) {
+export function AssistantFeedback({ message, surface = "panel" }: { message: AssistantMessage; surface?: AssistantSurface }) {
   const [rating, setRating] = useState<"good" | "bad" | null>(message.feedback?.rating ?? null);
   const [note, setNote] = useState(message.feedback?.note ?? "");
   const noteId = useId();
   const client = useQueryClient();
   const mutation = useMutation({ mutationFn: () => assistantApi.feedback(message.run_id!, rating!, note),
-    onSuccess: () => { void client.invalidateQueries({ queryKey: ["assistant", "conversation"] }); void client.invalidateQueries({ queryKey: assistantKeys.list }); } });
+    onSuccess: () => { assistantEvent("feedback_given", surface); void client.invalidateQueries({ queryKey: ["assistant", "conversation"] }); void client.invalidateQueries({ queryKey: assistantKeys.list }); } });
   if (!message.run_id || message.status === "running") return null;
   return <details className="assistant-feedback ph-mask"><summary>Give feedback</summary>
     <form onSubmit={event => { event.preventDefault(); if (rating) mutation.mutate(); }}>

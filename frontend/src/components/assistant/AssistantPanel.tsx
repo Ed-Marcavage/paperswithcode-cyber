@@ -29,7 +29,7 @@ export function AssistantPanel() {
     <div className="assistant-panel-header"><h2>Ask the catalog</h2>
       <button type="button" aria-label="Close assistant" onClick={() => setOpen(false)}>×</button>
     </div>
-    <nav className="assistant-panel-actions" aria-label="Chat navigation"><button type="button" onClick={newChat}>New chat</button>
+    <nav className="assistant-panel-actions" aria-label="Chat navigation"><button type="button" onClick={() => newChat()}>New chat</button>
       <Link to={currentId ? `/chat/${currentId}` : "/chat"} onClick={() => setOpen(false)}>All chats</Link></nav>
     <AssistantConversationView />
   </aside>;

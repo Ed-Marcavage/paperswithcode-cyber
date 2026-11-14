@@ -4,6 +4,7 @@ import { assistantApi, assistantKeys, AssistantError, type AssistantConversation
 import { AssistantContext } from "./context";
 import "./assistant.css";
 import { useAvailability } from "./useAvailability";
+import { assistantEvent } from "@/lib/catalogAnalytics";
 
 const OPEN_KEY = "pwc:assistant:open";
 const ID_KEY = "pwc:assistant:conversation";
@@ -27,7 +28,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<AssistantError | null>(null);
   const active = useRef<AbortController | null>(null);
   const revision = useRef(0);
-  const setOpen = useCallback((value: boolean) => { updateOpen(value); remember(OPEN_KEY, String(value)); }, []);
+  const setOpen = useCallback((value: boolean) => { updateOpen(value); remember(OPEN_KEY, String(value)); if (value) assistantEvent("opened", "panel"); }, []);
   const setId = useCallback((id: string | null) => { updateId(id); remember(ID_KEY, id); }, []);
 
   useEffect(() => {
@@ -51,7 +52,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     active.current?.abort(); active.current = null; revision.current += 1;
     setBusy(false); setError(null); setDraft(""); setConversation(empty()); setLoading(true); setId(id);
   }, [currentId, setId]);
-  const newChat = useCallback(() => {
+  const newChat = useCallback((surface: AssistantSurface = "panel") => {
+    assistantEvent("new_chat", surface);
     active.current?.abort(); active.current = null; revision.current += 1;
     setBusy(false); setLoading(false); setError(null); setDraft(""); setConversation(empty()); setId(null);
   }, [setId]);
@@ -64,6 +66,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     const answerId = crypto.randomUUID();
     const answer: AssistantMessage = { id: answerId, role: "assistant", content: "", status: "running", tool_steps: [] };
     const priorId = fresh ? null : currentId;
+    assistantEvent("message_sent", surface);
     setBusy(true); setError(null); setDraft("");
     setConversation(previous => ({ ...previous, messages: [...previous.messages,
       { id: crypto.randomUUID(), role: "user", content: question, status: "done", tool_steps: [] }, answer] }));
@@ -87,7 +90,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
         else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
-        else if (event.type === "done") updateAnswer(m => ({ ...m, status: event.status }));
+        else if (event.type === "done") { updateAnswer(m => ({ ...m, status: event.status })); assistantEvent("answer_done", surface); if (event.status === "limit_reached") assistantEvent("limit_hit", surface); }
         else if (event.type === "error") throw new AssistantError(event.message, event.code, 0, event.retry_at);
       }
     } catch (failure) {
@@ -95,6 +98,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       if (controller.signal.aborted) updateAnswer(m => ({ ...m, status: "cancelled" }));
       else {
         const problem = failure instanceof AssistantError ? failure : new AssistantError("The assistant could not respond. Please try again.");
+        assistantEvent(["usage_limit", "question_limit"].includes(problem.code) ? "limit_hit" : "error", surface);
         setError(problem); setDraft(question);
         if (["usage_limit", "disabled", "not_configured"].includes(problem.code)) {
           queryClient.setQueryData(assistantKeys.status, { available: false, code: problem.code, reason: problem.message, retry_at: problem.retryAt });
@@ -108,7 +112,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     }
   }, [currentId, loading, queryClient, setId, availability.available]);
 
-  const launch = (question: string, path: string) => { newChat(); void send(question, "landing", path, true); };
+  const launch = (question: string, path: string) => { newChat("landing"); assistantEvent("asked_from_landing", "landing"); void send(question, "landing", path, true); };
 
   return <AssistantContext.Provider value={{ open, setOpen, currentId, conversation, draft, setDraft, busy, loading, error,
     availability, launch, send, selectConversation, newChat, stop }}>{children}</AssistantContext.Provider>;

@@ -14,6 +14,10 @@ const PrivacyView: React.FC = () => {
     <p>When you arrive from another site, we record that site&apos;s domain, such as news.ycombinator.com, but not the address of the page that linked here. Visits through our awesome-list README links also include a fixed campaign label and whether the link leads to the catalog or MCP setup. Other campaign values are not collected.</p>
     <p>If your browser sends Do Not Track or Global Privacy Control, none of this happens: no analytics, no session recording and no referring domain. Clearing site storage resets the browser identifier.</p>
     <p>MCP usage is counted separately by tool name. Analytics does not include tool arguments, results, or client identifiers.</p>
+    <h2>Catalog assistant</h2>
+    <p>When you use the assistant, we store your chat text, the tool steps of each answer, feedback, and a random browser identifier. This lets us answer questions, keep your history in this browser, and review conversations to improve the assistant. We store a hash of the browser identifier on the server; no visitor IP address or user agent is stored with a chat.</p>
+    <p>Ollama processes your questions, conversation text and catalog tool results to generate answers. Chats and their tool steps and feedback are retained for 90 days after the conversation’s last activity. To delete a chat earlier, open Ask → All chats, choose Delete beside the chat and confirm. Clearing browser storage loses access to your history; it does not delete the server copy.</p>
+    <p>The transcript, composer, chat titles and feedback are masked in session replay. Assistant analytics records only actions such as opening a chat, sending a message, completion, link clicks, feedback and errors, without chat text or link addresses. The PostHog session id is not stored with a chat. Do Not Track and Global Privacy Control turn off analytics and recording; the assistant still saves chats so that your history works.</p>
   </article>;
 
   return (

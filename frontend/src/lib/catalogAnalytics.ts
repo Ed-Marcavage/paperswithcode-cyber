@@ -4,7 +4,12 @@ import type { Axis, DiscoveryWork } from "./api/discovery";
 import { catalogRecordingOptions, posthogPrivacyOptions } from "./posthogPrivacy";
 
 type Resource = "pdf" | "reader" | "cached_text" | "source" | "code" | "artifact";
-type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked";
+const assistantActions = ["opened", "asked_from_landing", "message_sent", "answer_done", "link_clicked", "new_chat", "feedback_given", "limit_hit", "error"] as const;
+type AssistantAction = typeof assistantActions[number];
+type AssistantSurface = "landing" | "panel" | "chat_page";
+type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | `assistant_${AssistantAction}`;
+const assistantEvents = new Set(assistantActions.map(action => `assistant_${action}`));
+const assistantFields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version", "catalog_environment", "surface"]);
 const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version",
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
   "topic", "target", "contribution", "kind", "year", "catalog_environment",
@@ -30,9 +35,11 @@ export const catalogOptions = {
       return { uuid: event.uuid, timestamp: event.timestamp, event: event.event,
         properties: Object.fromEntries(Object.entries(event.properties).filter(([key]) => snapshotFields.has(key))) };
     }
-    if (!event || !events.has(event.event as Event) || !event.properties.catalog_environment) return null;
+    if (!event || (!events.has(event.event as Event) && !assistantEvents.has(event.event)) || !event.properties.catalog_environment) return null;
+    const assistant = assistantEvents.has(event.event);
+    if (assistant && !["landing", "panel", "chat_page"].includes(String(event.properties.surface))) return null;
     // The SDK otherwise adds raw URLs, referrers, search strings and initial person properties.
-    const properties = Object.fromEntries(Object.entries(event.properties).filter(([key]) => fields.has(key)));
+    const properties = Object.fromEntries(Object.entries(event.properties).filter(([key]) => (assistant ? assistantFields : fields).has(key)));
     return { uuid: event.uuid, timestamp: event.timestamp, event: event.event,
       properties: { ...properties, $geoip_disable: true, $process_person_profile: false } };
   },
@@ -48,6 +55,11 @@ export function catalogPage(path: string) {
 function capture(event: Event, properties: Record<string, unknown>) {
   if (!isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || catalogPrivacySignal()) return;
   posthog.capture(event, { ...properties, catalog_environment: import.meta.env.VITE_CATALOG_ANALYTICS_ENV || "preview" });
+}
+/** Deliberately accepts no question, answer, title, note, URL, run or browser ID. */
+export function assistantEvent(action: AssistantAction, surface: AssistantSurface) {
+  if (!assistantActions.includes(action) || !["landing", "panel", "chat_page"].includes(surface)) return;
+  capture(`assistant_${action}`, { surface });
 }
 /** Recognize our public README links without collecting arbitrary campaign or URL text. */
 export function catalogReferral(search: string) {

@@ -1,3 +1,4 @@
+import { assistantEvent } from "@/lib/catalogAnalytics";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -7,6 +8,7 @@ import { useAssistant } from "./context";
 
 export default function AssistantPage() {
   const chat = useAssistant();
+  useEffect(() => { assistantEvent("opened", "chat_page"); }, []);
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -21,7 +23,7 @@ export default function AssistantPage() {
   const remove = useMutation({ mutationFn: assistantApi.delete, onSuccess: (_result, id) => {
     setRemoving(null); queryClient.removeQueries({ queryKey: assistantKeys.conversation(id) });
     void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
-    if (chat.currentId === id) { chat.newChat(); navigate("/chat", { replace: true }); }
+    if (chat.currentId === id) { chat.newChat("chat_page"); navigate("/chat", { replace: true }); }
   } });
   useEffect(() => {
     if (sessionId !== applied.current) {
@@ -32,7 +34,7 @@ export default function AssistantPage() {
       navigate(`/chat/${chat.currentId}`, { replace: true });
     }
   }, [sessionId, chat, navigate]);
-  const start = () => { chat.newChat(); setDrawer(false); navigate("/chat"); };
+  const start = () => { chat.newChat("chat_page"); setDrawer(false); navigate("/chat"); };
   return <section className="assistant-page" aria-label="Your chats">
     <button className="assistant-history-toggle" type="button" aria-expanded={drawer} onClick={() => setDrawer(!drawer)}>Your chats</button>
     {drawer && <button className="assistant-drawer-backdrop" aria-label="Close chat list" onClick={() => setDrawer(false)} />}
@@ -43,8 +45,8 @@ export default function AssistantPage() {
       <ul className="ph-mask">{list.data?.map(item => <li key={item.id}>
         <Link to={`/chat/${item.id}`} aria-current={chat.currentId === item.id ? "page" : undefined} onClick={() => setDrawer(false)}>{item.title}</Link>
         <time dateTime={item.updated_at}>{new Date(item.updated_at).toLocaleDateString()}</time>
-        <div><button type="button" aria-label={`Rename ${item.title}`} onClick={() => { rename.reset(); setEditing(item); setTitle(item.title); }}>Rename</button>
-          <button type="button" aria-label={`Delete ${item.title}`} onClick={() => { remove.reset(); setRemoving(item); }}>Delete</button></div>
+        <div><button type="button" aria-label="Rename chat" onClick={() => { rename.reset(); setEditing(item); setTitle(item.title); }}>Rename</button>
+          <button type="button" aria-label="Delete chat" onClick={() => { remove.reset(); setRemoving(item); }}>Delete</button></div>
       </li>)}</ul>
     </aside>
     <div className="assistant-page-main"><AssistantConversationView surface="chat_page" /></div>
