@@ -5,6 +5,7 @@ import { AssistantMarkdown } from "./AssistantMarkdown";
 import { AssistantToolSteps } from "./AssistantToolSteps";
 import { evidenceLinks } from "./markdown";
 import { ASSISTANT_PROMPTS } from "./prompts";
+import { AssistantFeedback } from "./AssistantFeedback";
 
 export function AssistantConversationView({ surface = "panel" }: { surface?: AssistantSurface }) {
   const chat = useAssistant();
@@ -27,6 +28,7 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
             <AssistantMarkdown text={message.content} streaming={message.status === "running"} evidence={evidence} />}
           <AssistantToolSteps steps={message.tool_steps} />
           {message.status === "cancelled" && <small>Stopped. Your partial answer is saved.</small>}
+          {message.role === "assistant" && <AssistantFeedback message={message} />}
           {message.tool_steps.some(step => step.pending) && <span role="status">Searching the catalog…</span>}
         </article>)}
     </div>

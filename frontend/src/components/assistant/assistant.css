@@ -65,3 +65,9 @@
   .assistant-home .sidebar-section-top-domains { order: 3; }
   .assistant-home .sidebar-section-trending-domains { order: 4; }
 }
+.assistant-feedback { margin-top: 12px; font-size: 12px; }
+.assistant-feedback summary { cursor: pointer; }
+.assistant-feedback button { padding: 6px 10px; border: 1px solid hsl(var(--border)); border-radius: 4px; margin: 8px 8px 8px 0; }
+.assistant-feedback button[aria-pressed="true"] { background: hsl(var(--muted)); font-weight: 700; }
+.assistant-feedback label, .assistant-feedback textarea { display: block; width: 100%; }
+.assistant-feedback textarea { background: transparent; border: 1px solid hsl(var(--border)); padding: 8px; margin: 4px 0; }
