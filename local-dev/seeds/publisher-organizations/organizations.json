@@ -1,0 +1,338 @@
+[
+  {
+    "slug": "aikido-security",
+    "name": "Aikido Security",
+    "website_url": "https://www.aikido.dev",
+    "github_url": "https://github.com/AikidoSec",
+    "github_account_id": 110776285,
+    "works": []
+  },
+  {
+    "slug": "alibaba",
+    "name": "Alibaba",
+    "website_url": "https://www.alibabagroup.com",
+    "github_url": "https://github.com/alibaba",
+    "github_account_id": 1961952,
+    "works": []
+  },
+  {
+    "slug": "amazon",
+    "name": "Amazon",
+    "website_url": "https://www.amazon.com",
+    "github_url": "https://github.com/amzn",
+    "github_account_id": 8594673,
+    "works": []
+  },
+  {
+    "slug": "aqua-security",
+    "name": "Aqua Security",
+    "website_url": "https://www.aquasec.com",
+    "github_url": "https://github.com/aquasecurity",
+    "github_account_id": 12783832,
+    "works": []
+  },
+  {
+    "slug": "bishop-fox",
+    "name": "Bishop Fox",
+    "website_url": "https://bishopfox.com",
+    "github_url": "https://github.com/BishopFox",
+    "github_account_id": 4523757,
+    "works": []
+  },
+  {
+    "slug": "certik",
+    "name": "CertiK",
+    "website_url": "https://www.certik.com",
+    "github_url": "https://github.com/CertiKProject",
+    "github_account_id": 34765168,
+    "works": []
+  },
+  {
+    "slug": "cisco",
+    "name": "Cisco",
+    "website_url": "https://www.cisco.com",
+    "github_url": "https://github.com/cisco",
+    "github_account_id": 1376999,
+    "works": []
+  },
+  {
+    "slug": "cohere",
+    "name": "Cohere",
+    "website_url": "https://cohere.com",
+    "github_url": "https://github.com/cohere-ai",
+    "github_account_id": 54850923,
+    "works": []
+  },
+  {
+    "slug": "databricks",
+    "name": "Databricks",
+    "website_url": "https://www.databricks.com",
+    "github_url": "https://github.com/databricks",
+    "github_account_id": 4998052,
+    "works": []
+  },
+  {
+    "slug": "datadog",
+    "name": "Datadog",
+    "website_url": "https://www.datadoghq.com",
+    "github_url": "https://github.com/DataDog",
+    "github_account_id": 365230,
+    "works": []
+  },
+  {
+    "slug": "elastic",
+    "name": "Elastic",
+    "website_url": "https://www.elastic.co",
+    "github_url": "https://github.com/elastic",
+    "github_account_id": 6764390,
+    "works": []
+  },
+  {
+    "slug": "endor-labs",
+    "name": "Endor Labs",
+    "website_url": "https://www.endorlabs.com",
+    "github_url": "https://github.com/endorlabs",
+    "github_account_id": 92199924,
+    "works": []
+  },
+  {
+    "slug": "github",
+    "name": "GitHub",
+    "website_url": "https://github.com",
+    "github_url": "https://github.com/github",
+    "github_account_id": 9919,
+    "works": []
+  },
+  {
+    "slug": "gitlab",
+    "name": "GitLab",
+    "website_url": "https://about.gitlab.com",
+    "github_url": "https://github.com/gitlabhq",
+    "github_account_id": 1086321,
+    "works": []
+  },
+  {
+    "slug": "hadrian",
+    "name": "Hadrian",
+    "website_url": "https://hadrian.io",
+    "github_url": "https://github.com/hadriansecurity",
+    "github_account_id": 87392456,
+    "works": []
+  },
+  {
+    "slug": "hiddenlayer",
+    "name": "HiddenLayer",
+    "website_url": "https://hiddenlayer.com",
+    "github_url": "https://github.com/hiddenlayerai",
+    "github_account_id": 161089038,
+    "works": []
+  },
+  {
+    "slug": "horizon3-ai",
+    "name": "Horizon3.ai",
+    "website_url": "https://horizon3.ai",
+    "github_url": "https://github.com/horizon3ai",
+    "github_account_id": 79593994,
+    "works": []
+  },
+  {
+    "slug": "hugging-face",
+    "name": "Hugging Face",
+    "website_url": "https://huggingface.co",
+    "github_url": "https://github.com/huggingface",
+    "github_account_id": 25720743,
+    "works": []
+  },
+  {
+    "slug": "ibm",
+    "name": "IBM",
+    "website_url": "https://www.ibm.com",
+    "github_url": "https://github.com/IBM",
+    "github_account_id": 1459110,
+    "works": []
+  },
+  {
+    "slug": "jfrog",
+    "name": "JFrog",
+    "website_url": "https://jfrog.com",
+    "github_url": "https://github.com/jfrog",
+    "github_account_id": 499942,
+    "works": []
+  },
+  {
+    "slug": "microsoft",
+    "name": "Microsoft",
+    "website_url": "https://www.microsoft.com",
+    "github_url": "https://github.com/microsoft",
+    "github_account_id": 6154722,
+    "works": []
+  },
+  {
+    "slug": "mindstudio",
+    "name": "MindStudio",
+    "website_url": "https://www.mindstudio.ai",
+    "github_url": "https://github.com/mindstudio-ai",
+    "github_account_id": 187797781,
+    "works": []
+  },
+  {
+    "slug": "minimax",
+    "name": "MiniMax",
+    "website_url": "https://www.minimax.io",
+    "github_url": "https://github.com/MiniMax-AI",
+    "github_account_id": 194880281,
+    "works": []
+  },
+  {
+    "slug": "mistral-ai",
+    "name": "Mistral AI",
+    "website_url": "https://mistral.ai",
+    "github_url": "https://github.com/mistralai",
+    "github_account_id": 132372032,
+    "works": []
+  },
+  {
+    "slug": "netflix",
+    "name": "Netflix",
+    "website_url": "https://netflixtechblog.com",
+    "github_url": "https://github.com/Netflix",
+    "github_account_id": 913567,
+    "works": []
+  },
+  {
+    "slug": "nvidia",
+    "name": "NVIDIA",
+    "website_url": "https://www.nvidia.com",
+    "github_url": "https://github.com/NVIDIA",
+    "github_account_id": 1728152,
+    "works": []
+  },
+  {
+    "slug": "orca-security",
+    "name": "Orca Security",
+    "website_url": "https://orca.security",
+    "github_url": "https://github.com/orcasecurity",
+    "github_account_id": 62629792,
+    "works": []
+  },
+  {
+    "slug": "palo-alto-networks",
+    "name": "Palo Alto Networks",
+    "website_url": "https://www.paloaltonetworks.com",
+    "github_url": "https://github.com/PaloAltoNetworks",
+    "github_account_id": 4855743,
+    "works": []
+  },
+  {
+    "slug": "portswigger",
+    "name": "PortSwigger",
+    "website_url": "https://portswigger.net",
+    "github_url": "https://github.com/PortSwigger",
+    "github_account_id": 13749115,
+    "works": []
+  },
+  {
+    "slug": "proofpoint",
+    "name": "Proofpoint",
+    "website_url": "https://www.proofpoint.com",
+    "github_url": "https://github.com/proofpoint",
+    "github_account_id": 626276,
+    "works": []
+  },
+  {
+    "slug": "qihoo-360",
+    "name": "Qihoo 360",
+    "website_url": "https://www.360.cn",
+    "github_url": "https://github.com/Qihoo360",
+    "github_account_id": 4082929,
+    "works": []
+  },
+  {
+    "slug": "rapid7",
+    "name": "Rapid7",
+    "website_url": "https://www.rapid7.com",
+    "github_url": "https://github.com/rapid7",
+    "github_account_id": 1013671,
+    "works": []
+  },
+  {
+    "slug": "semgrep",
+    "name": "Semgrep",
+    "website_url": "https://semgrep.dev",
+    "github_url": "https://github.com/semgrep",
+    "github_account_id": 29760937,
+    "works": []
+  },
+  {
+    "slug": "snyk",
+    "name": "Snyk",
+    "website_url": "https://snyk.io",
+    "github_url": "https://github.com/snyk",
+    "github_account_id": 12959162,
+    "works": []
+  },
+  {
+    "slug": "socket",
+    "name": "Socket",
+    "website_url": "https://socket.dev",
+    "github_url": "https://github.com/SocketDev",
+    "github_account_id": 69326764,
+    "works": []
+  },
+  {
+    "slug": "tenable",
+    "name": "Tenable",
+    "website_url": "https://www.tenable.com",
+    "github_url": "https://github.com/tenable",
+    "github_account_id": 2379954,
+    "works": []
+  },
+  {
+    "slug": "tencent",
+    "name": "Tencent",
+    "website_url": "https://www.tencent.com",
+    "github_url": "https://github.com/Tencent",
+    "github_account_id": 18461506,
+    "works": []
+  },
+  {
+    "slug": "trend-micro",
+    "name": "Trend Micro",
+    "website_url": "https://www.trendmicro.com",
+    "github_url": "https://github.com/trendmicro",
+    "github_account_id": 427106,
+    "works": []
+  },
+  {
+    "slug": "watchtowr",
+    "name": "watchTowr",
+    "website_url": "https://watchtowr.com",
+    "github_url": "https://github.com/watchtowrlabs",
+    "github_account_id": 99977116,
+    "works": []
+  },
+  {
+    "slug": "wiz",
+    "name": "Wiz",
+    "website_url": "https://www.wiz.io",
+    "github_url": "https://github.com/wiz-sec",
+    "github_account_id": 59924931,
+    "works": []
+  },
+  {
+    "slug": "xai",
+    "name": "xAI",
+    "website_url": "https://x.ai",
+    "github_url": "https://github.com/xai-org",
+    "github_account_id": 130314967,
+    "works": []
+  },
+  {
+    "slug": "xbow",
+    "name": "XBOW",
+    "website_url": "https://xbow.com",
+    "github_url": "https://github.com/xbow-engineering",
+    "github_account_id": 164951028,
+    "works": []
+  }
+]

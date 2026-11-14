@@ -401,7 +401,7 @@ const PaperDetailView: React.FC = () => {
           </h1>
           {originalTitle && <p className="detail-original-title">Original title: <span>{originalTitle}</span></p>}
           <div className="detail-meta">
-            <span>Submitted {formatLongDate(paper.published)}</span>
+            <span>{paper.catalog_kind === "post" ? "Published" : "Submitted"} {formatLongDate(paper.published)}</span>
             {numPages && (
               <>
                 <span>·</span>

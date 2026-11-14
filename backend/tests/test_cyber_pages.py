@@ -296,6 +296,7 @@ def test_reject_invalid_public_origins(value):
         "/personal-agents",
         "/developers",
         "/developers/42",
+        "/repos/rapid7/metasploit-framework",
         "/orgs/openai",
         "/pdf/2610.34435",
         "/docs/api",

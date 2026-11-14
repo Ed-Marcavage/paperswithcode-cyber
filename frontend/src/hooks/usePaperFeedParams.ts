@@ -14,12 +14,15 @@ export const PAPER_FEED_SORTS: ReadonlyArray<readonly [PaperFeedSort, string]> =
   ["citation_count", "most cited"],
 ];
 
-/** A paper feed's sort, resource toggles and date range, kept in the URL so feeds stay shareable. */
-export function usePaperFeedParams() {
+/**
+ * A paper feed's sort, resource toggles and date range, kept in the URL so feeds stay shareable.
+ * `defaultSort` applies when the URL names none; choosing it again clears `order_by`.
+ */
+export function usePaperFeedParams(defaultSort: PaperFeedSort = "trending") {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("order_by");
   const orderBy: PaperFeedSort =
-    requested === "date_published" || requested === "citation_count" ? requested : "trending";
+    PAPER_FEED_SORTS.find(([value]) => value === requested)?.[0] ?? defaultSort;
   const hasCode = searchParams.get("has_code") === "true";
   const hasHfArtifacts = searchParams.get("has_hf_artifacts") === "true";
   const dateRange = readPaperDateRange(searchParams);
@@ -38,7 +41,7 @@ export function usePaperFeedParams() {
     hasCode,
     hasHfArtifacts,
     dateRange,
-    setOrderBy: (value: string) => setParam("order_by", value === "trending" ? null : value),
+    setOrderBy: (value: string) => setParam("order_by", value === defaultSort ? null : value),
     setHasCode: (active: boolean) => setParam("has_code", active ? "true" : null),
     setHasHfArtifacts: (active: boolean) => setParam("has_hf_artifacts", active ? "true" : null),
     setDateRange: (value: PaperDateRangeValue) =>

@@ -157,7 +157,7 @@ def llms() -> Response:
 # Existing browser entry points. Assets, API, MCP transport and reader data are
 # routed separately by nginx; an arbitrary URL must never become a 200 shell.
 CLIENT_PATH = re.compile(
-    r"/(?:papers|tasks(?:/[^/]+)?|task/[^/]+|methods(?:/[^/]+)?|frameworks|trends|conferences(?:/[^/]+){0,2}|organizations(?:/[^/]+)?|orgs/[^/]+(?:/[^/]+)?|authors/[0-9]+|benchmark/[^/]+|developers(?:/[^/]+)?|pdf/[^/]+|mcp|personal-agents|docs/api|privacy|following|x-trending|submit|saved|settings|ai-deadlines|astra-for-robotics|rate-limits|request-access|admin-dashboard|cron-dashboard|autonomous-operations|submissions|authorize-paper-edit/[^/]+|chat(?:/[^/]+)?|share/[^/]+)"
+    r"/(?:papers|tasks(?:/[^/]+)?|task/[^/]+|methods(?:/[^/]+)?|frameworks|trends|conferences(?:/[^/]+){0,2}|organizations(?:/[^/]+)?|orgs/[^/]+(?:/[^/]+)?|authors/[0-9]+|benchmark/[^/]+|developers(?:/[^/]+)?|repos/[^/]+/[^/]+|pdf/[^/]+|mcp|personal-agents|docs/api|privacy|following|x-trending|submit|saved|settings|ai-deadlines|astra-for-robotics|rate-limits|request-access|admin-dashboard|cron-dashboard|autonomous-operations|submissions|authorize-paper-edit/[^/]+|chat(?:/[^/]+)?|share/[^/]+)"
 )
 
 

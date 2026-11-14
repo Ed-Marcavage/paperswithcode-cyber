@@ -8,6 +8,7 @@ import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import "./DiscoveryCatalog.css";
 import { developerAxes, developerParams, developerPageSize, getDeveloper, getDevelopers } from "@/lib/api/developers";
 import { TEN_MINUTES } from "@/lib/api/queryKeys";
+import { repositoryReferencesHref } from "@/lib/industryPost";
 import "./Organizations.css";
 import "./Developers.css";
 
@@ -142,6 +143,7 @@ export function DeveloperDetail() {
               </span>
               {repo.commits > 0 && <span className="developer-commits">{repo.commits.toLocaleString()} {repo.commits === 1 ? "commit" : "commits"}</span>}
               <Link className="developer-repo-team" to={`/developers?${new URLSearchParams({ repository: repo.full_name })}`}>View developers</Link>
+              <Link className="developer-repo-team" to={repositoryReferencesHref(...(repo.full_name.split("/") as [string, string]))}>Referenced by</Link>
             </div>
           ))}
         </div>

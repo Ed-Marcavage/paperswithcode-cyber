@@ -27,3 +27,10 @@
   .developer-work-row { flex-wrap: wrap; }
   .developer-work-main { flex-basis: 60%; }
 }
+
+/* Repository references page (/repos/:owner/:name). */
+.repository-references-title { overflow-wrap: anywhere; font-family: var(--mono); font-size: clamp(1.4rem, 5vw, 2.2rem); }
+.repository-reference-group { margin-top: 1.4rem; }
+.repository-reference-role { margin: 0; color: var(--ink-soft); font: 500 .72rem var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.repository-reference-role span { margin-left: .35rem; color: var(--ink-faint); }
+.developer-work-main > span.repository-reference-evidence { color: var(--ink-soft); font: .86rem/1.45 var(--serif); }

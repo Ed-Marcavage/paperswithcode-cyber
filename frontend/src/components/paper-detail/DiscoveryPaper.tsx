@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { axes, type Axis, discoveryPaperQuery, filtersQuery } from "@/lib/api/discovery";
 import { apiUrl } from "@/lib/apiUrl";
-import { postTypeLabel, subtopicLabel } from "@/lib/industryPost";
+import { parseGitHubRepoUrl } from "@/lib/github";
+import { postTypeLabel, repositoryReferencesHref, subtopicLabel } from "@/lib/industryPost";
 import "@/views/DiscoveryCatalog.css";
 
 export function DiscoveryPaper({ paperId }: { paperId: string }) {
@@ -20,6 +21,7 @@ export function DiscoveryPaper({ paperId }: { paperId: string }) {
   if (!paper) return <p role="status">{isError ? "Catalog details unavailable." : "Loading catalog details…"}</p>;
   const kind = paper.facets.kind?.[0];
   const post = kind === "post" ? paper.post : null;
+  const repository = kind === "repository" ? parseGitHubRepoUrl(paper.source_url.replace(/\/$/, "")) : null;
   const flags = post ? [
     post.reports_benchmark_results && "Reports benchmark results",
     post.agent_harness_engineering && "Agent harness engineering",
@@ -47,6 +49,7 @@ export function DiscoveryPaper({ paperId }: { paperId: string }) {
     </>}
     </dl>
     <div className="discovery-resources">
+      {repository && <Link to={repositoryReferencesHref(repository.owner, repository.repository)}>Papers and posts referencing this repository →</Link>}
       {paper.artifact_url && <a onClick={() => resourceClicked(paper.paper_id, externalResource(paper.artifact_url!, "artifact"))} href={paper.artifact_url} target="_blank" rel="noreferrer">Open project artifact ↗</a>}
       {paper.has_text
         ? <a onClick={() => resourceClicked(paper.paper_id, "cached_text")} href={apiUrl("/api/v1/catalog/papers/" + encodeURIComponent(paper.paper_id) + "/text")}>Read cached text</a>

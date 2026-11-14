@@ -54,6 +54,7 @@ if (!useHashRouter && typeof window !== "undefined") {
 const AuthorizePaperEditView = React.lazy(() => import("@/views/AuthorizePaperEditView"));
 const FollowingView = React.lazy(() => import("@/views/FollowingView"));
 const DiscoveryCatalogView = React.lazy(() => import("@/views/DiscoveryCatalogView"));
+const RepositoryReferencesView = React.lazy(() => import("@/views/RepositoryReferencesView"));
 const FeedView = React.lazy(() => import("@/views/FeedView"));
 const ChatView = React.lazy(() => import("@/views/ChatView"));
 const SharedChatView = React.lazy(() => import("@/views/SharedChatView"));
@@ -328,6 +329,7 @@ const Shell: React.FC = () => {
         <Route path="/conferences/:confSlug/:taskSlug" element={<ConferenceTaskView />} />
         {isDiscoveryCatalog() && <Route path="/developers" element={<DevelopersIndex />} />}
         {isDiscoveryCatalog() && <Route path="/developers/:id" element={<DeveloperDetail />} />}
+        {isDiscoveryCatalog() && <Route path="/repos/:owner/:name" element={<RepositoryReferencesView />} />}
         <Route path="/organizations" element={<OrganizationsIndexView />} />
         <Route path="/orgs/:orgSlug" element={<OrganizationDetailView />} />
         <Route path="/orgs/:orgSlug/:taskSlug" element={<OrganizationTaskView />} />

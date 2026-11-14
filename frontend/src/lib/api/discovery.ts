@@ -72,3 +72,34 @@ export function discoveryPaperQuery(id: string) {
     queryFn: () => apiRequest<DiscoveryWork>("/catalog/papers/" + encodeURIComponent(id)),
   });
 }
+/** One catalog work citing a repository (backend `discovery_catalog.repository_references`). */
+export interface RepositoryReference {
+  paper_id: string;
+  reference: string;
+  title: string;
+  kind: string | null;
+  date_published: string | null;
+  source_url: string;
+  is_official: boolean;
+  evidence: string | null;
+  link_url: string | null;
+  /** Industry posts only: the publisher organization's name, else the host. */
+  publisher?: string | null;
+}
+export interface RepositoryReferences {
+  repository: {
+    id: string; url: string; owner: string; name: string;
+    num_stars: number; num_stars_updated_at: string | null;
+  };
+  total: number;
+  /** Works grouped by role (original, target, supporting, dependency, unspecified), newest first. */
+  references: Record<string, RepositoryReference[]>;
+}
+export function repositoryReferencesQuery(owner: string, name: string) {
+  return queryOptions({
+    queryKey: ["discovery", "repository-references", owner.toLowerCase(), name.toLowerCase()],
+    queryFn: () => apiRequest<RepositoryReferences>(
+      `/catalog/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`),
+    staleTime: 300_000,
+  });
+}

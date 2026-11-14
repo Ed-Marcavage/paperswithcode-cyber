@@ -73,3 +73,47 @@ export function industryHeading(highlights: { this_week: boolean; heading?: stri
   if (highlights.heading) return highlights.heading;
   return highlights.this_week ? "From industry this week" : "Recent from industry";
 }
+
+/** Reviewed repository roles for a post's code links, in display order (the post's own code first). */
+export const REPOSITORY_ROLES = ["original", "supporting", "target", "dependency"] as const;
+export type RepositoryRole = (typeof REPOSITORY_ROLES)[number];
+
+/** Group heading on a post page: what the repository is to this post. */
+export const POST_REPOSITORY_ROLE_LABELS: Record<RepositoryRole, string> = {
+  original: "Code released with this post",
+  supporting: "Also uses",
+  target: "Targets / tests against",
+  dependency: "Depends on",
+};
+
+/** Group heading on a repository's references page: how each work relates to the repository. */
+export const REFERENCE_ROLE_LABELS: Record<string, string> = {
+  original: "Released by",
+  supporting: "Used by",
+  target: "Targeted or tested by",
+  dependency: "A dependency of",
+  unspecified: "Also linked from",
+};
+
+/** Repositories grouped by role in REPOSITORY_ROLES order; links without a known role come last as "other". */
+export function groupRepositoriesByRole<T extends { role?: string | null }>(
+  repositories: T[],
+): Array<{ role: RepositoryRole | "other"; repositories: T[] }> {
+  const known = new Set<string>(REPOSITORY_ROLES);
+  const groups = REPOSITORY_ROLES.map((role) => ({
+    role: role as RepositoryRole | "other",
+    repositories: repositories.filter((repository) => repository.role === role),
+  }));
+  groups.push({ role: "other", repositories: repositories.filter((repository) => !known.has(repository.role ?? "")) });
+  return groups.filter((group) => group.repositories.length > 0);
+}
+
+/** A star count is shown only once it has been observed; unfetched repositories carry a placeholder 0. */
+export function knownStars(repository: { num_stars?: number | null; num_stars_updated_at?: string | null }): number | null {
+  return repository.num_stars_updated_at ? repository.num_stars ?? null : null;
+}
+
+/** In-site page listing the papers and posts that reference a GitHub repository. */
+export function repositoryReferencesHref(owner: string, name: string): string {
+  return `/repos/${encodeURIComponent(owner)}/${encodeURIComponent(name)}`;
+}

@@ -312,7 +312,19 @@ sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /t
 ```
 
 `/api/v1/catalog/repositories/{owner}/{name}` lists the papers and posts citing
-a repository, grouped by role. Read the directory at `/api/v1/developers/`
+a repository, grouped by role; the site shows it at `/repos/{owner}/{name}`,
+linked from a post's GitHub card, repository entries and developer profiles.
+
+Publisher organizations the mapping creates start bare. Their GitHub
+organization and avatar logo come from the reviewed profile manifest
+`seeds/publisher-organizations/organizations.json` (42 of 47; each login was
+checked against the GitHub profile's name and website), applied like the
+other organization seeds:
+
+```sh
+sh local-dev/compose.sh cp local-dev/seeds/publisher-organizations/organizations.json backend:/tmp/publisher-organizations.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_catalog_organizations.py /tmp/publisher-organizations.json --execute
+``` Read the directory at `/api/v1/developers/`
 and profiles at `/api/v1/developers/{github_id}`.
 
 The Developers directory accepts `q` (GitHub username), `repository` (exact

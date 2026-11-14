@@ -1,11 +1,15 @@
 import { resourceClicked } from "@/lib/catalogAnalytics";
 import { useState } from "react";
+import { Link } from "react-router-dom";
 
 import { Icon } from "@/components/Icon";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { Paper, RelatedPaperRecommendation } from "@/lib/api/papers.types";
+import type { Paper, RelatedPaperRecommendation, Repository } from "@/lib/api/papers.types";
 import type { AuthUser } from "@/lib/authContext";
 import type { HuggingFaceArtifactsViewer } from "@/lib/paperDetailPresentation";
+import {
+  groupRepositoriesByRole, knownStars, POST_REPOSITORY_ROLE_LABELS, repositoryReferencesHref,
+} from "@/lib/industryPost";
 import { safeExternalHref } from "@/lib/safeExternalHref";
 
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
@@ -70,7 +74,7 @@ export function PaperResourceSidebar({
 
   return (
     <aside className="detail-sidebar">
-      <div className="sidebar-card">
+      {paper.catalog_kind === "post" ? <PostRepositoriesCard paper={paper} /> : <div className="sidebar-card">
         <div className="sidebar-card-title">
           <span>GitHub</span>
           <span className="badge">
@@ -116,7 +120,7 @@ export function PaperResourceSidebar({
               : `+ show ${sortedRepos.length - REPO_PREVIEW_LIMIT} more repos`}
           </button>
         )}
-      </div>
+      </div>}
 
       {!isDiscoveryCatalog() && <>
       <HuggingFaceArtifactsCard viewer={hfArtifactViewer} onEdit={onEditHfArtifacts} />
@@ -154,6 +158,60 @@ export function PaperResourceSidebar({
         </pre>
       </div>
     </aside>
+  );
+}
+
+/** An industry post's GitHub links, grouped by what each repository is to the post, with the review's evidence. */
+function PostRepositoriesCard({ paper }: { paper: Paper }) {
+  const repositories = (paper.repositories ?? []).filter((repository) => safeExternalHref(repository.url));
+  return (
+    <div className="sidebar-card">
+      <div className="sidebar-card-title">
+        <span>GitHub</span>
+        <span className="badge">{repositories.length} repo{repositories.length === 1 ? "" : "s"}</span>
+      </div>
+      {groupRepositoriesByRole(repositories).map(({ role, repositories: group }) => (
+        <section key={role} className="post-repo-group" aria-label={role === "other" ? "Linked repositories" : POST_REPOSITORY_ROLE_LABELS[role]}>
+          <h3 className="post-repo-group-title">{role === "other" ? "Linked repositories" : POST_REPOSITORY_ROLE_LABELS[role]}</h3>
+          {[...group].sort((a, b) => (knownStars(b) ?? -1) - (knownStars(a) ?? -1)).map((repository) => (
+            <PostRepositoryRow key={repository.id} paperId={paper.id} repository={repository} />
+          ))}
+        </section>
+      ))}
+      {repositories.length === 0 && (
+        <div style={{ fontFamily: "var(--mono)", fontSize: 11, color: "var(--ink-faint)", padding: "6px 0" }}>
+          No GitHub repositories linked to this post.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PostRepositoryRow({ paperId, repository }: { paperId: string; repository: Repository }) {
+  const stars = knownStars(repository);
+  return (
+    <div className="post-repo">
+      <a
+        href={safeExternalHref(repository.url) ?? undefined}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="code-line"
+        onClick={() => resourceClicked(paperId, "code")}
+        style={{ textDecoration: "none", marginBottom: 0 }}
+      >
+        <span className="code-line-repo">
+          <Icon name="github" size={12} />
+          <span className="code-line-repo-name">{repository.owner}/{repository.name}</span>
+        </span>
+        {stars != null && <span className="code-line-stars" title="Stars for the entire repository">★ {formatStars(stars)}</span>}
+      </a>
+      {repository.evidence && <p className="post-repo-evidence">{repository.evidence}</p>}
+      {repository.owner && repository.name && (
+        <Link className="post-repo-references" to={repositoryReferencesHref(repository.owner, repository.name)}>
+          Referenced by →
+        </Link>
+      )}
+    </div>
   );
 }
 

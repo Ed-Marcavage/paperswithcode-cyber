@@ -30,7 +30,8 @@ export const OrganizationPaperFeed: React.FC<{
 }> = ({ organizationSlug, taskSlug }) => {
   const navigate = useNavigate();
   const discovery = isDiscoveryCatalog();
-  const feed = usePaperFeedParams();
+  // The catalog's organizations are mostly publishers of industry posts: show their newest first.
+  const feed = usePaperFeedParams(discovery ? "date_published" : "trending");
   const { searchParams } = feed;
   const [logoFailed, setLogoFailed] = useState(false);
   const organizationQ = useQuery({
@@ -85,7 +86,7 @@ export const OrganizationPaperFeed: React.FC<{
       <div className="page">
         <Alert variant="destructive">
           <AlertDescription>
-            Failed to load organization papers. Please try again.
+            {discovery ? "Failed to load this organization's catalog entries." : "Failed to load organization papers."} Please try again.
           </AlertDescription>
         </Alert>
       </div>

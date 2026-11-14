@@ -162,8 +162,21 @@ export function toSotaRanks(ranks: LeaderboardRankSummary[] | null | undefined):
     });
 }
 
+/**
+ * A post's card credits only the code the post itself released (role `original`); a repository it
+ * merely uses, targets or depends on is not "its code". Unobserved star counts stay hidden.
+ */
+function postCardRepos(paper: Paper): { github: number | null; githubUrl: string | null; velocity24h: number | null } {
+  const original = (paper.repositories || []).filter((repository) => repository.role === "original");
+  const summary = summarizeRepos(original);
+  const top = original.find((repository) => repository.url === summary.githubUrl);
+  return { ...summary, github: top?.num_stars_updated_at ? summary.github : null };
+}
+
 export function transformPaperForCard(paper: Paper): PaperCardProps {
-  const { github, githubUrl, velocity24h } = summarizeRepos(paper.repositories);
+  const { github, githubUrl, velocity24h } = paper.catalog_kind === "post"
+    ? postCardRepos(paper)
+    : summarizeRepos(paper.repositories);
   const { hfKind, hfCount, hfUrl } = summarizeHfArtifacts(paper);
   const tags = (paper.tasks || []).map((t) => t.slug || "").filter(Boolean);
   const methods = (paper.methods || []).map((m) => ({

@@ -1067,3 +1067,30 @@
 }
 
 .detail-hero:not(:has(> .detail-hero-thumb)) { grid-template-columns: minmax(0, 1fr); }
+
+/* Industry post: GitHub links grouped by role, each with the review's evidence. */
+.post-repo-group + .post-repo-group { margin-top: 14px; }
+.post-repo-group-title {
+  margin: 0 0 8px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+.post-repo { margin-bottom: 10px; }
+.post-repo-evidence {
+  margin: 5px 2px 2px;
+  color: var(--ink-soft);
+  font-size: 12px;
+  line-height: 1.45;
+}
+.post-repo-references {
+  margin-left: 2px;
+  color: var(--ink-faint);
+  font-family: var(--mono);
+  font-size: 10px;
+  text-decoration: none;
+}
+.post-repo-references:hover { color: var(--accent); text-decoration: underline; }
