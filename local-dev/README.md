@@ -345,8 +345,8 @@ rejected, the publisher's social image is used; if there is none, a title card.
 Chrome user agent, a settle wait of about 5 s, one retry after a load failure,
 HTTP 429 or 5xx, and consent banners and dimming layers removed. A capture is
 rejected for HTTP 400 or above, a challenge or block page (a `cf-mitigated`
-header, a known challenge widget, or challenge wording in the title or in a page
-with under 3,000 characters of text), or a mostly blank image (92% or more of
+header, a challenge-page element, challenge wording in the title, or a captcha
+widget or challenge wording in a page with under 3,000 characters of text), or a mostly blank image (92% or more of
 pixels within 8 grey levels of the most common one). Challenges are not worked
 around. Details are in `post_previews.py`.
 

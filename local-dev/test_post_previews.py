@@ -104,6 +104,11 @@ class RejectionTest(unittest.TestCase):
             with self.subTest(case=case):
                 self.assertTrue(pp.load_reason(case).startswith("challenge page"))
 
+    def test_captcha_widget_counts_only_on_a_short_page(self):
+        widget = ["iframe[src*='recaptcha']"]
+        self.assertIsNone(pp.load_reason(report(text_length=18000, challenge_markers=widget)))
+        self.assertTrue(pp.load_reason(report(text_length=200, challenge_markers=widget)).startswith("challenge"))
+
     def test_long_article_about_captchas_is_not_a_challenge(self):
         self.assertIsNone(pp.load_reason(report(text_length=15000, text_head="How attackers solve CAPTCHA with agents")))
 

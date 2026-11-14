@@ -7,10 +7,11 @@ at a time, with one retry after a load failure, HTTP 429 or 5xx. Consent banners
 and dimming layers are removed before capture. A capture is rejected when:
 
 - the page did not load, or answered with HTTP 400 or above;
-- it is a challenge or block page: a `cf-mitigated: challenge` header, a known
-  challenge widget in the DOM (Cloudflare, PerimeterX, DataDome, Incapsula,
-  hCaptcha, reCAPTCHA), challenge wording in the title, or challenge wording
-  in a page with under 3,000 characters of text;
+- it is a challenge or block page: a `cf-mitigated: challenge` header, a
+  challenge-page element in the DOM (Cloudflare challenge form, PerimeterX,
+  DataDome, Incapsula), challenge wording in the title, or, in a page with
+  under 3,000 characters of text, challenge wording or a Turnstile, hCaptcha
+  or reCAPTCHA widget (those widgets also appear in ordinary pages' forms);
 - the image is mostly blank: at least 92% of the card's pixels have a grey
   level within 8 of the most common grey level. Real post pages measured
   0.37-0.84 on this test in the pilot.
@@ -49,6 +50,8 @@ CHALLENGE_TEXT = re.compile(
     r"|request (was )?blocked|enable javascript and cookies to continue|pardon our interruption",
     re.I,
 )
+
+EMBEDDABLE_WIDGETS = ("recaptcha", "hcaptcha.com", "challenges.cloudflare.com")
 
 METHOD_SCREENSHOT = "screenshot"
 METHOD_ARTWORK = "artwork"
@@ -99,12 +102,15 @@ def run_capture(url: str, png_path: Path) -> dict:
 def challenge_reason(report: dict) -> Optional[str]:
     if report.get("cf_mitigated") == "challenge":
         return "challenge page (cf-mitigated header)"
-    if report.get("challenge_markers"):
-        return "challenge page (" + report["challenge_markers"][0] + ")"
+    short = report.get("text_length", 0) < SHORT_PAGE_CHARS
+    for marker in report.get("challenge_markers") or []:
+        # Captcha and Turnstile widgets also sit in ordinary pages' forms; only a short page is a challenge.
+        if short or not any(widget in marker for widget in EMBEDDABLE_WIDGETS):
+            return f"challenge page ({marker})"
     title = report.get("title") or ""
     if CHALLENGE_TEXT.search(title):
         return f"challenge page (title: {title[:60]})"
-    if report.get("text_length", 0) < SHORT_PAGE_CHARS and CHALLENGE_TEXT.search(report.get("text_head") or ""):
+    if short and CHALLENGE_TEXT.search(report.get("text_head") or ""):
         return "challenge page (short page with challenge wording)"
     return None
 
