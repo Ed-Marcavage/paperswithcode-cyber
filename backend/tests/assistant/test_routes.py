@@ -3,28 +3,17 @@ import json
 from types import SimpleNamespace
 
 import pytest
-from fastapi.testclient import TestClient
 from pydantic import SecretStr
 
 from backend.assistant_config import get_assistant_settings
-from backend.config import get_settings
 from backend.main import create_app
 from backend.routers import assistant
 from backend.services.assistant_loop import Turn, run_turn
 from backend.tests.assistant.test_loop import text_chunk
 
 
-@pytest.fixture
-def client(monkeypatch):
-    settings = get_assistant_settings()
-    monkeypatch.setattr(settings, "enabled", True)
-    monkeypatch.setattr(settings, "api_key", SecretStr("fake"))
-    monkeypatch.setattr(get_settings(), "discovery_catalog", True)
-    return TestClient(create_app())
-
-
 def test_sse_events_and_validation(client, monkeypatch):
-    async def fake(payload, settings):
+    async def fake(payload, settings, saved, store):
         for event in [
             {"type": "tool_started", "id": "one", "name": "search_papers"},
             {"type": "tool_finished", "id": "one", "name": "search_papers", "error": False},

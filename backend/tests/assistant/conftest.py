@@ -6,6 +6,14 @@ import sys
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
+from sqlalchemy import create_engine, event
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall
+from backend.services.assistant_store import AssistantStore
+
 if sys.platform != "linux":
     original_read = Path.read_text
 
@@ -18,3 +26,33 @@ if sys.platform != "linux":
     # runtime is Linux; keep its implementation and other file reads intact.
     with patch.object(Path, "read_text", local_process_stat):
         importlib.import_module("backend.services.deployment_lifecycle")
+
+
+@pytest.fixture
+def store():
+    engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+    @event.listens_for(engine, "connect")
+    def foreign_keys(connection, _):
+        connection.execute("PRAGMA foreign_keys=ON")
+    for model in (AssistantConversation, AssistantMessage, AssistantToolCall):
+        model.__table__.create(engine)
+    yield AssistantStore(sessionmaker(bind=engine, expire_on_commit=False))
+    engine.dispose()
+
+
+@pytest.fixture
+def client(monkeypatch, store):
+    from fastapi.testclient import TestClient
+    from pydantic import SecretStr
+    from backend.assistant_config import get_assistant_settings
+    from backend.config import get_settings
+    from backend.main import create_app
+    from backend.services.assistant_store import get_assistant_store
+
+    settings = get_assistant_settings()
+    monkeypatch.setattr(settings, "enabled", True)
+    monkeypatch.setattr(settings, "api_key", SecretStr("fake"))
+    monkeypatch.setattr(get_settings(), "discovery_catalog", True)
+    app = create_app()
+    app.dependency_overrides[get_assistant_store] = lambda: store
+    return TestClient(app, headers={"Origin": "http://testserver"})

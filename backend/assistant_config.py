@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import SecretStr
+from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -14,6 +14,7 @@ class AssistantSettings(BaseSettings):
     api_key: SecretStr = SecretStr("")
     base_url: str = "https://ollama.com/v1"
     model: str = "glm-5.3-flash"
+    retention_days: int = Field(default=90, ge=1)
 
 
 @lru_cache

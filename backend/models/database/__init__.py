@@ -8,6 +8,11 @@ module only re-exports them, and importing it registers every table on
 """
 
 from backend.models.database.base import Base
+from backend.models.database.assistant import (
+    AssistantConversation,
+    AssistantMessage,
+    AssistantToolCall,
+)
 from backend.models.database.autonomous import (
     AutonomousSubmissionClaim,
     AutonomousOperatorState,
