@@ -64,9 +64,10 @@ def post_score(post: dict) -> int:
     return post["technical_depth"] + post["originality"] + (1 if post.get("agent_harness_engineering") else 0)
 
 
-def agent_related(post: dict) -> bool:
-    """Agent relevance high enough for Trending's non-curated posts."""
-    return (post.get("agent_relevance") or 0) >= MIN_AGENT_RELEVANCE
+def agent_related(post: dict, min_agent_relevance: int = MIN_AGENT_RELEVANCE) -> bool:
+    """Agent relevance at least ``min_agent_relevance`` (the catalog API's parameter of the
+    same name); the default is Trending's rule for posts that are not hand-picked."""
+    return (post.get("agent_relevance") or 0) >= min_agent_relevance
 
 
 def _published_on(row: dict) -> date:

@@ -27,10 +27,16 @@ def papers(topic: str = "", target: str = "", contribution: str = "", kind: str 
            tier: Literal["", "featured", "catalog"] = Query("", description="Industry post tier"),
            post_type: str = Query("", max_length=64, description="Industry post type slug"),
            order: Literal["", "featured"] = Query("", description="`featured` lists featured posts first"),
+           min_agent_relevance: int | None = Query(
+               None, ge=0, le=4,
+               description="Leave out industry posts whose review agent relevance (0-4) is below this. "
+                           "Papers are not filtered; add `kind=post` for posts only. Trending uses "
+                           f"{trending_posts.MIN_AGENT_RELEVANCE}."),
            db: Session = Depends(get_database_session)):
     facets = dict(topic=topic, target=target, contribution=contribution, kind=kind, year=year)
     return discovery_catalog.browse(db, facets, limit, offset, include_facet_counts,
-                                    tier=tier, post_type=post_type, featured_first=order == "featured")
+                                    tier=tier, post_type=post_type, featured_first=order == "featured",
+                                    min_agent_relevance=min_agent_relevance)
 
 
 @router.get("/trending-posts/highlights", summary="Industry posts for the top of Trending")
