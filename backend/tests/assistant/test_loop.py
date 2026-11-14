@@ -106,6 +106,7 @@ def test_tool_limit_including_multi_call_reply():
     services = FakeServices([[tool_chunk(i) for i in range(12)], [text_chunk("Final")]])
     turn, _ = asyncio.run(services.run())
     assert len(services.tool_requests) == 10
+    assert len(turn.steps[0]["tool_calls"]) == 12  # trace includes unexecuted calls too
     assert turn.status == "limit_reached"
     assert "tools" not in services.model_requests[-1]
 
@@ -117,6 +118,15 @@ def test_output_cap_and_finalizer():
     assert turn.text == "x" * 30 + "y" * 10
     assert turn.status == "limit_reached"
     assert "tools" not in services.model_requests[-1]
+
+
+def test_empty_finalizer_still_gives_a_bounded_plain_answer():
+    services = FakeServices([[tool_chunk()]] * 7 + [[chunk(finish="length")]])
+    turn, events = asyncio.run(services.run())
+    assert turn.status == "limit_reached"
+    assert "narrow your question" in turn.text
+    assert len(turn.text) <= TurnLimits().output_chars
+    assert events[-2]["type"] == "text_delta"
 
 
 def test_time_limit_stops_research_and_finalizes_with_tools_off():

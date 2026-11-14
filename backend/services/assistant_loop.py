@@ -101,9 +101,6 @@ async def model_pass(client, model, messages, tools, result, room):
                     break
             for part in delta.tool_calls or []:
                 if part.index not in calls:
-                    if len(calls) >= 10:
-                        result.limited = True
-                        continue
                     calls[part.index] = {"id": "", "type": "function",
                                          "function": {"name": "", "arguments": ""}}
                 call = calls[part.index]
@@ -112,7 +109,7 @@ async def model_pass(client, model, messages, tools, result, room):
                 if part.function:
                     call["function"]["name"] += part.function.name or ""
                     call["function"]["arguments"] += part.function.arguments or ""
-                if len(json.dumps(call)) > 32768:
+                if len(json.dumps(calls)) > 32768:
                     raise AssistantProviderError(PROVIDER_ERROR)
         result.calls = list(calls.values())
         if any(not call["id"] or not call["function"]["name"] for call in result.calls):
@@ -237,6 +234,8 @@ async def run_turn(
             if result.limited or tools_used >= limits.tool_calls:
                 return
             if not result.calls:
+                if not result.text:
+                    raise AssistantProviderError(PROVIDER_ERROR)
                 turn.status = "done"
                 return
 
@@ -274,6 +273,10 @@ async def run_turn(
                 text = text[:limits.output_chars - len(turn.text)]
                 turn.text += text
                 yield {"type": "text_delta", "text": text}
+            if not turn.text:
+                text = "I could not establish an answer within this turn's limits. Please narrow your question."
+                turn.text = text[:limits.output_chars]
+                yield {"type": "text_delta", "text": turn.text}
         terminal = True
         yield {"type": "done", "status": turn.status}
     except (asyncio.CancelledError, GeneratorExit):
