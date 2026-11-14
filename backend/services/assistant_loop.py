@@ -230,7 +230,7 @@ async def run_turn(
                 tools_used += 1
                 messages.append({"role": "tool", "tool_call_id": call["id"], "content": tool_result.text})
                 yield {"type": "tool_finished", "id": call["id"], "name": name,
-                       "error": tool_result.is_error}
+                       "error": tool_result.is_error, "result": tool_result.text}
             if result.limited or tools_used >= limits.tool_calls:
                 return
             if not result.calls:

@@ -90,6 +90,7 @@ def test_interleaved_tool_calls_and_grounded_answer():
     messages = services.model_requests[1]["messages"]
     assert [m["role"] for m in messages] == ["system", "user", "assistant", "tool", "tool"]
     assert "/paper/evidence" in messages[-1]["content"]
+    assert events[3]["result"] == messages[-1]["content"]
     assert turn.steps[0]["input_tokens"] is None
 
 

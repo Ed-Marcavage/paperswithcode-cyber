@@ -84,7 +84,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         } else if (event.type === "text_delta") updateAnswer(m => ({ ...m, content: m.content + event.text }));
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
-        else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error } : s) }));
+        else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
         else if (event.type === "done") updateAnswer(m => ({ ...m, status: event.status }));
         else if (event.type === "error") throw new AssistantError(event.message, event.code, 0, event.retry_at);
       }

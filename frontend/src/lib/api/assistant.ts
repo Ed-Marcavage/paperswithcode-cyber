@@ -13,7 +13,7 @@ export interface AssistantConversation extends AssistantSummary { messages: Assi
 export type AssistantEvent =
   | { type: "meta"; conversation_id: string; message_id: string; run_id: string; question_count: number; question_limit: number }
   | { type: "text_delta"; text: string }
-  | { type: "tool_started" | "tool_finished"; id: string; name: string; error?: boolean }
+  | { type: "tool_started" | "tool_finished"; id: string; name: string; error?: boolean; result?: string }
   | { type: "done"; status: string }
   | { type: "error"; code: string; message: string; retry_at?: string | null };
 

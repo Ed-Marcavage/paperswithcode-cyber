@@ -1,11 +1,15 @@
 import { useLocation } from "react-router-dom";
 import type { AssistantSurface } from "@/lib/api/assistant";
 import { useAssistant } from "./context";
+import { AssistantMarkdown } from "./AssistantMarkdown";
+import { AssistantToolSteps } from "./AssistantToolSteps";
+import { evidenceLinks } from "./markdown";
 
 export function AssistantConversationView({ surface = "panel" }: { surface?: AssistantSurface }) {
   const chat = useAssistant();
   const { pathname } = useLocation();
   const count = chat.conversation.question_count;
+  const evidence = evidenceLinks(chat.conversation.messages);
   const disabled = chat.busy || chat.loading || count >= chat.conversation.question_limit;
   const send = () => { if (!disabled) void chat.send(chat.draft, surface, pathname); };
   return <div className="assistant-conversation">
@@ -14,7 +18,9 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
         <p className="assistant-empty">Ask about papers, security research, repositories, organizations, or developers in the catalog.</p> :
         chat.conversation.messages.map(message => <article key={message.id} className={`assistant-message assistant-message-${message.role}`}>
           <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
-          <div className="assistant-text">{message.content}</div>
+          {message.role === "user" ? <div className="assistant-text">{message.content}</div> :
+            <AssistantMarkdown text={message.content} streaming={message.status === "running"} evidence={evidence} />}
+          <AssistantToolSteps steps={message.tool_steps} />
           {message.tool_steps.some(step => step.pending) && <span role="status">Searching the catalog…</span>}
         </article>)}
     </div>
