@@ -12,6 +12,7 @@ vi.mock("@/lib/apiUrl", () => ({
   isDiscoveryCatalog: () => false,
   isAuthDisabled: () => buildFlags.authDisabled,
   isChatEnabled: () => buildFlags.chatEnabled,
+  isAssistantEnabled: () => false,
   isChatMirror: () => buildFlags.authDisabled && !buildFlags.chatEnabled,
 }));
 
