@@ -201,6 +201,7 @@ from backend.models.trends import (
     TrendPoint as TrendPoint,
     TrendsResponse as TrendsResponse,
 )
+from backend.models.assistant import AssistantTurnRequest as AssistantTurnRequest
 from backend.models.research import (
     FollowView as FollowView,
     ResearchEntry as ResearchEntry,

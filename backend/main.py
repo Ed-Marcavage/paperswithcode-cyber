@@ -19,6 +19,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from backend.config import get_settings
+from backend.assistant_config import get_assistant_settings
 from backend.services.catalog_admission import CatalogAdmissionMiddleware
 from backend.services.deployment_lifecycle import (
     DeploymentAccountingMiddleware,
@@ -593,6 +594,9 @@ def create_app() -> FastAPI:
         from backend.chat_gateway_app import app as chat_gateway_app
 
         app.mount("/api/internal/chat-gateway", chat_gateway_app)
+    if get_assistant_settings().enabled:
+        from backend.routers import assistant
+        app.include_router(assistant.router, prefix="/api/v1")
     app.include_router(codex_add_evals.router, prefix="/api/v1", tags=["admin"])
     app.include_router(codex_enrich_paper.router, prefix="/api/v1", tags=["admin"])
     app.include_router(
@@ -724,7 +728,12 @@ def create_app() -> FastAPI:
         async def enforce_read_only_catalog(request: Request, call_next):
             # Check the same decoded path the ASGI router dispatches.
             path = request.scope["path"]
-            if request.method not in _DISCOVERY_READ_METHODS and (path == "/api" or path.startswith("/api/")):
+            assistant_write = (
+                path.startswith("/api/v1/assistant/")
+                and request.method in {"POST", "DELETE"}
+                and get_assistant_settings().enabled
+            )
+            if not assistant_write and request.method not in _DISCOVERY_READ_METHODS and (path == "/api" or path.startswith("/api/")):
                 return JSONResponse(
                     {"detail": "This catalog is read-only."},
                     status_code=405,

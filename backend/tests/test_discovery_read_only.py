@@ -17,6 +17,9 @@ def discovery_client(monkeypatch):
     def method_echo(request: Request):
         return {"method": request.method}
 
+    # The discovery HTML catch-all is already mounted by create_app(). Put
+    # this test probe before it so GET/HEAD exercise the middleware, not HTML.
+    app.router.routes.insert(0, app.router.routes.pop())
     return TestClient(app)
 
 
