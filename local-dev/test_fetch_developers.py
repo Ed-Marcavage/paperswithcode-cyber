@@ -6,6 +6,7 @@ from fetch_developers import collect
 
 class CollectDeveloperTests(unittest.TestCase):
     repo = {"id": 101, "full_name": "alice/tool", "private": False,
+            "html_url": "https://github.com/alice/tool", "stargazers_count": 42, "archived": False,
             "owner": {"id": 1, "login": "alice", "type": "User"}}
 
     def test_owner_is_one_account_and_all_pages_are_used(self):
@@ -16,6 +17,9 @@ class CollectDeveloperTests(unittest.TestCase):
             snapshot = collect("old-name/tool")
         self.assertEqual(snapshot["catalog_name"], "old-name/tool")
         self.assertEqual(snapshot["full_name"], "alice/tool")
+        # The same response gives the star observation import_developers.py stores.
+        self.assertEqual((snapshot["url"], snapshot["stars"], snapshot["archived"]),
+                         ("https://github.com/alice/tool", 42, False))
         api.assert_called_with("repos/alice/tool/contributors?per_page=100", "--paginate", "--slurp")
         self.assertEqual(snapshot["users"], [
             dict(id=1, login="alice", owns=True, commits=3),

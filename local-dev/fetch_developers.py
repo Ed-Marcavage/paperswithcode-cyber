@@ -1,4 +1,9 @@
-"""Collect public GitHub owner/contributor snapshots for repositories in a local catalog."""
+"""Collect public GitHub owner/contributor snapshots for repositories in a local catalog.
+
+Only credited repositories (an official link from a catalog work; for industry posts, the
+roles in import_post_links.CREDITED_ROLES) are collected. The same `repos/` response also
+gives the star observation, which import_developers.py stores like repository_catalog.py.
+"""
 import argparse
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
@@ -33,6 +38,7 @@ def collect(full_name):
                 users[user["id"]] = dict(id=user["id"], login=user["login"],
                                          owns=user["id"] == owner["id"], commits=user["contributions"])
     return dict(catalog_name=full_name, github_repo_id=repo["id"], full_name=repo["full_name"],
+                url=repo["html_url"], stars=repo["stargazers_count"], archived=repo["archived"],
                 observed_at=observed, users=list(users.values()))
 
 
@@ -40,7 +46,7 @@ def tracked(api):
     names = set()
     page = 1
     while page:
-        with urlopen(f"{api}/repositories/?page_size=100&page={page}", timeout=30) as response:
+        with urlopen(f"{api}/repositories/?page_size=100&page={page}&official_only=true", timeout=30) as response:
             data = json.load(response)
         names.update(f"{r['owner']}/{r['name']}" for r in data["results"])
         page = data["next_page"]

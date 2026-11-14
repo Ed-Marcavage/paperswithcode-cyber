@@ -23,13 +23,15 @@ CREATE TABLE IF NOT EXISTS discovery_github_repo_accounts (
 CREATE INDEX IF NOT EXISTS ix_discovery_repo_accounts_github_id
     ON discovery_github_repo_accounts (github_id);
 
+-- Only credited links (is_official) make developers: a post that merely cites
+-- a repository as target, supporting or dependency code does not.
 CREATE OR REPLACE VIEW discovery_developer_work AS
 WITH tracked AS (
     SELECT DISTINCT ON (s.github_repo_id) s.*
     FROM discovery_github_repo_snapshots s
     WHERE EXISTS (
         SELECT 1 FROM paper_repositories pr JOIN discovery_works w USING (paper_id)
-        WHERE pr.repository_id = s.repository_id
+        WHERE pr.repository_id = s.repository_id AND pr.is_official
     )
     ORDER BY s.github_repo_id, s.observed_at DESC, s.repository_id
 )

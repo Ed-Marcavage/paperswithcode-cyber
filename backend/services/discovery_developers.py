@@ -6,7 +6,8 @@ from sqlalchemy.orm import Session
 from backend.models.developers import DeveloperProfile, Developers
 
 
-# Work-level facets stay together through matching. Collapse to one developer/repo
+# Work-level facets stay together through matching. Only credited (is_official)
+# links count: a post citing a repository as target or dependency adds no facets. Collapse to one developer/repo
 # before ranking so multiple linked works cannot inflate counts or star totals.
 WORK = """
     WITH work AS (
@@ -17,7 +18,7 @@ WORK = """
         JOIN repositories r ON r.id = s.repository_id
         JOIN paper_repositories pr USING (repository_id)
         JOIN discovery_works w USING (paper_id)
-        WHERE strpos(lower(d.login), lower(:q)) > 0
+        WHERE pr.is_official AND strpos(lower(d.login), lower(:q)) > 0
           AND (:repository = '' OR lower(d.full_name) = lower(:repository))
     )
 """

@@ -1,4 +1,8 @@
-"""Apply completed repo snapshots atomically to the local discovery catalog."""
+"""Apply completed repo snapshots atomically to the local discovery catalog.
+
+Snapshots from fetch_developers.py also carry the star observation; it is stored and scored
+with repository_catalog.py's own functions. Only credited (is_official) links count.
+"""
 import argparse
 import json
 from pathlib import Path
@@ -6,16 +10,18 @@ import re
 
 from sqlalchemy import text
 
-from repository_catalog import ROOT, local_session
+from repository_catalog import ROOT, local_session, score, store_snapshot
 
 
 def import_snapshots(records, execute):
     updated = 0
     with local_session() as db:
         db.execute(text("SELECT pg_advisory_xact_lock(hashtext('discovery-developers'))"))
-        for sql in (ROOT / "backend/database/migrations/add_discovery_developers.sql").read_text().split(";"):
-            if sql.strip():
-                db.execute(text(sql))
+        for migration in ("add_discovery_post_links.sql", "add_discovery_developers.sql"):
+            for sql in (ROOT / "backend/database/migrations" / migration).read_text().split(";"):
+                if sql.strip():
+                    db.execute(text(sql))
+        starred = []
         for row in records:
             if not re.fullmatch(r"[\w.-]+/[\w.-]+", row["full_name"], re.ASCII):
                 raise ValueError("Invalid repository path")
@@ -23,11 +29,16 @@ def import_snapshots(records, execute):
             repo_id = db.execute(text("""
                 SELECT id FROM repositories r WHERE lower(url) = lower(:url) AND EXISTS (
                     SELECT 1 FROM paper_repositories pr JOIN discovery_works w USING (paper_id)
-                    WHERE pr.repository_id = r.id)
+                    WHERE pr.repository_id = r.id AND pr.is_official)
             """), params).scalar_one_or_none()
             if repo_id is None:
                 continue
             params["repo"] = repo_id
+            if "stars" in row:
+                from backend.models.database import Repository
+                snapshot = {key: row[key] for key in ("full_name", "url", "stars", "archived", "observed_at")}
+                if store_snapshot(db, db.get(Repository, repo_id), snapshot):
+                    starred.append(repo_id)
             current = db.execute(text("""
                 INSERT INTO discovery_github_repo_snapshots AS s
                     (repository_id, github_repo_id, full_name, observed_at) VALUES
@@ -56,7 +67,10 @@ def import_snapshots(records, execute):
                     VALUES (:repo, :id, :owns, :commits)
                 """), values)
             updated += 1
+        db.flush()
         if execute:
+            # The upstream calculator commits this transaction, as in repository_catalog.py.
+            score(db, starred)
             db.commit()
     return updated
 
