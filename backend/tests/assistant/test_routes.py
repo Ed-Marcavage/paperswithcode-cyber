@@ -55,11 +55,19 @@ def test_every_other_api_write_stays_read_only(client, method, path):
     assert client.request(method, path, json={}).status_code == 405
 
 
-def test_delete_is_admitted_only_inside_assistant(client):
-    @client.app.delete("/api/v1/assistant/test-delete")
-    def delete():
-        return {"deleted": True}
-    assert client.delete("/api/v1/assistant/test-delete").json() == {"deleted": True}
+@pytest.mark.parametrize("method", ["POST", "PATCH", "DELETE"])
+def test_assistant_write_methods_are_admitted(client, method):
+    @client.app.api_route("/api/v1/assistant/test-write", methods=[method])
+    def write():
+        return {"handled": True}
+    assert client.request(method, "/api/v1/assistant/test-write").json() == {"handled": True}
+
+
+def test_put_is_still_rejected_inside_assistant(client):
+    @client.app.put("/api/v1/assistant/test-write")
+    def write():
+        pytest.fail("PUT reached an assistant handler")
+    assert client.put("/api/v1/assistant/test-write").status_code == 405
 
 
 @pytest.mark.parametrize("spec", ["2.0", "2.4"])

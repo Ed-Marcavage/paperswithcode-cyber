@@ -730,7 +730,7 @@ def create_app() -> FastAPI:
             path = request.scope["path"]
             assistant_write = (
                 path.startswith("/api/v1/assistant/")
-                and request.method in {"POST", "DELETE"}
+                and request.method in {"POST", "PATCH", "DELETE"}
                 and get_assistant_settings().enabled
             )
             if not assistant_write and request.method not in _DISCOVERY_READ_METHODS and (path == "/api" or path.startswith("/api/")):
