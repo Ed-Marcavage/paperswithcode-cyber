@@ -336,6 +336,56 @@ distinct matching owned repos with known star counts). Request
 each individual filter while retaining the others, including username and repo.
 The MCP tools `list_developers` and `get_developer` use the same endpoints.
 
+### Post preview images
+
+A post's card preview is a screenshot of its page: the top 1280x1760 pixels at
+a 1280x900 viewport, scaled to 400x550, JPEG quality 85. If the screenshot is
+rejected, the publisher's social image is used; if there is none, a title card.
+`post_screenshot.mjs` takes the screenshot, one page at a time, with a desktop
+Chrome user agent, a settle wait of about 5 s, one retry after a load failure,
+HTTP 429 or 5xx, and consent banners and dimming layers removed. A capture is
+rejected for HTTP 400 or above, a challenge or block page (a `cf-mitigated`
+header, a known challenge widget, or challenge wording in the title or in a page
+with under 3,000 characters of text), or a mostly blank image (92% or more of
+pixels within 8 grey levels of the most common one). Challenges are not worked
+around. Details are in `post_previews.py`.
+
+Screenshots run on the host, not in the backend container. They need Node on
+`PATH`, a Playwright package and an installed Chromium; nothing is downloaded:
+
+```sh
+export PWC_PLAYWRIGHT_CORE=~/.npm/_npx/<hash>/node_modules/playwright-core
+export PWC_CHROMIUM=~/Library/Caches/ms-playwright/chromium-1217/chrome-mac-arm64/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"
+```
+
+Without `PWC_CHROMIUM`, Playwright's own expected build is used. The commands
+stop with an explanation if Node, Playwright or Chromium is missing.
+`--no-screenshots` keeps artwork or title card only.
+
+New posts get previews from `catalog_post_previews.py` as before (see
+`seeds/harness-catalog/README.md`); `previews/report.json` in the output
+bundle records the method per post and why a screenshot was rejected. To
+refresh posts already in the catalog, write the images to a new folder, check
+the contact sheet, then load them as a separate step:
+
+```sh
+uv run python local-dev/refresh_post_previews.py shoot /tmp/post-previews 1008 https://example.com/post --api http://localhost:8095
+uv run python local-dev/refresh_post_previews.py sheet /tmp/post-previews
+sh local-dev/compose.sh cp /tmp/post-previews backend:/tmp/post-previews
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json --execute
+```
+
+`shoot` takes paper ids (resolved through the catalog API) or post URLs, or
+`--from-file` with one per line. `manifest.json` lists each post's file,
+SHA-256 digest, method and rejection reason. The load is a dry run that only
+reads the database unless `--execute` is given. It stores each JPEG in
+`discovery_previews` under its digest and sets `papers.thumbnail_url` to
+`/api/v1/catalog/papers/{id}/preview/{digest}.jpg`, as `import_catalog.py`
+does. It skips posts whose URL differs from the manifest and posts whose
+thumbnail came from elsewhere. The backend image must include this commit, or
+copy `load_post_previews.py` into the container with the folder.
+
 ### Public HTML and Markdown
 
 With `PWC_DISCOVERY_CATALOG=true`, FastAPI serves visible initial HTML at `/`,
