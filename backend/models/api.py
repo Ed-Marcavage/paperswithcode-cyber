@@ -203,6 +203,7 @@ from backend.models.trends import (
 )
 from backend.models.assistant import AssistantTurnRequest as AssistantTurnRequest
 from backend.models.assistant import AssistantFeedbackRequest as AssistantFeedbackRequest
+from backend.models.assistant import AssistantRenameRequest as AssistantRenameRequest
 from backend.models.research import (
     FollowView as FollowView,
     ResearchEntry as ResearchEntry,

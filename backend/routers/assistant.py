@@ -13,12 +13,12 @@ import anyio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
 
 from backend.assistant_config import AssistantSettings, get_assistant_settings
 from backend.config import get_settings
-from backend.models.assistant import AssistantTurnRequest, AssistantFeedbackRequest
+from backend.models.assistant import AssistantTurnRequest, AssistantFeedbackRequest, AssistantRenameRequest
 from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
 from backend.services.assistant_store import (
@@ -178,3 +178,44 @@ def feedback(run_id: UUID, payload: AssistantFeedbackRequest, settings=Depends(r
     except ConversationNotFound:
         raise HTTPException(404, "Answer not found.") from None
     return {"saved": True}
+
+
+def private_response(value, visitor, settings):
+    response = JSONResponse(value, headers={"Cache-Control": "no-store"})
+    set_visitor_cookie(response, visitor, settings)
+    return response
+
+
+@router.get("/conversations")
+def conversations(settings=Depends(require_assistant), visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    return private_response(store.list_conversations(visitor), visitor, settings)
+
+
+@router.get("/conversations/{conversation_id}")
+def conversation(conversation_id: UUID, settings=Depends(require_assistant),
+                 visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    try:
+        result = store.get_conversation(visitor, str(conversation_id))
+    except ConversationNotFound:
+        raise HTTPException(404, "Chat not found.") from None
+    return private_response(result, visitor, settings)
+
+
+@router.patch("/conversations/{conversation_id}")
+def rename_conversation(conversation_id: UUID, payload: AssistantRenameRequest, settings=Depends(require_assistant),
+                        visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    try:
+        result = store.rename(visitor, str(conversation_id), payload.title)
+    except ConversationNotFound:
+        raise HTTPException(404, "Chat not found.") from None
+    return private_response(result, visitor, settings)
+
+
+@router.delete("/conversations/{conversation_id}", status_code=204)
+def delete_conversation(conversation_id: UUID, settings=Depends(require_assistant),
+                        visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    try:
+        store.delete_conversation(visitor, str(conversation_id))
+    except ConversationNotFound:
+        raise HTTPException(404, "Chat not found.") from None
+    return Response(status_code=204, headers={"Cache-Control": "no-store"})

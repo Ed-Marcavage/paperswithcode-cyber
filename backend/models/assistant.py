@@ -31,3 +31,15 @@ class AssistantTurnRequest(BaseModel):
 class AssistantFeedbackRequest(BaseModel):
     rating: Literal["good", "bad"]
     note: str = Field(default="", max_length=500)
+
+
+class AssistantRenameRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=60)
+
+    @field_validator("title")
+    @classmethod
+    def nonblank_title(cls, value: str) -> str:
+        value = " ".join(value.split())
+        if not value:
+            raise ValueError("Please enter a title.")
+        return value

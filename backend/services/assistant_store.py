@@ -51,10 +51,11 @@ class AssistantStore:
         self.sessions = sessions
 
     @staticmethod
-    def owned(db, conversation_id, visitor):
-        row = db.scalar(select(AssistantConversation).where(
+    def owned(db, conversation_id, visitor, *, lock=False):
+        query = select(AssistantConversation).where(
             AssistantConversation.id == conversation_id,
-            AssistantConversation.visitor_hash == visitor_hash(visitor)))
+            AssistantConversation.visitor_hash == visitor_hash(visitor))
+        row = db.scalar(query.with_for_update() if lock else query)
         if row is None:
             raise ConversationNotFound()
         return row
@@ -71,7 +72,7 @@ class AssistantStore:
                        created_at=now, updated_at=now))
                 db.flush()
             else:
-                self.owned(db, conversation_id, visitor)
+                self.owned(db, conversation_id, visitor, lock=True)
             # The conditional increment is atomic across workers and tabs.
             count = db.scalar(update(AssistantConversation).where(
                 AssistantConversation.id == conversation_id,
@@ -103,12 +104,18 @@ class AssistantStore:
 
     def record_step(self, saved: SavedTurn, position: int, step: dict):
         with self.sessions.begin() as db:
+            if db.scalar(select(AssistantConversation).where(
+                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                return
             if db.get(AssistantRun, saved.run_id) is not None:
                 db.add(AssistantRunStep(id=identifier(), run_id=saved.run_id, position=position,
                                        kind=step["kind"], detail=step))
 
     def finish(self, saved: SavedTurn, turn):
         with self.sessions.begin() as db:
+            if db.scalar(select(AssistantConversation).where(
+                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                return
             message = db.get(AssistantMessage, saved.message_id)
             if message is None:
                 return  # The visitor may delete a chat while it is streaming.
@@ -132,8 +139,49 @@ class AssistantStore:
             run = db.get(AssistantRun, run_id)
             if run is None:
                 raise ConversationNotFound()
-            self.owned(db, run.conversation_id, visitor)
+            conversation = self.owned(db, run.conversation_id, visitor, lock=True)
+            conversation.updated_at = datetime.now(UTC)
             run.feedback_rating, run.feedback_note = rating, note
+
+    @staticmethod
+    def summary(row):
+        return {"id": row.id, "title": row.title, "updated_at": row.updated_at.replace(tzinfo=UTC).isoformat(),
+                "question_count": row.question_count, "question_limit": QUESTION_LIMIT}
+
+    def list_conversations(self, visitor):
+        with self.sessions() as db:
+            return [self.summary(row) for row in db.scalars(select(AssistantConversation).where(
+                AssistantConversation.visitor_hash == visitor_hash(visitor))
+                .order_by(AssistantConversation.updated_at.desc(), AssistantConversation.id))]
+
+    def get_conversation(self, visitor, conversation_id):
+        with self.sessions() as db:
+            result = self.summary(self.owned(db, conversation_id, visitor))
+            messages = list(db.scalars(select(AssistantMessage).where(
+                AssistantMessage.conversation_id == conversation_id).order_by(AssistantMessage.position)))
+            runs = {r.message_id: r for r in db.scalars(select(AssistantRun).where(AssistantRun.conversation_id == conversation_id))}
+            steps = {}
+            for call in db.scalars(select(AssistantToolCall).join(AssistantMessage).where(
+                    AssistantMessage.conversation_id == conversation_id).order_by(AssistantToolCall.position)):
+                steps.setdefault(call.message_id, []).append(call.detail)
+            result["messages"] = [{"id": m.id, "role": m.role, "content": m.content, "status": m.status,
+                                   "tool_steps": steps.get(m.id, []),
+                                   "run_id": runs[m.id].id if m.id in runs else None,
+                                   "error": runs[m.id].error if m.id in runs else None,
+                                   "feedback": {"rating": runs[m.id].feedback_rating, "note": runs[m.id].feedback_note}
+                                   if m.id in runs else None} for m in messages]
+            return result
+
+    def rename(self, visitor, conversation_id, title):
+        with self.sessions.begin() as db:
+            row = self.owned(db, conversation_id, visitor, lock=True)
+            row.title, row.updated_at = title, datetime.now(UTC)
+            return self.summary(row)
+
+    def delete_conversation(self, visitor, conversation_id):
+        with self.sessions.begin() as db:
+            row = self.owned(db, conversation_id, visitor, lock=True)
+            db.delete(row)
 
     @staticmethod
     def trace(db, run):
