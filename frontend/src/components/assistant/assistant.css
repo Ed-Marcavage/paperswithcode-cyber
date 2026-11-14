@@ -59,3 +59,9 @@
 .assistant-landing button { padding: 5px 10px; font-size: 13px; font-weight: 600; }
 .assistant-landing button:disabled { opacity: .45; }
 @media (max-width: 640px) { .assistant-landing { margin-bottom: 10px; } }
+/* Keep Editor's picks directly after the compact chat box on narrow screens. */
+@media (max-width: 880px) {
+  .assistant-home .feed-content { order: 2; }
+  .assistant-home .sidebar-section-top-domains { order: 3; }
+  .assistant-home .sidebar-section-trending-domains { order: 4; }
+}

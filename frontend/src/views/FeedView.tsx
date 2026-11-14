@@ -481,7 +481,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const error = infinite.error;
 
   return (
-    <div className="page">
+    <div className={`page${isAssistantEnabled() ? " assistant-home" : ""}`}>
       <div className="feed-header">
         <div>
           <h1 className="feed-title">
