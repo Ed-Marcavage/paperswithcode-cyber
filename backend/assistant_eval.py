@@ -1,0 +1,105 @@
+"""Run the fixed, sequential catalog evaluation; no database or visitor identity.
+
+Usage: uv run --env-file .local.env python -m backend.assistant_eval \
+    --model glm-5.3-flash --output .assistant-evals/glm.jsonl
+A full evaluation can use up to 160 model requests. Run only with the owner's
+explicit budget authorization, not as an automated test or startup check.
+"""
+
+import argparse
+import asyncio
+import json
+import re
+import sys
+import time
+from pathlib import Path
+
+import httpx
+from pydantic import ValidationError
+
+from backend.assistant_config import AssistantSettings
+from backend.services.assistant_loop import Turn, model_client, run_turn
+from backend.services.assistant_mcp import CatalogMcp
+
+QUESTIONS = (
+    "Show me recent security papers in the catalog.",
+    "Which organizations have research in the catalog?",
+    "Show me repositories for security research.",
+    "Which developers contribute to catalog repositories?",
+    "What is EVMbench, and where can I read its catalog page?",
+    "Find Cybench and summarize what it evaluates, with catalog links.",
+    "Find ChatAFL and its official repository in the catalog.",
+    "Which catalog topics and target categories can I browse?",
+    "Find papers about fuzzing and test generation.",
+    "Find research about smart-contract security.",
+    "Show catalog work on vulnerability repair.",
+    "Find security work involving AI systems.",
+    "Show engineering posts about security from the catalog.",
+    "Which catalog repositories have the most stars? Explain what the counts mean.",
+    "List trending security papers and link their catalog pages.",
+    "Pick a listed organization and describe its catalog work with a link to its organization page.",
+    "Pick a listed developer and show their tracked repositories and profile link.",
+    "Find related work for one recent security paper, citing catalog evidence.",
+    "Read the cached text for EVMbench and summarize its evaluation; say if no text is cached.",
+    "Find a catalog entry titled ZZZ-Unpublished-Quantum-Toaster-999; say plainly if it is absent.",
+)
+
+
+def result_row(index, question, model, turn, elapsed):
+    model_steps = [s for s in turn.steps if s["kind"] == "model"]
+    tokens = {}
+    for field in ("input_tokens", "output_tokens"):
+        values = [s.get(field) for s in model_steps]
+        tokens[field] = sum(values) if values and all(v is not None for v in values) else None
+    return {"question_id": index, "question": question, "model": model,
+            "answer": turn.text, "status": turn.status, "error": turn.error,
+            "tools": [s for s in turn.steps if s["kind"] == "tool"],
+            "links": sorted(set(re.findall(r"\]\((https?://[^\s)]+|/[^\s)]+)\)", turn.text))),
+            "duration_ms": round(elapsed * 1000), "tokens": tokens,
+            "model_calls": len(model_steps)}
+
+
+async def evaluate(client, mcp, model, output, *, questions=QUESTIONS):
+    """Write each completed question immediately, stopping if a quota is hit."""
+    for index, question in enumerate(questions, 1):
+        turn = Turn()
+        began = time.monotonic()
+        async for _ in run_turn(client, mcp, model, [{"role": "user", "content": question}], turn):
+            pass
+        row = result_row(index, question, model, turn, time.monotonic() - began)
+        output.write(json.dumps(row, ensure_ascii=False) + "\n")
+        output.flush()
+        print(f"Question {index}/{len(questions)}: {turn.status}; {row['duration_ms']} ms", file=sys.stderr)
+        if turn.status == "provider_limit":
+            return False
+    return True
+
+
+async def run(args):
+    settings = AssistantSettings()
+    if not settings.api_key.get_secret_value():
+        print("Set PWC_ASSISTANT_API_KEY in the process environment.", file=sys.stderr)
+        return 2
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    # Exclusive creation prevents replacing an earlier evaluation accidentally.
+    with args.output.open("x", encoding="utf-8") as output:
+        async with httpx.AsyncClient(timeout=30) as http, model_client(settings) as client:
+            completed = await evaluate(client, CatalogMcp(http, args.mcp_url), args.model, output)
+    return 0 if completed else 2
+
+
+def main(argv=None):
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--model", required=True, help="Named model; no implicit model selection")
+    parser.add_argument("--mcp-url", default="http://localhost:8095/mcp")
+    parser.add_argument("--output", required=True, type=Path)
+    args = parser.parse_args(argv)
+    try:
+        return asyncio.run(run(args))
+    except (OSError, httpx.HTTPError, ValidationError):
+        print("Evaluation could not finish. Check the local endpoint and output path.", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

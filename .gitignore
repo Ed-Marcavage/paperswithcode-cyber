@@ -87,3 +87,4 @@ frontend/dist.rollback-*/
 # Standalone local/hosted-training experiments live outside the application tree.
 # Publish these through their owning environment registry instead of this repo.
 environments/pwc_url_extraction_v1/
+.assistant-evals/

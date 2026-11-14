@@ -390,3 +390,104 @@ the same heading React shows. Owner-pinned posts (`pinned` in
 Future intake should poll engineering blogs (including OpenAI, Anthropic,
 Cloudflare, Ramp and Shopify) hourly, detect new cyber-related posts, and feature
 them on the day they are added. That scraper and daily placement are not implemented.
+
+## Optional Cyber assistant (local review)
+
+The independent catalog assistant uses Ollama cloud and the same read-only MCP
+catalog. It does not enable upstream chat, OAuth, web search or editor jobs.
+The backend and frontend switches default to false. Put the Ollama key only in
+the private ignored `.local.env` as `PWC_ASSISTANT_API_KEY` (or supply it in the
+process environment). Never put it in a `VITE_*` setting, command argument, log,
+committed file or rendered Compose output. If `.local.env` is a symlink, retain
+that link and manage its target privately. The implementer does not modify it.
+
+For the reviewer to enable the assistant, set `PWC_ASSISTANT_ENABLED=true` and
+`VITE_ASSISTANT_ENABLED=true` in that private configuration. Leave
+`VITE_CHAT_ENABLED=false`. Compose passes the key to the backend only; no model
+key is required by the frontend or MCP. Settings:
+
+| Setting | Default |
+| --- | --- |
+| `PWC_ASSISTANT_BASE_URL` | `https://ollama.com/v1` |
+| `PWC_ASSISTANT_MODEL` | `glm-5.3-flash` (provisional until evaluation) |
+| `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
+| `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
+| `PWC_ASSISTANT_RETENTION_DAYS` | `90`, measured from last activity |
+
+Compose permits the internal `mcp:7860` Host header and forces
+`PWC_ASSISTANT_STORE_ANALYTICS_SESSION=false`; the browser never submits a
+PostHog session id. No key produces a plain 503. A provider usage limit is stored
+in the database and disables every composer until the reset; status checks do
+not call a model. Temporary provider concurrency errors are retried briefly.
+
+Before enabling on an existing **local** database, the reviewer applies the
+three additive migrations in order (a new empty database's `init-db.sh` uses
+ORM `create_all`, which includes these tables):
+
+```sh
+for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql
+do
+  sh local-dev/compose.sh exec -T db psql -U pwc_local -d pwc_local -v ON_ERROR_STOP=1 < "backend/database/migrations/$migration"
+done
+```
+
+Then the reviewer rebuilds/restarts the backend and frontend using the normal
+local workflow above. Implementation work does not start, stop or rebuild any
+containers. Inspect the panel, `/chat`, reload restoration, a second browser
+profile, and the three disabled composers using a fake provider. No host
+`npm run build` is needed for implementation checks.
+
+Read traces with the local backend environment (these commands need no model
+key):
+
+```sh
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli list --days 7
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli show RUN_ID
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export --days 7 > /tmp/assistant-runs.jsonl
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli purge
+```
+
+Schedule the purge command daily in the review/deployment environment when
+chat is enabled. It removes chats older than the configured last-activity
+retention, including messages, tools, runs, steps and feedback. Sending,
+completing, renaming and giving feedback update last activity; reading does not.
+The disclosed default is 90 days; update the privacy page if changing it.
+
+### Model evaluation
+
+`backend.assistant_eval` asks the same 20 fixed questions in order, with fresh
+history per question and the application's normal bounded loop. Its JSON Lines
+output records question, named model, answer, status/error, tools and results,
+links, duration, model-call count and input/output tokens (null when absent).
+It writes each row immediately and stops on a provider usage limit. It neither
+writes chat history to the database nor sends analytics.
+
+**Obtain a live-request budget before running.** Twenty questions can make up to
+160 model requests. The implementation specification's allowance of a few live
+requests does not authorize a complete evaluation. Use fake providers in tests.
+With an authorized budget and an already-running local MCP:
+
+```sh
+uv run --env-file .local.env python -m backend.assistant_eval \
+  --model glm-5.3-flash --mcp-url http://localhost:8095/mcp \
+  --output .assistant-evals/glm-5.3-flash.jsonl
+```
+
+Outputs are ignored by Git and exclusive-created (use a new name for a repeat).
+Review all 20 answers against their recorded tool evidence: supported facts,
+real catalog links, no invented result for the deliberately missing title,
+useful answers, failures, latency and token usage. Record the chosen model and
+reason in the local implementation report; only then update the default if
+needed. No evaluation results or model choice are claimed by the script itself.
+
+### Nginx review configuration
+
+Include `nginx-assistant-http.conf` once inside nginx's `http` block, then include
+`nginx-public-pages.conf` inside the Cyber `server` block. The exact assistant
+turn location has a generous **2 requests/second per IP with a burst of 60**,
+returns 429 for excess traffic, disables proxy buffering and caching, and allows
+120 seconds for streaming. This is a proxy abuse limit, not a per-visitor daily
+or concurrent-turn quota. Other assistant paths use the existing API proxy.
+The normal Vite review proxy streams directly; these fragments are for review,
+not an instruction to deploy or reload nginx. Validate the assembled configuration
+as an unprivileged isolated instance following `docs/development-guide.md`.

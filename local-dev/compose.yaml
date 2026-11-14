@@ -26,6 +26,14 @@ services:
       PWC_DB_PORT: "5432"
       PWC_HOST: "0.0.0.0"
       PWC_PORT: "8000"
+      PWC_ASSISTANT_ENABLED: ${PWC_ASSISTANT_ENABLED:-false}
+      PWC_ASSISTANT_API_KEY: ${PWC_ASSISTANT_API_KEY:-}
+      PWC_ASSISTANT_BASE_URL: ${PWC_ASSISTANT_BASE_URL:-https://ollama.com/v1}
+      PWC_ASSISTANT_MODEL: ${PWC_ASSISTANT_MODEL:-glm-5.3-flash}
+      PWC_ASSISTANT_MCP_URL: ${PWC_ASSISTANT_MCP_URL:-http://mcp:7860/mcp}
+      PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES: ${PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES:-30}
+      PWC_ASSISTANT_RETENTION_DAYS: ${PWC_ASSISTANT_RETENTION_DAYS:-90}
+      PWC_ASSISTANT_STORE_ANALYTICS_SESSION: "false"
     depends_on:
       db:
         condition: service_healthy
@@ -53,7 +61,7 @@ services:
       PWC_API_URL: http://backend:8000/api/v1
       PWC_CATALOG_ONLY: "1"
       PWC_SITE_URL: http://localhost:${CATALOG_PORT:-8095}
-      PWC_MCP_ALLOWED_HOSTS: localhost:*,127.0.0.1:*
+      PWC_MCP_ALLOWED_HOSTS: localhost:*,127.0.0.1:*,mcp:7860
       PWC_MCP_ALLOWED_ORIGINS: http://localhost:${CATALOG_PORT:-8095},http://127.0.0.1:${CATALOG_PORT:-8095}
       PWC_MCP_CURSOR_KEY_CURRENT: ${PWC_MCP_CURSOR_KEY_CURRENT:?Run configure.py}
     depends_on:
@@ -69,6 +77,7 @@ services:
       VITE_ALLOWED_HOSTS: ${VITE_ALLOWED_HOSTS:-localhost}
       VITE_DISABLE_AUTH: "1"
       VITE_CHAT_ENABLED: "false"
+      VITE_ASSISTANT_ENABLED: ${VITE_ASSISTANT_ENABLED:-false}
       VITE_LOCAL_CATALOG: "true"
       VITE_API_URL: ""
       VITE_POSTHOG_PROJECT_TOKEN: ${VITE_POSTHOG_PROJECT_TOKEN:-}
