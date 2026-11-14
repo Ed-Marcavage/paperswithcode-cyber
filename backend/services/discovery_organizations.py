@@ -12,7 +12,8 @@ def with_catalog_metrics(
         return []
     # Paper attribution and repository ownership are separate relationships.
     # EXISTS limits ownership to cataloged repos without multiplying their stars
-    # when several papers link to the same repo.
+    # when several papers link to the same repo. Only credited (is_official) links
+    # count, so a post citing another company's repository adds nothing.
     rows = db.execute(
         text("""
         WITH kinds AS (
@@ -29,7 +30,7 @@ def with_catalog_metrics(
             FROM organizations o JOIN repositories r
               ON lower(rtrim(o.github_url, '/')) = 'https://github.com/' || lower(r.owner)
             WHERE EXISTS (SELECT 1 FROM paper_repositories pr JOIN discovery_works w
-                          ON w.paper_id=pr.paper_id WHERE pr.repository_id=r.id)
+                          ON w.paper_id=pr.paper_id WHERE pr.repository_id=r.id AND pr.is_official)
             GROUP BY o.id
         )
         SELECT o.id, coalesce(k.papers,0) AS paper_count, coalesce(k.posts,0) AS post_count,

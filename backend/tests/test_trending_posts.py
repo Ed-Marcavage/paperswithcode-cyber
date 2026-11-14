@@ -79,7 +79,7 @@ def test_heading_makes_a_date_claim_only_without_pins():
 def test_publisher_name_prefers_curated_then_map_then_host():
     assert publisher_name("https://www.endorlabs.com/learn/x", "Endor Labs") == "Endor Labs"
     assert publisher_name("https://www.elastic.co/security-labs/blog/x") == "Elastic"
-    assert publisher_name("https://projectzero.google/2026/10/x.html") == "Google Project Zero"
+    assert publisher_name("https://projectzero.google/2026/10/x.html") == "Google"
     assert publisher_name("https://security.microsoft.com/x") == "Microsoft"
     assert publisher_name("https://unknown.example/post") == "unknown.example"
     assert publisher_name(None) is None

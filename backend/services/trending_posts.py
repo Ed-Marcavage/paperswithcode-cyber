@@ -23,7 +23,7 @@ from typing import Optional
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from backend.services.publishers import publisher_name
+from backend.services.publishers import PUBLISHER_ORGANIZATION_SQL, publisher_name
 
 # None anchors to the newest reviewed post's date; set a date to pin it.
 ANCHOR_DATE: Optional[date] = None
@@ -37,7 +37,8 @@ DECAY_HALF_LIFE_DAYS = 7
 
 _POSTS = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
-           p.title, p.date_published, w.facets, w.source_url, w.post_details AS post
+           p.title, p.date_published, w.facets, w.source_url, w.post_details AS post,
+           """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
      WHERE w.facets -> 'kind' ? 'post' AND w.post_details IS NOT NULL
        AND p.date_published IS NOT NULL
@@ -108,8 +109,10 @@ def rank_feed(rows: list[dict], anchor: date) -> list[dict]:
 
 
 def _serialize(row: dict) -> dict:
+    row = dict(row)
+    organization = row.pop("publisher_organization", None)
     return {**row, "date_published": _published_on(row).isoformat(),
-            "publisher": publisher_name(row["source_url"], row["post"].get("curated_company"))}
+            "publisher": publisher_name(row["source_url"], row["post"].get("curated_company"), organization)}
 
 
 def block_heading(pinned: int, shown: int, this_week: bool) -> str:

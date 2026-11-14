@@ -18,6 +18,10 @@ def load(manifest, execute):
         ):
             raise RuntimeError("Organization seed requires the local catalog database")
         db.execute(text("SELECT pg_advisory_xact_lock(27451504)"))
+        migration = Path(__file__).resolve().parents[1] / "backend/database/migrations/add_discovery_post_links.sql"
+        for statement in migration.read_text().split(";"):
+            if statement.strip():
+                db.execute(text(statement))
         for row in manifest:
             org = db.query(Organization).filter_by(slug=row["slug"]).one_or_none()
             if org is None:
@@ -40,12 +44,18 @@ def load(manifest, execute):
                     text("SELECT paper_id FROM discovery_works WHERE catalog_id=:id"),
                     {"id": link["id"]},
                 ).scalar_one()
-                if db.get(PaperOrganization, (paper_id, org.id)) is None:
+                existing = db.get(PaperOrganization, (paper_id, org.id))
+                if existing is None:
                     db.add(
                         PaperOrganization(
-                            paper_id=paper_id, organization_id=org.id, source="manual"
+                            paper_id=paper_id,
+                            organization_id=org.id,
+                            source="manual",
+                            role=link["role"],
                         )
                     )
+                elif existing.role is None:
+                    existing.role = link["role"]
         db.flush()
         if execute:
             db.commit()
