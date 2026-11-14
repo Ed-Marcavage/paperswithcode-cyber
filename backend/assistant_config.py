@@ -16,6 +16,7 @@ class AssistantSettings(BaseSettings):
     model: str = "glm-5.3-flash"
     retention_days: int = Field(default=90, ge=1)
     store_analytics_session: bool = False
+    limit_cooldown_minutes: int = Field(default=30, ge=1)
 
 
 @lru_cache

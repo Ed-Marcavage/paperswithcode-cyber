@@ -13,6 +13,7 @@ import anyio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from starlette.responses import StreamingResponse
+from starlette.responses import JSONResponse
 from starlette.concurrency import run_in_threadpool
 
 from backend.assistant_config import AssistantSettings, get_assistant_settings
@@ -23,6 +24,7 @@ from backend.services.assistant_mcp import CatalogMcp
 from backend.services.assistant_store import (
     ConversationNotFound, QuestionLimitReached, SavedTurn, get_assistant_store,
 )
+from backend.services.assistant_provider import quota_reset, safe_provider_message
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 COOKIE_NAME = "pwc_assistant_visitor"
@@ -90,10 +92,17 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
     async def record(step):
         with anyio.CancelScope(shield=True):
             await run_in_threadpool(store.record_step, saved, len(turn.steps) - 1, step)
+    async def provider_limit(error):
+        # Persist the cooldown even if the browser disconnects at this point.
+        with anyio.CancelScope(shield=True):
+            reset = await quota_reset(error, settings)
+            return await run_in_threadpool(store.record_provider_limit,
+                safe_provider_message(error, settings.api_key.get_secret_value()), reset)
     try:
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
-            events = run_turn(client, CatalogMcp(http, settings.mcp_url), settings.model, saved.history, turn, on_step=record)
+            events = run_turn(client, CatalogMcp(http, settings.mcp_url), settings.model, saved.history, turn,
+                              on_step=record, on_provider_limit=provider_limit)
             async with aclosing(events):
                 async for event in events:
                     if event["type"] in {"done", "error"}:
@@ -118,6 +127,9 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
 @router.post("/turn")
 async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assistant),
                     visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    status = await run_in_threadpool(store.provider_status)
+    if not status["available"]:
+        raise HTTPException(503, status)
     try:
         saved = await run_in_threadpool(store.begin, visitor,
                                        str(payload.conversation_id) if payload.conversation_id else None,
@@ -136,6 +148,18 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     )
     set_visitor_cookie(response, visitor, settings)
     return response
+
+
+@router.get("/status")
+def status(store=Depends(get_assistant_store)):
+    settings = get_assistant_settings()
+    if not settings.enabled:
+        result = {"available": False, "code": "disabled", "reason": "The assistant is switched off.", "retry_at": None}
+    elif not settings.api_key.get_secret_value():
+        raise HTTPException(503, "The assistant is not configured yet.")
+    else:
+        result = store.provider_status()
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/runs/{run_id}/feedback")

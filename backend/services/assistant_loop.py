@@ -12,6 +12,7 @@ from openai import APIError, AsyncOpenAI
 
 from backend.assistant_config import AssistantSettings
 from backend.services.assistant_mcp import AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
+from backend.services.assistant_provider import is_busy, is_usage_limit, USAGE_LIMIT_MESSAGE
 
 PROMPT_VERSION = "cyber-assistant-v1"
 SYSTEM_PROMPT = """You are the assistant for Papers with Code Cyber, a curated
@@ -128,6 +129,7 @@ async def model_pass(client, model, messages, tools, result, room):
 async def run_turn(
     client, mcp: CatalogMcp, model: str, history: list[dict], turn: Turn,
     *, limits: TurnLimits = TurnLimits(), on_step: Callable[[dict], Awaitable[None]] | None = None,
+    on_provider_limit: Callable[[APIError], Awaitable[dict]] | None = None,
 ):
     """Yield UI events; keep bounded results and partial answers on ``turn``.
 
@@ -138,13 +140,16 @@ async def run_turn(
     deadline = started + limits.seconds
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
     tools_used = 0
+    model_attempts = 0
 
     async def record(step):
         turn.steps.append(step)
         if on_step:
             await on_step(step)
 
-    async def generate(tools, room):
+    async def generate_once(tools, room):
+        nonlocal model_attempts
+        model_attempts += 1
         result = ModelPass()
         began = time.monotonic()
         status = "done"
@@ -167,10 +172,25 @@ async def run_turn(
                     "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
         yield {"type": "model_result", "result": result}
 
+    async def generate(tools, room):
+        for retry in range(3):
+            previous_text = len(turn.text)
+            try:
+                async with aclosing(generate_once(tools, room)) as stream:
+                    async for event in stream:
+                        yield event
+                return
+            except APIError as error:
+                if (not is_busy(error) or len(turn.text) != previous_text or retry == 2
+                        or model_attempts >= limits.model_turns - 1):
+                    raise
+                # Brief retries use the existing per-turn time/model budgets.
+                await asyncio.sleep(0.5 * (retry + 1))
+
     async def research():
         nonlocal tools_used
         tools = await mcp.tools()
-        for _ in range(max(0, limits.model_turns - 1)):
+        while model_attempts < limits.model_turns - 1:
             room = limits.output_chars - limits.final_chars - len(turn.text)
             if room <= 0:
                 return
@@ -257,7 +277,18 @@ async def run_turn(
     except (asyncio.CancelledError, GeneratorExit):
         turn.status = "cancelled"
         raise
-    except (APIError, AssistantProviderError, AssistantMcpError):
+    except APIError as error:
+        if is_usage_limit(error):
+            turn.status = "provider_limit"
+            turn.error = USAGE_LIMIT_MESSAGE
+            status = await on_provider_limit(error) if on_provider_limit else {}
+            yield {"type": "error", "code": "usage_limit", "message": turn.error,
+                   "retry_at": status.get("retry_at")}
+        else:
+            turn.status = "failed"
+            turn.error = PROVIDER_ERROR
+            yield {"type": "error", "code": "provider_error", "message": turn.error}
+    except (AssistantProviderError, AssistantMcpError):
         turn.status = "failed"
         turn.error = PROVIDER_ERROR
         yield {"type": "error", "code": "provider_error", "message": turn.error}

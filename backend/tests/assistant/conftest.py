@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep
+from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit
 from backend.services.assistant_store import AssistantStore
 
 if sys.platform != "linux":
@@ -34,7 +34,7 @@ def store():
     @event.listens_for(engine, "connect")
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
-    for model in (AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep):
+    for model in (AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit):
         model.__table__.create(engine)
     yield AssistantStore(sessionmaker(bind=engine, expire_on_commit=False))
     engine.dispose()
@@ -52,6 +52,7 @@ def client(monkeypatch, store):
     settings = get_assistant_settings()
     monkeypatch.setattr(settings, "enabled", True)
     monkeypatch.setattr(settings, "api_key", SecretStr("fake"))
+    monkeypatch.setattr(settings, "base_url", "http://model.test/v1")
     monkeypatch.setattr(get_settings(), "discovery_catalog", True)
     app = create_app()
     app.dependency_overrides[get_assistant_store] = lambda: store

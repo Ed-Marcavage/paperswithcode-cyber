@@ -34,6 +34,8 @@ class FakeServices:
     def model(self, request):
         self.model_requests.append(json.loads(request.content))
         reply = next(self.replies)
+        if isinstance(reply, httpx.Response):
+            return reply
         if isinstance(reply, int):
             return httpx.Response(reply, json={"error": {"message": "private detail", "type": "server_error"}})
         body = "".join("data: " + json.dumps(c) + "\n\n" for c in reply) + "data: [DONE]\n\n"

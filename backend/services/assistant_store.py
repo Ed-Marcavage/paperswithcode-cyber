@@ -9,8 +9,10 @@ from sqlalchemy import delete, select, update
 
 from backend.models.database.assistant import (
     AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep,
+    AssistantProviderLimit,
 )
 from backend.services.assistant_loop import SYSTEM_PROMPT, PROMPT_VERSION
+from backend.services.assistant_provider import USAGE_LIMIT_MESSAGE
 
 QUESTION_LIMIT = 10
 
@@ -174,6 +176,21 @@ class AssistantStore:
         with self.sessions.begin() as db:
             return db.execute(delete(AssistantConversation).where(
                 AssistantConversation.created_at < cutoff)).rowcount
+
+    def provider_status(self, *, now=None):
+        now = now or datetime.now(UTC)
+        with self.sessions() as db:
+            reset = db.scalar(select(AssistantProviderLimit.off_until).where(
+                AssistantProviderLimit.off_until > now).order_by(AssistantProviderLimit.off_until.desc()).limit(1))
+            return {"available": reset is None, "code": "usage_limit" if reset else None,
+                    "reason": USAGE_LIMIT_MESSAGE if reset else None,
+                    "retry_at": reset.replace(tzinfo=UTC).isoformat() if reset else None}
+
+    def record_provider_limit(self, message, off_until, *, now=None):
+        with self.sessions.begin() as db:
+            db.add(AssistantProviderLimit(id=identifier(), occurred_at=now or datetime.now(UTC),
+                                          off_until=off_until, provider_message=message))
+        return self.provider_status(now=now)
 
 
 def get_assistant_store() -> AssistantStore:

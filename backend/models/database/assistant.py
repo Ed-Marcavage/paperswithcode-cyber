@@ -73,3 +73,12 @@ class AssistantRunStep(Base):
     position = Column(Integer, nullable=False)
     kind = Column(String(16), nullable=False)
     detail = Column(JSON, nullable=False)
+
+
+class AssistantProviderLimit(Base):
+    __tablename__ = "assistant_provider_limits"
+
+    id = Column(String(36), primary_key=True)
+    occurred_at = Column(DateTime(timezone=True), nullable=False)
+    off_until = Column(DateTime(timezone=True), nullable=False, index=True)
+    provider_message = Column(Text, nullable=False)

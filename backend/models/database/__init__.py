@@ -14,6 +14,7 @@ from backend.models.database.assistant import (
     AssistantToolCall,
     AssistantRun,
     AssistantRunStep,
+    AssistantProviderLimit,
 )
 from backend.models.database.autonomous import (
     AutonomousSubmissionClaim,
