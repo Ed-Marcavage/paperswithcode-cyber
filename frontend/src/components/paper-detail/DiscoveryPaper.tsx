@@ -71,7 +71,7 @@ export function DiscoveryPaper({ paperId, thumbnailUrl = null, title = "" }: { p
       {preview && <aside className="discovery-paper-preview" aria-label="Original post">
         <a className="discovery-paper-shot" href={paper.source_url} target="_blank" rel="noopener noreferrer"
           aria-label={`Open the original post: ${label}`}
-          onClick={() => resourceClicked(paper.paper_id, externalResource(paper.source_url, "source"))}>
+          onClick={() => resourceClicked(paper.paper_id, externalResource(paper.source_url, "source"), "paper", "screenshot")}>
           <img src={preview} alt="" width={400} height={550} loading="lazy" decoding="async" onError={() => setFailedPreview(preview)} />
         </a>
         {sourceLink}

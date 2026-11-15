@@ -1,4 +1,4 @@
-import { taxonomySelected } from "@/lib/catalogAnalytics";
+import { catalogKindSelected, taxonomySelected } from "@/lib/catalogAnalytics";
 import {
   cyberHomeDescription, cyberTrendingIndustryNote, cyberTrendingPapersDescription, cyberTrendingPostsDescription,
 } from "@/lib/cyberCopy";
@@ -358,6 +358,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
     navigate(query ? `${path}?${query}` : path);
   };
   const showKind = (kind: "paper" | "post") => {
+    if (kind !== (showPosts ? "post" : "paper")) catalogKindSelected(kind);
     const next = new URLSearchParams(searchParams);
     if (kind === "paper") next.set("kind", "paper");
     else next.delete("kind");

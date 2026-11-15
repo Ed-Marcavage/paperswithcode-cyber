@@ -38,6 +38,30 @@ it("opens history by route, renames, confirms deletion and starts a new chat", a
   expect(localStorage.getItem("pwc:assistant:conversation")).toBeNull();
   expect(screen.queryByText("Clear chat")).toBeNull();
 });
+it("keeps chat titles out of attributes, which session replay records unmasked", async () => {
+  mount("/chat/saved");
+  await screen.findByText("Saved answer");
+  await waitFor(() => expect(document.querySelectorAll(".assistant-history-title")).toHaveLength(1));
+  const withTitle = [...document.querySelectorAll("*")].filter(element => [...element.attributes].some(attribute => attribute.value.includes("Old title")));
+  expect(withTitle).toEqual([]);
+  for (const element of screen.getAllByText("Old title")) expect(element.closest(".ph-mask")).not.toBeNull();
+});
+it("counts a rename and a deletion without their titles", async () => {
+  const analytics = await import("@/lib/catalogAnalytics");
+  const event = vi.spyOn(analytics, "assistantEvent").mockImplementation(() => {});
+  vi.spyOn(assistantApi, "rename").mockResolvedValue({ ...saved, title: "Private title" });
+  vi.spyOn(assistantApi, "delete").mockResolvedValue();
+  mount("/chat/saved");
+  await screen.findByText("Saved answer");
+  fireEvent.click(screen.getByRole("button", { name: "Rename chat" }));
+  fireEvent.change(screen.getByLabelText("Chat title"), { target: { value: "Private title" } });
+  fireEvent.click(screen.getByRole("button", { name: "Save title" }));
+  await waitFor(() => expect(event).toHaveBeenCalledWith("chat_renamed", "chat_page"));
+  fireEvent.click(screen.getByRole("button", { name: "Delete chat" }));
+  fireEvent.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Delete chat" }));
+  await waitFor(() => expect(event).toHaveBeenCalledWith("chat_deleted", "chat_page"));
+  expect(JSON.stringify(event.mock.calls)).not.toContain("title");
+});
 it("offers four prompts and lets the mobile history drawer close", async () => {
   mount();
   for (const prompt of ASSISTANT_PROMPTS) expect(screen.getByRole("button", { name: prompt })).toBeInTheDocument();

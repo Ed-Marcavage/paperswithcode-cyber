@@ -1,6 +1,7 @@
 import { Link, useLocation } from "react-router-dom";
 
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
+import { outboundNavigation } from "@/lib/catalogAnalytics";
 
 const SiteFooter = () => {
   const { pathname } = useLocation();
@@ -15,8 +16,8 @@ const SiteFooter = () => {
         <Link to="/mcp">MCP</Link>
         <Link to="/privacy">Privacy</Link>
         {isDiscoveryCatalog() && <>
-          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber" target="_blank" rel="noreferrer">GitHub</a>
-          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber/issues" target="_blank" rel="noreferrer">Feedback</a>
+          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber" target="_blank" rel="noreferrer" onClick={() => outboundNavigation("footer", "github")}>GitHub</a>
+          <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber/issues" target="_blank" rel="noreferrer" onClick={() => outboundNavigation("footer", "feedback")}>Feedback</a>
         </>}
         {!isDiscoveryCatalog() && <>
         <a

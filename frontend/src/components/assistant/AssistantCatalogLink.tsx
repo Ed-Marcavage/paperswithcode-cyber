@@ -16,6 +16,6 @@ export function AssistantCatalogLink({ className = "" }: { className?: string })
     onClick={event => {
       if (window.matchMedia?.("(max-width: 640px)")?.matches || event.metaKey || event.ctrlKey || event.shiftKey) return;
       event.preventDefault();
-      setOpen(!open);
+      setOpen(!open, "try_chat");
     }}>{open ? <>Close chat<span aria-hidden="true"> ×</span></> : <>Try chat<span aria-hidden="true"> →</span></>}</Link>;
 }

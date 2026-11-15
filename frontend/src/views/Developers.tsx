@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { catalogSortSelected } from "@/lib/catalogAnalytics";
 import { Link, useLocation, useParams, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import NotFound from "@/pages/NotFound";
@@ -80,7 +81,7 @@ export function DevelopersIndex() {
           <div className="organizations-sort" aria-label="Sort developers">
             {sorts.map(([value, label]) => (
               <button key={value} type="button" aria-pressed={sort === value} className={sort === value ? "active" : ""}
-                onClick={() => change("sort", value === "agent" ? "" : value)}>{label}</button>
+                onClick={() => { if (value !== sort) catalogSortSelected("developers", value); change("sort", value === "agent" ? "" : value); }}>{label}</button>
             ))}
           </div>
         </div>

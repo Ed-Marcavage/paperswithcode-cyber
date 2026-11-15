@@ -30,15 +30,18 @@ export function replayUrl(url: string): string | null {
 /**
  * Session replay settings for the catalog build. Page text is public catalog
  * content and is recorded; every input's value is masked, and text that echoes
- * a search (marked `ph-mask` in the components) is masked too. Account UI
- * cannot render in the catalog build (auth is off), but is blocked in case it
- * ever does. No canvas, cross-origin iframes, headers or bodies; recorded page
- * addresses lose their query string and fragment.
+ * a search or a chat (marked `ph-mask` in the components) is masked too. `ph-mask`
+ * masks text only: attributes are recorded as written, so links inside an
+ * assistant answer, whose addresses would show what the answer cited, are
+ * blocked (kept as empty boxes of the same size). Account UI cannot render in
+ * the catalog build (auth is off), but is blocked in case it ever does. No
+ * canvas, cross-origin iframes, headers or bodies; recorded page addresses lose
+ * their query string and fragment.
  */
 export const catalogRecordingOptions = {
   maskAllInputs: true,
   maskInputOptions: { password: true },
-  blockSelector: ".user-avatar-btn, .settings-page-content, .following-topic-note",
+  blockSelector: ".user-avatar-btn, .settings-page-content, .following-topic-note, .assistant-markdown a",
   recordCrossOriginIframes: false,
   recordHeaders: false,
   recordBody: false,

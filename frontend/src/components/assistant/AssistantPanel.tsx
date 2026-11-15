@@ -10,7 +10,7 @@ export function AssistantAskButton() {
   const { open, setOpen } = useAssistant();
   if (useOnChatPage()) return null;
   return <button type="button" id="assistant-ask-button" className={`assistant-ask-trigger${open ? " is-open" : ""}`} title={open ? "Close the assistant" : "Ask the catalog"}
-    aria-expanded={open} aria-controls="assistant-panel" onClick={() => setOpen(!open)}><AssistantIcon name="ask" size={14} /><span>Ask</span></button>;
+    aria-expanded={open} aria-controls="assistant-panel" onClick={() => setOpen(!open, "ask_button")}><AssistantIcon name="ask" size={14} /><span>Ask</span></button>;
 }
 
 export function AssistantPanel() {
@@ -52,7 +52,8 @@ export function AssistantPanel() {
       <div className="assistant-panel-header">
         <div className="assistant-panel-heading">
           <h2>Ask the catalog</h2>
-          {title && title !== "New chat" && <p className="assistant-panel-subtitle ph-mask" title={title}>{title}</p>}
+          {/* The chat title is the visitor's first question: masked text, and no title attribute (replay records attributes). */}
+          {title && title !== "New chat" && <p className="assistant-panel-subtitle ph-mask">{title}</p>}
         </div>
         <button type="button" className="assistant-icon-button" aria-label="New chat" title="New chat" onClick={() => newChat()}><AssistantIcon name="plus" /></button>
         <Link className="assistant-icon-button" to={currentId ? `/chat/${currentId}` : "/chat"} aria-label="All chats" title="Open in the chat page with all your chats"

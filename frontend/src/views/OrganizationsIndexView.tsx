@@ -1,4 +1,5 @@
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
+import { catalogSortSelected } from "@/lib/catalogAnalytics";
 import React, { useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
@@ -140,7 +141,7 @@ const OrganizationsIndexView: React.FC = () => {
                 key={value}
                 className={sort === value ? "active" : ""}
                 aria-pressed={sort === value}
-                onClick={() => setView({ sort: value })}
+                onClick={() => { if (value !== sort) catalogSortSelected("organizations", value); setView({ sort: value }); }}
               >
                 {label}
               </button>

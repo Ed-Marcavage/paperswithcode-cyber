@@ -356,7 +356,7 @@ describe("topic analytics", () => {
     fireEvent.click(screen.getByRole("button", { name: NEXT[0] }));
     await waitFor(() => expect(capture).toHaveBeenCalledWith("assistant_follow_up_clicked", { surface: "chat_page", catalog_environment: "preview" }));
     expect(capture).toHaveBeenCalledWith("assistant_slash_menu_used", { surface: "chat_page", catalog_environment: "preview" });
-    expect(capture).toHaveBeenCalledWith("assistant_topic_chosen", { surface: "chat_page", topic: "penetration-testing", catalog_environment: "preview" });
+    expect(capture).toHaveBeenCalledWith("assistant_topic_chosen", { surface: "chat_page", topic: "penetration-testing", via: "slash", catalog_environment: "preview" });
     expect(JSON.stringify(capture.mock.calls)).not.toContain("benchmarks");
   });
 
@@ -369,10 +369,10 @@ describe("topic analytics", () => {
     expect(send("assistant_slash_menu_used", {})).toBeDefined();
     const capture = vi.spyOn(posthog, "capture").mockReturnValue(undefined);
     vi.stubEnv("VITE_LOCAL_CATALOG", "true"); vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "phc_test");
-    assistantEvent("topic_chosen", "panel", "Not a slug");
+    assistantEvent("topic_chosen", "panel", { topic: "Not a slug" });
     expect(capture).toHaveBeenLastCalledWith("assistant_topic_chosen", { surface: "panel", catalog_environment: "preview" });
     vi.stubGlobal("navigator", { doNotTrack: "1" });
-    for (const action of ["topic_chosen", "slash_menu_used", "follow_up_clicked"] as const) assistantEvent(action, "panel", "fuzzing");
+    for (const action of ["topic_chosen", "slash_menu_used", "follow_up_clicked"] as const) assistantEvent(action, "panel", { topic: "fuzzing" });
     expect(capture).toHaveBeenCalledTimes(1);
   });
 });

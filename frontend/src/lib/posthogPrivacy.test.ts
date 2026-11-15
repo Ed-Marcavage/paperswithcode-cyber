@@ -29,6 +29,8 @@ describe("PostHog privacy initialization", () => {
       captureCanvas: { recordCanvas: false },
     });
     expect(catalogRecordingOptions.blockSelector).toContain(".user-avatar-btn");
+    // Answer links: their addresses would show what an answer cited; ph-mask hides text, not attributes.
+    expect(catalogRecordingOptions.blockSelector).toContain(".assistant-markdown a");
   });
 
   it("keeps only the origin and path of recorded page addresses", () => {

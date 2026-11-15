@@ -19,7 +19,7 @@ it("saves a thumb at once, then an optional note on the same run, preserving the
   expect(screen.getByRole("button", { name: "Good answer" })).toHaveAttribute("aria-pressed", "false");
   await screen.findByText("Thanks for the feedback.");
   expect(save).toHaveBeenLastCalledWith("run-id", "bad", "");
-  expect(event).toHaveBeenLastCalledWith("feedback_given", "panel");
+  expect(event).toHaveBeenLastCalledWith("feedback_given", "panel", { rating: "bad" });
   fireEvent.change(screen.getByLabelText("Optional note"), { target: { value: "Missed a source" } });
   fireEvent.click(screen.getByRole("button", { name: "Send note" }));
   await screen.findByRole("alert"); expect(screen.getByLabelText("Optional note")).toHaveValue("Missed a source");
@@ -27,7 +27,8 @@ it("saves a thumb at once, then an optional note on the same run, preserving the
   fireEvent.click(screen.getByRole("button", { name: "Send note" }));
   await screen.findByText("Thanks for the feedback."); expect(save).toHaveBeenLastCalledWith("run-id", "bad", "Missed a source");
   await waitFor(() => expect(screen.queryByLabelText("Optional note")).toBeNull());
-  expect(event).toHaveBeenCalledTimes(2);
+  // The note is saved on the same rating: one rating event, not two.
+  expect(event).toHaveBeenCalledTimes(1);
 });
 it("shows a saved rating as pressed and hides controls while the answer runs", () => {
   const { rerender } = render(<QueryClientProvider client={new QueryClient()}>

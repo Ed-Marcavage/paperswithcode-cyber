@@ -24,7 +24,7 @@ export function AssistantLanding() {
   const label = disabled ? null : topicLabel(chat.topics, topic);
   const { placeholder, prompt } = useRotatingPlaceholder(!question && !label && chat.availability.available);
   const menu = useCommandMenu({ topics: chat.topics, draft: question, setDraft: setQuestion, field, surface: "landing", enabled: !disabled,
-    onTopic: slug => { setTopic(slug); assistantEvent("topic_chosen", "landing", slug); } });
+    onTopic: slug => { setTopic(slug); assistantEvent("topic_chosen", "landing", { topic: slug, via: "slash" }); } });
   const offerTopics = chat.topics.length > 0 && !disabled;
   const reason = chat.availability.reason ?? "The assistant is unavailable.";
   // While empty, reserve the height of the longest example so the rotating

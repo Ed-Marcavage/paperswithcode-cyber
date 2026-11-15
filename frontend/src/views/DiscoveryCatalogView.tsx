@@ -1,7 +1,7 @@
 import { CatalogFacetSelect } from "@/components/CatalogFacetSelect";
 import { EditorsPickChip, FeaturedChip } from "@/components/Chips";
 import { cyberCatalogDescription } from "@/lib/cyberCopy";
-import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
+import { catalogFiltersOpened, paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
@@ -90,7 +90,7 @@ export default function DiscoveryCatalogView() {
     </div></header>
     {/* Phones: one Filters button opening a sheet, with active filters as removable chips. */}
     <div className="discovery-mobile-bar">
-      <Dialog.Root>
+      <Dialog.Root onOpenChange={open => { if (open) catalogFiltersOpened(); }}>
         <Dialog.Trigger asChild>
           <button type="button" className="discovery-filters-button">
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3" /></svg>

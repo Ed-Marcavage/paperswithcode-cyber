@@ -12,11 +12,15 @@ export function AssistantFeedback({ message, surface = "panel" }: { message: Ass
   const [noteOpen, setNoteOpen] = useState(false);
   const noteId = useId();
   const client = useQueryClient();
-  const mutation = useMutation({ mutationFn: (value: { rating: Rating; note: string }) => assistantApi.feedback(message.run_id!, value.rating, value.note),
-    onSuccess: () => { assistantEvent("feedback_given", surface); void client.invalidateQueries({ queryKey: ["assistant", "conversation"] }); void client.invalidateQueries({ queryKey: assistantKeys.list }); } });
+  // thumb: a thumb press, counted once with its rating; saving the optional note afterwards is not another rating.
+  const mutation = useMutation({ mutationFn: (value: { rating: Rating; note: string; thumb?: boolean }) => assistantApi.feedback(message.run_id!, value.rating, value.note),
+    onSuccess: (_saved, value) => {
+      if (value.thumb) assistantEvent("feedback_given", surface, { rating: value.rating });
+      void client.invalidateQueries({ queryKey: ["assistant", "conversation"] }); void client.invalidateQueries({ queryKey: assistantKeys.list });
+    } });
   if (!message.run_id || message.status === "running") return null;
   // A thumb saves at once; the note is an optional follow-up on the same rating.
-  const rate = (value: Rating) => { setRating(value); setNoteOpen(true); mutation.reset(); mutation.mutate({ rating: value, note }); };
+  const rate = (value: Rating) => { setRating(value); setNoteOpen(true); mutation.reset(); mutation.mutate({ rating: value, note, thumb: true }); };
   return <div className="assistant-feedback ph-mask">
     <div className="assistant-feedback-row" role="group" aria-label="Rate this answer">
       <button type="button" className="assistant-icon-button" aria-pressed={rating === "good"} aria-label="Good answer" title="Good answer"

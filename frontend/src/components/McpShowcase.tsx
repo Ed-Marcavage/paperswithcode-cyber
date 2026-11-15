@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { AgentLogos } from "@/components/paper-detail/AgentLogos";
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
+import { outboundNavigation } from "@/lib/catalogAnalytics";
 
 const icons: Record<string, string> = import.meta.env.PWC_PERSONAL_AGENT_ICONS ?? {};
 const personalAgents = [
@@ -49,7 +50,7 @@ export function McpShowcase({ className = "", canNavigate }: McpShowcaseProps) {
       <p className="sidebar-tools-copy">
         Search papers, benchmarks, and leaderboards from any MCP client, or from the
         terminal with the{" "}
-        <a href={pwcCliRepositoryUrl} target="_blank" rel="noreferrer">
+        <a href={pwcCliRepositoryUrl} target="_blank" rel="noreferrer" onClick={() => outboundNavigation("sidebar", "pwc_cli")}>
           <code>pwc</code> CLI
         </a>
         .

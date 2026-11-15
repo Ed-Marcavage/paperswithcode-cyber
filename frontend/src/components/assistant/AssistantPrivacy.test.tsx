@@ -44,7 +44,7 @@ it("masks transcript and composer while actual sent and done events contain no t
   expect(input.closest(".ph-mask")).not.toBeNull();
   fireEvent.change(input, { target: { value: "Private question" } }); fireEvent.click(screen.getByRole("button", { name: "Send" }));
   expect((await screen.findByText("Private answer")).closest(".ph-mask")).not.toBeNull();
-  expect(capture).toHaveBeenCalledWith("assistant_message_sent", { surface: "panel", catalog_environment: "preview" });
+  expect(capture).toHaveBeenCalledWith("assistant_message_sent", { surface: "panel", chat: "new", catalog_environment: "preview" });
   expect(capture).toHaveBeenCalledWith("assistant_answer_done", { surface: "panel", catalog_environment: "preview" });
   expect(JSON.stringify(capture.mock.calls)).not.toContain("Private");
 });
@@ -54,4 +54,7 @@ it("discloses last-activity retention, Ollama processing, deletion and saved DNT
   expect(screen.getByText(/Ollama processes/)).toHaveTextContent(/90 days after the conversation’s last activity/);
   expect(screen.getByText(/Ollama processes/)).toHaveTextContent(/All chats.*Delete.*confirm/);
   expect(screen.getByText(/The transcript, composer/)).toHaveTextContent(/PostHog session id is not stored.*still saves chats/);
+  // What assistant analytics does carry: the topic, the link kind and the thumb, never text.
+  expect(screen.getByText(/The transcript, composer/)).toHaveTextContent(/choosing a topic.*stays on this site.*thumbs up or down.*never includes chat text/);
+  expect(screen.getByText(/We also record sessions/)).toHaveTextContent(/follow-up questions and chat titles are replaced with asterisks.*links inside answers are left out/);
 });

@@ -30,8 +30,8 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
   const send = () => { if (!disabled) void chat.send(chat.draft, surface, pathname); };
   const topic = paused ? null : chat.topic;
   const label = topicLabel(chat.topics, topic);
-  const chooseTopic = (slug: string | null) => { chat.setTopic(slug, surface); field.current?.focus(); };
-  const menu = useCommandMenu({ topics: chat.topics, draft: chat.draft, setDraft: chat.setDraft, onTopic: chooseTopic, field, surface, enabled: !disabled });
+  const chooseTopic = (slug: string | null, via: "chip" | "slash") => { chat.setTopic(slug, surface, via); field.current?.focus(); };
+  const menu = useCommandMenu({ topics: chat.topics, draft: chat.draft, setDraft: chat.setDraft, onTopic: slug => chooseTopic(slug, "slash"), field, surface, enabled: !disabled });
   const last = messages[messages.length - 1];
   // Only the latest finished answer offers next questions, and only while one can be asked.
   // "limit_reached" is also a finished answer: research hit its budget and the closing step wrote it.
@@ -69,7 +69,7 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
             <p>Ask about papers, industry posts, repositories, organizations or developers in the catalog. Answers link to the entries they draw on.</p>
             <div className="assistant-examples" aria-label="Example questions" role="group">{ASSISTANT_PROMPTS.map(prompt => <button key={prompt} type="button"
               onClick={() => { chat.setDraft(prompt); if (chat.topic) chat.setTopic(null, surface); field.current?.focus(); }}>{prompt}</button>)}</div>
-            {offerTopics && <TopicChips topics={chat.topics} selected={chat.topic} onSelect={chooseTopic} disabled={disabled} />}
+            {offerTopics && <TopicChips topics={chat.topics} selected={chat.topic} onSelect={slug => chooseTopic(slug, "chip")} disabled={disabled} />}
           </div> :
           messages.map(message => {
             const running = message.status === "running";

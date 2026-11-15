@@ -4,20 +4,41 @@ import type { Axis, DiscoveryWork } from "./api/discovery";
 import { catalogRecordingOptions, posthogPrivacyOptions } from "./posthogPrivacy";
 
 type Resource = "pdf" | "reader" | "cached_text" | "source" | "code" | "artifact";
-const assistantActions = ["opened", "asked_from_landing", "message_sent", "answer_done", "link_clicked", "new_chat", "feedback_given", "limit_hit", "error",
-  "topic_chosen", "slash_menu_used", "follow_up_clicked"] as const;
+const assistantActions = ["opened", "closed", "asked_from_landing", "message_sent", "answer_done", "link_clicked", "new_chat", "feedback_given", "limit_hit", "error",
+  "topic_chosen", "slash_menu_used", "follow_up_clicked", "chat_renamed", "chat_deleted"] as const;
 type AssistantAction = typeof assistantActions[number];
 type AssistantSurface = "landing" | "panel" | "chat_page";
-type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | `assistant_${AssistantAction}`;
+type CatalogEvent = "catalog_kind_selected" | "catalog_sort_selected" | "catalog_filters_opened";
+type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | CatalogEvent | `assistant_${AssistantAction}`;
 const assistantEvents = new Set(assistantActions.map(action => `assistant_${action}`));
 const assistantFields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version", "catalog_environment", "surface"]);
 // A topic slug is a fixed catalog identifier, never chat text; only assistant_topic_chosen carries one.
 const topicSlug = /^[a-z0-9][a-z0-9-]{0,63}$/;
+/**
+ * The only extra properties an assistant event may carry, each a fixed label chosen in code
+ * (never chat text, a title or an address): which topic and how it was picked, how the panel
+ * was opened, whether an answer link stays on the site, which thumb was pressed, and whether
+ * a message starts a new chat (so questions per chat can be counted without a chat id).
+ */
+const assistantExtras: Partial<Record<AssistantAction, Record<string, readonly string[] | RegExp>>> = {
+  topic_chosen: { topic: topicSlug, via: ["chip", "slash"] },
+  opened: { via: ["ask_button", "try_chat"] },
+  link_clicked: { link: ["site", "external"] },
+  feedback_given: { rating: ["good", "bad"] },
+  message_sent: { chat: ["new", "existing"] },
+};
+export type AssistantExtra = { topic?: string; via?: string; link?: "site" | "external"; rating?: "good" | "bad"; chat?: "new" | "existing" };
+function allowedExtra(action: string, key: string, value: unknown) {
+  const rule = assistantExtras[action as AssistantAction]?.[key];
+  if (!rule || typeof value !== "string") return false;
+  return rule instanceof RegExp ? rule.test(value) : rule.includes(value);
+}
 const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version",
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
   "topic", "target", "contribution", "kind", "year", "catalog_environment",
   "referral_source", "referral_campaign", "referral_link", "referral_domain"]);
-const events = new Set<Event>(["$pageview", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked"]);
+const events = new Set<Event>(["$pageview", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked",
+  "catalog_kind_selected", "catalog_sort_selected", "catalog_filters_opened"]);
 // Session replay batches: the recorder's own fields only.
 const snapshotFields = new Set(["token", "distinct_id", "$session_id", "$window_id", "$snapshot_bytes",
   "$snapshot_data", "$snapshot_host", "$lib", "$lib_version"]);
@@ -41,9 +62,14 @@ export const catalogOptions = {
     if (!event || (!events.has(event.event as Event) && !assistantEvents.has(event.event)) || !event.properties.catalog_environment) return null;
     const assistant = assistantEvents.has(event.event);
     if (assistant && !["landing", "panel", "chat_page"].includes(String(event.properties.surface))) return null;
+    // posthog-js 1.418 sends a returning browser's first event after the 30-minute idle timeout
+    // with $session_id null (the stale session is cleared mid-check). Asking for the id starts
+    // the new session here, the one its recording uses, so the landing pageview joins it.
+    if (event.properties.$session_id === null) event.properties.$session_id = posthog.get_session_id() || null;
     // The SDK otherwise adds raw URLs, referrers, search strings and initial person properties.
+    const action = event.event.slice("assistant_".length);
     const properties = Object.fromEntries(Object.entries(event.properties).filter(([key, value]) => (assistant ? assistantFields : fields).has(key)
-      || (event.event === "assistant_topic_chosen" && key === "topic" && typeof value === "string" && topicSlug.test(value))));
+      || (assistant && allowedExtra(action, key, value))));
     return { uuid: event.uuid, timestamp: event.timestamp, event: event.event,
       properties: { ...properties, $geoip_disable: true, $process_person_profile: false } };
   },
@@ -53,21 +79,47 @@ export function catalogPrivacySignal() {
   return navigator.doNotTrack === "1" || Boolean((navigator as Navigator & {globalPrivacyControl?: boolean}).globalPrivacyControl);
 }
 export function catalogPage(path: string) {
-  const section = path.split("/")[1];
-  return !section ? "trending" : ["catalog", "mcp", "personal-agents", "paper", "pdf", "papers", "tasks", "privacy", "docs"].includes(section) ? section : "other";
+  const [, section, detail] = path.split("/");
+  if (!section) return "trending";
+  if (section === "chat") return "chat";
+  // The index and one entry are different pages; the entry's id or slug is never sent.
+  if (section === "developers") return detail ? "developer" : "developers";
+  if (section === "organizations") return "organizations";
+  if (section === "orgs") return "organization";
+  return ["catalog", "mcp", "personal-agents", "paper", "pdf", "papers", "tasks", "privacy", "docs"].includes(section) ? section : "other";
+}
+/**
+ * The address a pageview stands for. A chat's own address (/chat/<id>) is the same chat page:
+ * the new chat's id replacing /chat, or picking another chat from the list, is not a new page.
+ */
+export function catalogPageKey(path: string) {
+  return path === "/chat" || path.startsWith("/chat/") ? "/chat" : path;
 }
 function capture(event: Event, properties: Record<string, unknown>) {
   if (!isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || catalogPrivacySignal()) return;
   posthog.capture(event, { ...properties, catalog_environment: import.meta.env.VITE_CATALOG_ANALYTICS_ENV || "preview" });
 }
 /**
- * Deliberately accepts no question, answer, title, note, URL, run or browser ID. The one
- * extra is the topic slug on topic_chosen (a catalog identifier); follow_up_clicked does
- * not say which suggestion was clicked.
+ * Deliberately accepts no question, answer, title, note, URL, run or browser ID. The only
+ * extras are the fixed labels in assistantExtras, such as the topic slug on topic_chosen (a
+ * catalog identifier); follow_up_clicked does not say which suggestion was clicked.
  */
-export function assistantEvent(action: AssistantAction, surface: AssistantSurface, topic?: string) {
+export function assistantEvent(action: AssistantAction, surface: AssistantSurface, extra: AssistantExtra = {}) {
   if (!assistantActions.includes(action) || !["landing", "panel", "chat_page"].includes(surface)) return;
-  capture(`assistant_${action}`, { surface, ...(action === "topic_chosen" && topic && topicSlug.test(topic) ? { topic } : {}) });
+  const allowed = Object.fromEntries(Object.entries(extra).filter(([key, value]) => allowedExtra(action, key, value)));
+  capture(`assistant_${action}`, { surface, ...allowed });
+}
+/** Trending's Papers or Posts switch. */
+export function catalogKindSelected(kind: "paper" | "post") {
+  capture("catalog_kind_selected", { page: "trending", kind });
+}
+/** A sort button or menu on the Organizations or Developers index; `value` is the sort's fixed key. */
+export function catalogSortSelected(page: "organizations" | "developers", value: string) {
+  if (/^[a-z_]{1,32}$/.test(value)) capture("catalog_sort_selected", { page, value });
+}
+/** The phone Filters sheet on Browse catalog. */
+export function catalogFiltersOpened() {
+  capture("catalog_filters_opened", { page: "catalog" });
 }
 /** Recognize our public README links without collecting arbitrary campaign or URL text. */
 export function catalogReferral(search: string) {
@@ -118,14 +170,18 @@ export async function startCatalogRecording(client: Pick<typeof posthog, "startS
 export function catalogNavigation(to: string) {
   if (to === "/catalog" || to === "/mcp" || to === "/personal-agents") capture("catalog_navigation", {surface: "top_nav", destination: to.slice(1)});
 }
+/** The site's own off-site links (its GitHub repository, issue tracker and CLI), which otherwise leave no trace. */
+export function outboundNavigation(surface: "footer" | "sidebar", destination: "github" | "feedback" | "pwc_cli") {
+  capture("catalog_navigation", {surface, destination});
+}
 export function taxonomySelected(axis: Axis | "domain", value: string | undefined, surface: "catalog_filter" | "top_domains" | "paper_tag") {
   if (value) capture("taxonomy_selected", {axis, value, surface});
 }
 export function paperOpened(paper: DiscoveryWork) {
   capture("paper_opened", { paper_id: paper.paper_id, paper_title: paper.title, ...paper.facets });
 }
-export function resourceClicked(paperId: string, resource: Resource, surface: "feed" | "paper" | "reader" = "paper") {
-  capture("paper_resource_clicked", {paper_id: paperId, resource, surface});
+export function resourceClicked(paperId: string, resource: Resource, surface: "feed" | "paper" | "reader" = "paper", part?: "screenshot") {
+  capture("paper_resource_clicked", {paper_id: paperId, resource, surface, ...(part ? {link_part: part} : {})});
 }
 
 /** Classify only destinations whose format or repository path is explicit. */

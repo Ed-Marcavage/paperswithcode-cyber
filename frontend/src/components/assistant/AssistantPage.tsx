@@ -21,8 +21,9 @@ export default function AssistantPage() {
   const [removing, setRemoving] = useState<AssistantSummary | null>(null);
   const list = useQuery({ queryKey: assistantKeys.list, queryFn: assistantApi.list });
   const rename = useMutation({ mutationFn: ({ id, title }: { id: string; title: string }) => assistantApi.rename(id, title),
-    onSuccess: () => { setEditing(null); void queryClient.invalidateQueries({ queryKey: assistantKeys.list }); } });
+    onSuccess: () => { assistantEvent("chat_renamed", "chat_page"); setEditing(null); void queryClient.invalidateQueries({ queryKey: assistantKeys.list }); } });
   const remove = useMutation({ mutationFn: assistantApi.delete, onSuccess: (_result, id) => {
+    assistantEvent("chat_deleted", "chat_page");
     setRemoving(null); queryClient.removeQueries({ queryKey: assistantKeys.conversation(id) });
     void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
     if (chat.currentId === id) { chat.newChat("chat_page"); navigate("/chat", { replace: true }); }
@@ -43,7 +44,8 @@ export default function AssistantPage() {
     <div className="assistant-page-bar">
       <button className="assistant-history-toggle" type="button" aria-expanded={drawer} aria-controls="assistant-history" onClick={() => setDrawer(!drawer)}>
         <AssistantIcon name="chats" /><span>Your chats</span></button>
-      {chatTitle && <p className="assistant-page-title ph-mask" title={chatTitle}>{chatTitle}</p>}
+      {/* No title attribute: replay masks text in .ph-mask but records attributes as written. */}
+      {chatTitle && <p className="assistant-page-title ph-mask">{chatTitle}</p>}
     </div>
     {drawer && <button className="assistant-drawer-backdrop" aria-label="Close chat list" onClick={() => setDrawer(false)} />}
     <aside id="assistant-history" className={`assistant-history ${drawer ? "is-open" : ""}`} aria-label="Chat history"
@@ -58,7 +60,7 @@ export default function AssistantPage() {
       <ul className="ph-mask">{list.data?.map(item => {
         const current = chat.currentId === item.id;
         return <li key={item.id} className={current ? "is-current" : undefined}>
-          <Link to={`/chat/${item.id}`} aria-current={current ? "page" : undefined} onClick={() => setDrawer(false)} title={item.title}>
+          <Link to={`/chat/${item.id}`} aria-current={current ? "page" : undefined} onClick={() => setDrawer(false)}>
             <span className="assistant-history-title">{item.title}</span>
             <time dateTime={item.updated_at}>{friendlyDate(item.updated_at)}</time>
           </Link>

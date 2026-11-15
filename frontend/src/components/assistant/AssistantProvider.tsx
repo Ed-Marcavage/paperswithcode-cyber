@@ -38,16 +38,22 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   // free meanwhile; asking again, Stop or leaving the chat aborts it and drops the follow-ups.
   const trailing = useRef<AbortController | null>(null);
   const revision = useRef(0);
-  const setOpen = useCallback((value: boolean) => { updateOpen(value); remember(OPEN_KEY, String(value)); if (value) assistantEvent("opened", "panel"); }, []);
+  const openNow = useRef(open);
+  const setOpen = useCallback((value: boolean, via?: "ask_button" | "try_chat") => {
+    const was = openNow.current; openNow.current = value;
+    updateOpen(value); remember(OPEN_KEY, String(value));
+    if (value) assistantEvent("opened", "panel", via ? { via } : {});
+    else if (was) assistantEvent("closed", "panel");
+  }, []);
   const setId = useCallback((id: string | null) => { updateId(id); remember(ID_KEY, id); }, []);
-  const setTopic = useCallback((slug: string | null, surface: AssistantSurface = "panel") => {
+  const setTopic = useCallback((slug: string | null, surface: AssistantSurface = "panel", via?: "chip" | "slash") => {
     const key = currentId ?? "";
     setTopicByChat(previous => {
       const next = { ...previous };
       if (slug) next[key] = slug; else delete next[key];
       return next;
     });
-    if (slug) assistantEvent("topic_chosen", surface, slug);
+    if (slug) assistantEvent("topic_chosen", surface, { topic: slug, ...(via ? { via } : {}) });
   }, [currentId]);
 
   useEffect(() => {
@@ -89,7 +95,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
     const answer: AssistantMessage = { id: answerId, role: "assistant", content: "", status: "running", tool_steps: [] };
     const priorId = fresh ? null : currentId;
     const sentTopic = chosen === undefined ? topic : chosen;
-    assistantEvent("message_sent", surface);
+    assistantEvent("message_sent", surface, { chat: priorId ? "existing" : "new" });
     setBusy(true); setError(null); if (!keepDraft) setDraft("");
     setConversation(previous => ({ ...previous, messages: [...previous.messages,
       { id: crypto.randomUUID(), role: "user", content: question, status: "done", tool_steps: [], topic: sentTopic }, answer] }));

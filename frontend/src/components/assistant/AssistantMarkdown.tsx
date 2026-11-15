@@ -15,7 +15,7 @@ export function AssistantMarkdown({ text, streaming, evidence, surface = "panel"
       a: ({ href, children }) => {
         const link = allowedLink(href ?? "", evidence);
         if (!link) return <span>{children}</span>;
-        const clicked = () => assistantEvent("link_clicked", surface);
+        const clicked = () => assistantEvent("link_clicked", surface, { link: link.local ? "site" : "external" });
         // Site pages open through the router, so the panel stays open; anything else opens in a new tab.
         if (link.local) return <Link to={link.href} onClick={clicked}>{children}</Link>;
         return <a href={link.href} target="_blank" rel="noopener noreferrer" className="assistant-external-link" onClick={clicked}>

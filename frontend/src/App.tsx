@@ -1,5 +1,5 @@
 import { CyberMetadata } from "@/components/CyberMetadata";
-import { catalogPageview } from "@/lib/catalogAnalytics";
+import { catalogPageKey, catalogPageview } from "@/lib/catalogAnalytics";
 /**
  * Root app: react-router-dom routes. Every page is bookmarkable and the
  * browser back button works as expected.
@@ -290,8 +290,9 @@ const Shell: React.FC = () => {
   const { pathname } = useLocation();
   const lastPath = React.useRef<string>();
   React.useEffect(() => {
-    if (lastPath.current !== pathname) catalogPageview(pathname);
-    lastPath.current = pathname;
+    const key = catalogPageKey(pathname);
+    if (lastPath.current !== key) catalogPageview(pathname);
+    lastPath.current = key;
   }, [pathname]);
   useScrollToTop();
   React.useLayoutEffect(() => {

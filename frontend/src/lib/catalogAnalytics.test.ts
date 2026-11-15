@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { catalogOptions, catalogPage, catalogReferral, catalogReferrerDomain, externalResource } from "./catalogAnalytics";
+import { assistantEvent, catalogFiltersOpened, catalogKindSelected, catalogOptions, catalogPage, catalogPageKey, catalogReferral, catalogReferrerDomain, catalogSortSelected, externalResource, outboundNavigation, resourceClicked } from "./catalogAnalytics";
 it("retains the paper measurements while dropping SDK URL, search, referrer, profile and location properties", () => {
   const event = { uuid: "test", event: "paper_opened", properties: {
     distinct_id: "anonymous", $current_url: "https://example.org/?q=private", $referrer: "private",
@@ -61,6 +61,79 @@ it("page categories never include search terms or arbitrary path segments", () =
   expect(catalogPage("/paper/2603.04915")).toBe("paper");
   expect(catalogPage("/unknown/private")).toBe("other");
   expect(catalogPage("/")).toBe("trending");
+  expect(catalogPage("/chat")).toBe("chat");
+  expect(catalogPage("/chat/0b6f2c1e-private")).toBe("chat");
+  expect(catalogPage("/developers")).toBe("developers");
+  expect(catalogPage("/developers/private-login")).toBe("developer");
+  expect(catalogPage("/organizations")).toBe("organizations");
+  expect(catalogPage("/orgs/private-org")).toBe("organization");
+});
+
+it("counts the chat page once, whatever chat id its address carries", () => {
+  expect(catalogPageKey("/chat")).toBe("/chat");
+  expect(catalogPageKey("/chat/3f1c")).toBe("/chat");
+  expect(catalogPageKey("/chatter")).toBe("/chatter");
+  expect(catalogPageKey("/paper/1")).toBe("/paper/1");
+});
+
+it("gives a returning browser's first event the new session id instead of null", async () => {
+  const { vi } = await import("vitest");
+  const posthog = (await import("posthog-js")).default;
+  const id = vi.spyOn(posthog, "get_session_id").mockReturnValue("01a1-new-session");
+  try {
+    const sent = catalogOptions.before_send({ uuid: "test", event: "$pageview", properties: {
+      catalog_environment: "production", page: "trending", $session_id: null } });
+    expect(sent?.properties.$session_id).toBe("01a1-new-session");
+    const kept = catalogOptions.before_send({ uuid: "test", event: "$pageview", properties: {
+      catalog_environment: "production", page: "trending", $session_id: "01a1-existing" } });
+    expect(kept?.properties.$session_id).toBe("01a1-existing");
+    expect(id).toHaveBeenCalledTimes(1);
+  } finally { id.mockRestore(); }
+});
+
+it("lets assistant events carry only their own fixed labels", () => {
+  const send = (event: string, properties: Record<string, unknown>) =>
+    catalogOptions.before_send({ uuid: "test", event, properties: { catalog_environment: "preview", surface: "chat_page", ...properties } })?.properties;
+  const base = { catalog_environment: "preview", surface: "chat_page", $geoip_disable: true, $process_person_profile: false };
+  expect(send("assistant_link_clicked", { link: "external", href: "https://private.example/" })).toEqual({ ...base, link: "external" });
+  expect(send("assistant_link_clicked", { link: "https://private.example/" })).toEqual(base);
+  expect(send("assistant_feedback_given", { rating: "bad", note: "private" })).toEqual({ ...base, rating: "bad" });
+  expect(send("assistant_feedback_given", { rating: "private" })).toEqual(base);
+  expect(send("assistant_topic_chosen", { topic: "fuzzing", via: "chip" })).toEqual({ ...base, topic: "fuzzing", via: "chip" });
+  expect(send("assistant_opened", { via: "try_chat" })).toEqual({ ...base, via: "try_chat" });
+  expect(send("assistant_opened", { via: "private text" })).toEqual(base);
+  expect(send("assistant_message_sent", { chat: "new", question: "private" })).toEqual({ ...base, chat: "new" });
+  // A label belongs to its own event only.
+  expect(send("assistant_message_sent", { rating: "good", link: "site", via: "chip", topic: "fuzzing", chat: "c-123" })).toEqual(base);
+  expect(send("assistant_answer_done", { chat: "new" })).toEqual(base);
+  for (const event of ["assistant_closed", "assistant_chat_renamed", "assistant_chat_deleted"]) {
+    expect(send(event, { title: "private" })).toEqual(base);
+  }
+});
+
+it("records Trending's kind switch, index sorts, the filter sheet and the screenshot link", async () => {
+  const { vi } = await import("vitest");
+  const posthog = (await import("posthog-js")).default;
+  vi.stubEnv("VITE_LOCAL_CATALOG", "true");
+  vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "phc_test");
+  const spy = vi.spyOn(posthog, "capture").mockReturnValue(undefined);
+  try {
+    catalogKindSelected("paper");
+    catalogSortSelected("developers", "stars");
+    catalogSortSelected("organizations", "Private Text");
+    catalogFiltersOpened();
+    resourceClicked("5294", "source", "paper", "screenshot");
+    assistantEvent("link_clicked", "panel", { link: "site" });
+    outboundNavigation("sidebar", "pwc_cli");
+    expect(spy.mock.calls.map(call => call[0])).toEqual(["catalog_kind_selected", "catalog_sort_selected", "catalog_filters_opened",
+      "paper_resource_clicked", "assistant_link_clicked", "catalog_navigation"]);
+    expect(spy).toHaveBeenCalledWith("catalog_sort_selected", expect.objectContaining({ page: "developers", value: "stars" }));
+    expect(spy).toHaveBeenCalledWith("paper_resource_clicked", expect.objectContaining({ link_part: "screenshot", resource: "source" }));
+    for (const [event, properties] of spy.mock.calls) {
+      const sent = catalogOptions.before_send({ uuid: "test", event, properties: properties as Record<string, unknown> });
+      expect(sent?.properties).toEqual({ ...(properties as object), $geoip_disable: true, $process_person_profile: false });
+    }
+  } finally { spy.mockRestore(); vi.unstubAllEnvs(); }
 });
 
 it("allows only the known README campaign and link labels, never arbitrary URL text", () => {
