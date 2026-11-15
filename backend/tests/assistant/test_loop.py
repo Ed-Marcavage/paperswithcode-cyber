@@ -100,7 +100,7 @@ def test_interleaved_tool_calls_and_grounded_answer():
 
 def test_model_turn_limit_reserves_two_passes_for_finalizer():
     services = FakeServices([[tool_chunk()]] * 6 + [[text_chunk("Final answer")]])
-    turn, _ = asyncio.run(services.run())
+    turn, _ = asyncio.run(services.run(TurnLimits(model_turns=8, tool_calls=10, seconds=90)))
     assert turn.status == "limit_reached"
     assert len(services.model_requests) == 7
     assert "tools" not in services.model_requests[-1]
@@ -109,7 +109,7 @@ def test_model_turn_limit_reserves_two_passes_for_finalizer():
 
 def test_tool_limit_including_multi_call_reply():
     services = FakeServices([[tool_chunk(i, arguments=json.dumps({"query": str(i)})) for i in range(12)], [text_chunk("Final")]])
-    turn, _ = asyncio.run(services.run())
+    turn, _ = asyncio.run(services.run(TurnLimits(model_turns=8, tool_calls=10, seconds=90)))
     assert len(services.tool_requests) == 10
     assert len(turn.steps[0]["tool_calls"]) == 12  # trace includes unexecuted calls too
     assert turn.status == "limit_reached"
@@ -127,7 +127,7 @@ def test_output_cap_and_finalizer():
 
 def test_empty_finalizer_still_gives_a_bounded_plain_answer():
     services = FakeServices([[tool_chunk()]] * 6 + [[chunk(finish="length")]] * 2)
-    turn, events = asyncio.run(services.run())
+    turn, events = asyncio.run(services.run(TurnLimits(model_turns=8, tool_calls=10, seconds=90)))
     assert turn.status == "limit_reached"
     assert "narrow your question" in turn.text
     assert len(turn.text) <= TurnLimits().output_chars

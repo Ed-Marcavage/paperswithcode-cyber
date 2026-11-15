@@ -134,3 +134,20 @@ def test_reported_cumulative_growth_in_review_trace_goes_to_finalizer_before_fou
     assert model_steps[-1]["cumulative_input_tokens"] < INPUT_TOKEN_BUDGET
     assert model_steps[-1]["input_messages"] == services.model_requests[-1]["messages"]
     assert len(services.tool_requests) == 2
+
+
+def test_research_budget_is_a_soft_stop_before_the_hard_limit():
+    from backend.services.assistant_loop import TurnLimits, research_budget_notice
+
+    limits = TurnLimits()
+    assert (limits.tool_calls, limits.soft_tool_calls) == (20, 15)
+    sent: set[str] = set()
+    assert research_budget_notice(14, limits, sent) is None
+    wrap_up = research_budget_notice(15, limits, sent)
+    assert "15 of 20" in wrap_up and "wrapping up" in wrap_up
+    assert research_budget_notice(16, limits, sent) is None  # said once
+    answer_now = research_budget_notice(19, limits, sent)
+    assert "19 of 20" in answer_now and "Write your answer now" in answer_now
+    assert research_budget_notice(19, limits, sent) is None
+    # A batch that jumps past both thresholds gets only the stronger message.
+    assert "Write your answer now" in research_budget_notice(19, limits, set())

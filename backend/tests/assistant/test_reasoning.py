@@ -37,7 +37,7 @@ def test_empty_reasoning_finalizer_retries_once_with_larger_allowance():
 
 def test_two_empty_finalizers_fall_back_within_eight_call_budget():
     services = FakeServices([[tool_chunk()]] * 6 + [thinking_only()] * 2)
-    turn, _ = asyncio.run(services.run())
+    turn, _ = asyncio.run(services.run(TurnLimits(model_turns=8, tool_calls=10, seconds=90)))
     assert len(services.model_requests) == 8
     assert "could not establish" in turn.text
     assert [s["phase"] for s in turn.steps if s["kind"] == "model"] == ["research"] * 6 + ["finalizer", "finalizer_retry"]

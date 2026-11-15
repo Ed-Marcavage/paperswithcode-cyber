@@ -89,15 +89,34 @@ class AssistantProviderError(Exception):
 
 @dataclass(frozen=True)
 class TurnLimits:
-    # Reserve two of eight model calls, 30 seconds and 4,000 characters for
-    # a tools-off final answer and one empty-answer retry, inside total limits.
-    model_turns: int = 8
-    tool_calls: int = 10
-    seconds: float = 90
+    # Reserve two model calls, 30 seconds and 4,000 characters for a tools-off
+    # final answer and one empty-answer retry, inside total limits.
+    # Research may use up to 20 catalog searches. The stop is soft first: at
+    # ``soft_tool_calls`` the model is told to start wrapping up, one search
+    # before the limit it is told to answer now, and only then is it cut off.
+    model_turns: int = 18
+    tool_calls: int = 20
+    soft_tool_calls: int = 15
+    seconds: float = 110
     final_seconds: float = 30
     output_chars: int = 16000
     final_chars: int = 4000
     input_tokens: int = INPUT_TOKEN_BUDGET
+
+
+def research_budget_notice(tools_used: int, limits: "TurnLimits", sent: set[str]) -> str | None:
+    """The soft stop: warn once when research is running long, then once to answer now."""
+    remaining = limits.tool_calls - tools_used
+    if remaining <= 1 and "answer_now" not in sent:
+        sent.add("answer_now")
+        sent.add("wrap_up")
+        return (f"[Research budget] You have used {tools_used} of {limits.tool_calls} catalog searches. "
+                "Write your answer now from what you have found; do not search again.")
+    if tools_used >= limits.soft_tool_calls and "wrap_up" not in sent:
+        sent.add("wrap_up")
+        return (f"[Research budget] You have used {tools_used} of {limits.tool_calls} catalog searches. "
+                "Start wrapping up: make another search only if the answer needs it, then write the answer.")
+    return None
 
 
 @dataclass
@@ -290,6 +309,8 @@ async def run_turn(
                 # Brief retries use the existing per-turn time/model budgets.
                 await asyncio.sleep(0.5 * (retry + 1))
 
+    notices_sent: set[str] = set()
+
     async def research():
         nonlocal tools_used
         while model_attempts < limits.model_turns - 2:
@@ -368,6 +389,10 @@ async def run_turn(
                        "error": tool_result.is_error, "result": tool_result.text}
             if result.limited or tools_used >= limits.tool_calls:
                 return
+            notice = research_budget_notice(tools_used, limits, notices_sent)
+            if notice:
+                # A plain message after the tool results; it is part of this turn only.
+                messages.append({"role": "user", "content": notice})
             if not result.calls:
                 if not result.text:
                     raise AssistantProviderError(PROVIDER_ERROR)
