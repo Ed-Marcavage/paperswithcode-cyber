@@ -7,7 +7,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     services = FakeServices([[tool_chunk()], [text_chunk('Found one useful post.')]])
     turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
-    assert PROMPT_VERSION == 'cyber-assistant-v4' and turn.status == 'limit_reached'
+    assert PROMPT_VERSION == 'cyber-assistant-v5' and turn.status == 'limit_reached'
     assert services.model_requests[0]['messages'][0]['content'] == SYSTEM_PROMPT
     final_messages = services.model_requests[-1]['messages']
     assert final_messages[0]['content'] == SYSTEM_PROMPT
@@ -15,7 +15,7 @@ def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     for prompt in (SYSTEM_PROMPT, FINALIZER_PROMPT):
         assert 'No emoji' in prompt
         assert 'internal field names' in prompt and 'selection thresholds' in prompt
-        assert '[Title](catalog_url) ([source](source_url))' in prompt
+        assert 'catalog_url' not in prompt and 'addresses present in' in prompt
         assert 'at most six items' in prompt and 'one short caveat' in prompt
         assert 'catalog-wide' in prompt
     assert 'one-sentence direct answer' in SYSTEM_PROMPT

@@ -213,8 +213,8 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
     assert "tools" not in services.model_requests[-1]
 
 
-def test_prompt_links_catalog_titles_before_original_sources():
+def test_prompt_leaves_link_style_to_the_model_but_forbids_invented_addresses():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v4"
-    assert "catalog_url" in SYSTEM_PROMPT
-    assert "[Title](catalog_url) ([source](source_url))" in SYSTEM_PROMPT
+    assert PROMPT_VERSION == "cyber-assistant-v5"
+    assert "catalog_url" not in SYSTEM_PROMPT
+    assert "Use only addresses present in tool results and never invent one" in SYSTEM_PROMPT
