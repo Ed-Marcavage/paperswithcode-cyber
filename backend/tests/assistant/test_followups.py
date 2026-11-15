@@ -132,7 +132,8 @@ def test_count_checks_reuse_post_query_and_existing_paper_search_at_limit_one(mo
     seen = followups.SeenWorks(ids={'42'}, arxiv={'2601.12345'})
     db = CountSessions()
     result = followups.read_counts(FollowUpPostCheck(query='agent patches'), seen, db, time.monotonic() + 1)
-    assert result == {'match_count': 7, 'new_match_count': 4}
+    assert result['match_count'] == 7 and result['new_match_count'] == 4
+    assert result['match_mode'] == 'all_words' and result['relaxations'] == []
     assert db.calls[0] == ('SET TRANSACTION READ ONLY', None) and len(db.calls) == 3
     assert 0 < int(db.calls[1][1]['timeout']) <= 1000
     assert 'min_agent_relevance' in db.calls[-1][1]

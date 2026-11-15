@@ -595,6 +595,19 @@ a provider usage limit still activates the normal cooldown. Set
 The terminal `done` and reloaded assistant messages retain the same `follow_ups`
 array. The separate `follow_ups` trace step records tokens, latency, proposals and
 verification outcomes; its tokens count toward run totals, outside research budgets.
+Post checks use the same all-words → implicit-relevance relaxation → ranked
+any-word search as `find_posts`, retaining every explicit filter. A missing query
+is derived from the proposed question, excluding stop words and its publisher
+filter. In the any-word pass, all-words hits still count; other hits must contain
+a least-frequent query lexeme within those filters and two distinct subject
+lexemes in the title/summary. Publisher-name lexemes and terms occurring in more
+than 10% of catalog posts cannot supply those two hits. A missing subject term
+therefore cannot be rescued by unrelated posts from the same publisher. This is
+a conservative keyword check, not a semantic guarantee. Traces include the
+effective query/filters, match mode, lexeme evidence, raw and qualified counts,
+new-match counts, and each keep/drop reason. Paper checks retain their existing
+keyword search. PostgreSQL stemming, counts and deadline performance need a
+local-stack check; fake-search tests do not execute those operators.
 Reapply the
 idempotent `add_assistant_topics_followups.sql` if only its topic column was
 previously installed; it now also adds the message `follow_ups` column.
