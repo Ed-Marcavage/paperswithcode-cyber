@@ -77,7 +77,8 @@ def test_token_totals_only_when_every_call_reports_usage():
 
 def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch, capsys):
     from backend import assistant_eval
-    replies = [[tool_chunk()], [text_chunk("Answer")], [text_chunk('{"candidates":[]}')]] * len(QUESTIONS)
+    from backend.tests.assistant.test_followup_phase import submission
+    replies = [[tool_chunk()], [text_chunk("Answer")], [submission([])]] * len(QUESTIONS)
     services = FakeServices(replies)
     mcp_urls = []
 
@@ -140,11 +141,9 @@ def test_owner_questions_lead_the_twenty_item_evaluation_without_duplicate_gener
 
 
 def test_topic_evaluation_records_verified_followups(monkeypatch):
-    from backend.services import assistant_followups
-    from backend.tests.assistant.test_followups import QUESTION, CHECK
-    monkeypatch.setattr(assistant_followups, "read_counts", lambda *args: {"match_count": 5, "new_match_count": 3})
+    from backend.tests.assistant.test_followup_phase import QUESTION, submission
     replies = [[tool_chunk()], [text_chunk("Grounded answer")],
-               [text_chunk(json.dumps({"candidates": [{"question": QUESTION, "check": CHECK}]}))]]
+               [tool_chunk()], [submission()]]
     services = FakeServices(replies * 4)
     output = io.StringIO()
     async def run():
@@ -157,8 +156,8 @@ def test_topic_evaluation_records_verified_followups(monkeypatch):
     for row in map(json.loads, output.getvalue().splitlines()):
         assert row["follow_ups_check"] == {"expected": True, "passed": True}
         assert row["follow_ups"] == [QUESTION]
-        decision = row["follow_up_steps"][0]["candidates"][0]
-        assert decision["match_count"] == 5 and decision["new_match_count"] == 3 and decision["kept"]
+        decision = row["follow_up_steps"][-1]["decisions"][0]
+        assert decision["kept"] and decision["support"]
 
 
 def test_evaluation_stops_on_optional_usage_limit_without_failing_the_answer():

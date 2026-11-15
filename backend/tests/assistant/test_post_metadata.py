@@ -134,7 +134,7 @@ def test_database_lookup_is_one_parameterized_select_with_readonly_connection_li
 
 
 def test_prompt_focuses_agent_harness_posts_without_overclaiming_rankings():
-    assert PROMPT_VERSION == "cyber-assistant-v9"
+    assert PROMPT_VERSION == "cyber-assistant-v10"
     for phrase in ("AI agent harnesses", "agent_relevance of 3", "vulnerabilities, malware or threats",
                    "tldr", "Group by publisher", "limited search samples"):
         assert phrase in SYSTEM_PROMPT

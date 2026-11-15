@@ -90,7 +90,7 @@ def test_interleaved_tool_calls_and_grounded_answer():
     turn, events = asyncio.run(services.run())
     assert turn.status == "done"
     assert len(services.tool_requests) == 2
-    assert [e["type"] for e in events] == ["tool_started", "tool_finished", "tool_started", "tool_finished", "text_delta", "done"]
+    assert [e["type"] for e in events] == ["tool_started", "tool_finished", "tool_started", "tool_finished", "text_delta", "answer_complete", "done"]
     messages = services.model_requests[1]["messages"]
     assert [m["role"] for m in messages] == ["system", "user", "assistant", "tool", "tool"]
     assert "/paper/evidence" in messages[-1]["content"]
@@ -131,7 +131,7 @@ def test_empty_finalizer_still_gives_a_bounded_plain_answer():
     assert turn.status == "limit_reached"
     assert "narrow your question" in turn.text
     assert len(turn.text) <= TurnLimits().output_chars
-    assert events[-2]["type"] == "text_delta"
+    assert events[-3]["type"] == "text_delta"
 
 
 def test_time_limit_stops_research_and_finalizes_with_tools_off():
@@ -215,6 +215,6 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
 
 def test_prompt_leaves_link_style_to_the_model_but_forbids_invented_addresses():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v9"
+    assert PROMPT_VERSION == "cyber-assistant-v10"
     assert "catalog_url" not in SYSTEM_PROMPT
     assert "Use only addresses present in tool results and never invent one" in SYSTEM_PROMPT

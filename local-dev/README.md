@@ -584,30 +584,26 @@ five minutes and remain available during provider cooldown. A turn may send
 and browse calls for that turn only. Apply `add_assistant_topics_followups.sql`
 before using the new fields; subsequent turns must send the topic again.
 
-After the answer is fully streamed and saved, one optional tools-off model call
-proposes follow-ups: reasoning off, 1,024 output tokens, six seconds, and at most
-2,800 estimated input tokens for the question, answer, topic and work digest.
-Read-only database checks then share a three-second deadline, keeping at most
-three questions with three matches including two works not already shown.
-Generation timeout, invalid output, errors or Stop leave the answer intact with no suggestions;
-a provider usage limit still activates the normal cooldown. Set
-`PWC_ASSISTANT_FOLLOW_UPS_ENABLED=false` to skip the step entirely.
-The terminal `done` and reloaded assistant messages retain the same `follow_ups`
-array. The separate `follow_ups` trace step records tokens, latency, proposals and
-verification outcomes; its tokens count toward run totals, outside research budgets.
-Post checks use the same all-words → implicit-relevance relaxation → ranked
-any-word search as `find_posts`, retaining every explicit filter. A missing query
-is derived from the proposed question, excluding stop words and its publisher
-filter. In the any-word pass, all-words hits still count; other hits must contain
-a least-frequent query lexeme within those filters and two distinct subject
-lexemes in the title/summary. Publisher-name lexemes and terms occurring in more
-than 10% of catalog posts cannot supply those two hits. A missing subject term
-therefore cannot be rescued by unrelated posts from the same publisher. This is
-a conservative keyword check, not a semantic guarantee. Traces include the
-effective query/filters, match mode, lexeme evidence, raw and qualified counts,
-new-match counts, and each keep/drop reason. Paper checks retain their existing
-keyword search. PostgreSQL stemming, counts and deadline performance need a
-local-stack check; fake-search tests do not execute those operators.
+After the answer is fully streamed and saved, `answer_complete` is emitted.
+The same turn then researches follow-ups with the full conversation, tool results
+and answer. It offers only `find_posts`, `search_papers`, `browse_catalog` and
+`submit_follow_ups`. The model judges whether its searches support useful questions;
+there are no match-count, novelty-count or lexical relevance gates. Submission
+keeps at most three nonempty questions of at most 120 characters, drops exact or
+near-exact duplicates and requires at least one successful search in this phase.
+Support sentences are trace-only and are not included in visitor tool steps.
+
+The phase has four model passes **including** a final submit-only pass, six search
+calls, 25 seconds (five reserved for the final gate) and a separate 1,000,000-token
+cumulative input allowance. A plain-text reply or invalid submission triggers
+another pass offering only `submit_follow_ups`; this does not use `tool_choice`.
+At a bound the final gate offers only submission, then returns no suggestions if
+it fails. Stop, disconnect or phase errors preserve the already-saved answer;
+a provider usage limit still activates cooldown. `PWC_ASSISTANT_FOLLOW_UPS_ENABLED=false`
+skips the phase. The terminal `done` and reloaded assistant messages keep their
+`follow_ups` string array. Trace model/tool steps have `phase=follow_ups`, including
+submitted questions, support sentences and any duplicate/no-search drops; run
+token totals include every model call. Research prompts and answering are unchanged.
 Reapply the
 idempotent `add_assistant_topics_followups.sql` if only its topic column was
 previously installed; it now also adds the message `follow_ups` column.
@@ -626,8 +622,9 @@ history per question and the application's normal bounded loop. Its JSON Lines
 output records question, named model, answer, status/error, tools and results,
 links, duration, model-call count and input/output tokens (null when absent).
 Four questions also select a topic and record a `follow_ups_check` that passes
-only when the dedicated step verifies at least one suggestion; review its
-`follow_up_steps` candidate counts for relevance and useful novelty. `model_calls`
+only when the phase submits at least one suggestion; review its
+`follow_up_steps` searches and support sentences, then actually ask every offered
+question. `follow_up_tokens` records the phase cost separately. `model_calls`
 and tokens include that optional call; `research_model_calls` reports the answer
 loop alone. Compare research status/tool counts separately from suggestion quality.
 These replace the generic taxonomy, vulnerability-repair, AI-system-security
@@ -639,8 +636,8 @@ bounded read-only post-metadata lookups with the backend database settings;
 unavailable enrichment is marked in the tool result and does not fail the turn.
 
 Evaluate one named model at a time and reserve enough provider allowance before
-starting. Each full run asks 20 questions and can make up to 180 model requests
-(eight research/answer calls plus one optional call per question); comparing three models can use up to 540
+starting. Each full run asks 20 questions and can make up to 240 model requests
+(eight research/answer calls plus four follow-up passes per question); comparing three models can use up to 720
 requests. Live evaluation shares the provider allowance with the assistant.
 Use fake providers for implementation tests, and stop live runs when the
 remaining allowance is needed for interactive use.

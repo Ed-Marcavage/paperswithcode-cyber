@@ -17,10 +17,11 @@ from backend.services.assistant_input_budget import (
     estimate_input_tokens, finalizer_messages,
 )
 from backend.services.assistant_tool_budget import bounded_arguments
+from backend.services.assistant_context import paired_messages
 from backend.services.assistant_topics import topic_instruction, scoped_result
 from backend.services.assistant_provider import is_busy, is_usage_limit, USAGE_LIMIT_MESSAGE
 
-PROMPT_VERSION = "cyber-assistant-v9"
+PROMPT_VERSION = "cyber-assistant-v10"
 SYSTEM_PROMPT = """You are the assistant for Papers with Code Cyber, a curated
 catalog of security research papers, industry posts, repositories, organizations
 and developers. The audience builds and uses AI agent harnesses for security
@@ -201,6 +202,7 @@ async def run_turn(
     scope_prompt = topic_instruction(topic)
     scope_messages = [{"role": "system", "content": scope_prompt}] if scope_prompt else []
     messages = [{"role": "system", "content": SYSTEM_PROMPT}, *scope_messages, *history]
+    research_messages = messages
     tools_used = 0
     model_attempts = 0
     output_used = 0
@@ -419,12 +421,24 @@ async def run_turn(
         turn.answer_complete = True
         if on_answer:
             await on_answer()
+        yield {"type": "answer_complete"}
         enabled = get_assistant_settings().follow_ups_enabled if follow_ups_enabled is None else follow_ups_enabled
         if enabled:
-            from backend.services.assistant_followup_generation import generate_followups
+            from backend.services.assistant_followups import research_followups
             question = next((m["content"] for m in reversed(history) if m["role"] == "user"), "")
-            turn.follow_ups = await generate_followups(client, model, question, turn.text, turn.steps,
-                topic=topic, sessions=getattr(mcp, "sessions", None), record=record, on_provider_limit=on_provider_limit)
+            context = paired_messages(research_messages)
+            # The finalizer may have used shortened input. Continue the full
+            # research conversation, removing any unfinished answer pass.
+            if context[-1]['role'] == 'assistant' and not context[-1].get('tool_calls'):
+                context.pop()
+            context.append({'role': 'assistant', 'content': turn.text})
+            try:
+                turn.follow_ups = await research_followups(client, mcp, model, context, question,
+                    topic=topic, record=record, on_provider_limit=on_provider_limit)
+            except Exception:
+                # The optional phase cannot fail an already-saved answer.
+                # Cancellation/GeneratorExit are BaseExceptions and propagate.
+                turn.follow_ups = []
         terminal = True
         yield {"type": "done", "status": turn.status, "follow_ups": turn.follow_ups}
     except (asyncio.CancelledError, GeneratorExit):

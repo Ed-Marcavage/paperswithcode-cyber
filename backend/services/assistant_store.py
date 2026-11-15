@@ -154,7 +154,7 @@ class AssistantStore:
                                            kind=step["kind"], detail=step))
             db.execute(update(AssistantConversation).where(
                 AssistantConversation.id == saved.conversation_id).values(updated_at=datetime.now(UTC)))
-            for position, step in enumerate(s for s in turn.steps if s["kind"] == "tool"):
+            for position, step in enumerate(s for s in turn.steps if s["kind"] == "tool" and s.get('phase') != 'follow_ups'):
                 db.add(AssistantToolCall(id=identifier(), message_id=saved.message_id,
                                         position=position, detail=step))
 
