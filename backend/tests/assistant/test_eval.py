@@ -84,7 +84,7 @@ def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch
         max_retries=0, http_client=TestHttpClient()))
     output = tmp_path / "evaluation.jsonl"
     assert assistant_eval.main(["--model", "named-container-model", "--mcp-url", "http://mcp:7860/mcp", "--output", str(output)]) == 0
-    assert len(mcp_urls) == 41  # Discovery/tool per question plus one cached vocabulary request.
+    assert len(mcp_urls) == 22  # One discovery + vocabulary fetch, then 20 actual tool calls.
     rows = [json.loads(line) for line in output.read_text().splitlines()]
     assert len(rows) == 20
     assert all(row["model"] == "named-container-model" and row["status"] == "done" for row in rows)

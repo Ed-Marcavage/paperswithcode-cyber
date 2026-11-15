@@ -8,9 +8,18 @@ import unittest
 from unittest import mock
 
 from PIL import Image, ImageDraw
+import pytest
 
 import post_previews as pp
 import refresh_post_previews as refresh
+
+
+@pytest.fixture(autouse=True)
+def public_dns(monkeypatch):
+    import socket
+    monkeypatch.setattr(socket, "getaddrinfo", lambda *args, **kwargs: [
+        (socket.AF_INET, socket.SOCK_STREAM, 6, "", ("8.8.8.8", 443)),
+    ])
 
 
 def page_image(size=(1280, 1760), lines=40, background="white"):
@@ -213,8 +222,7 @@ class ManifestTest(unittest.TestCase):
     def test_items_are_ids_or_urls(self):
         self.assertEqual(refresh.parse_item("1008")["paper_id"], 1008)
         self.assertEqual(refresh.parse_item("https://example.com/p")["url"], "https://example.com/p")
-        with self.assertRaises(ValueError):
-            refresh.parse_item("ftp://example.com/p")
+        self.assertEqual(refresh.parse_item("ftp://example.com/p")["url"], "ftp://example.com/p")
 
     def test_entry_records_file_digest_and_method(self):
         data = b"jpeg bytes"

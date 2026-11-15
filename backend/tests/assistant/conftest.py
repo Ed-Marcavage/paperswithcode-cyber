@@ -11,7 +11,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit
+from backend.models.database.assistant import AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit, AssistantAdmission
 from backend.services.assistant_store import AssistantStore
 
 if sys.platform != "linux":
@@ -34,7 +34,7 @@ def store():
     @event.listens_for(engine, "connect")
     def foreign_keys(connection, _):
         connection.execute("PRAGMA foreign_keys=ON")
-    for model in (AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit):
+    for model in (AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep, AssistantProviderLimit, AssistantAdmission):
         model.__table__.create(engine)
     yield AssistantStore(sessionmaker(bind=engine, expire_on_commit=False))
     engine.dispose()
@@ -64,3 +64,5 @@ def isolated_filter_cache(monkeypatch):
     from backend.services import assistant_mcp
     monkeypatch.setattr(assistant_mcp, "FILTER_CACHE", {})
     monkeypatch.setattr(assistant_mcp, "FILTER_LOCKS", {})
+    monkeypatch.setattr(assistant_mcp, "TOOL_CACHE", {})
+    monkeypatch.setattr(assistant_mcp, "TOOL_LOCKS", {})

@@ -7,6 +7,10 @@ are off. Keyword search and reading the cache do not require a model key.
 
 ## Start the review environment
 
+Paths beginning `/path/to/` in these examples are placeholders. Choose existing
+writable directories on the host or inside the backend container as appropriate;
+keep generated reports and imported data outside Git.
+
 From the repository root, using a Docker context that can build Linux images:
 
     python3 local-dev/configure.py
@@ -71,9 +75,9 @@ raw exports, document indexes, bundles and dumps outside Git.
    the paper's source link. Copy the complete bundle into the backend, then
    preview and apply the same file:
 
-       sh local-dev/compose.sh cp data/bundle backend:/tmp/reviewed
-       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /tmp/reviewed/catalog.json
-       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /tmp/reviewed/catalog.json --execute
+       sh local-dev/compose.sh cp data/bundle backend:/path/to/work/reviewed
+       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /path/to/work/reviewed/catalog.json
+       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /path/to/work/reviewed/catalog.json --execute
 
    Preview rolls back schema and data together. The import reuses native papers
    (versioned arXiv ID or canonical external URL) and author/topic links. Catalog
@@ -83,7 +87,7 @@ raw exports, document indexes, bundles and dumps outside Git.
    repeat preview must report zero new papers and zero added or removed topic links.
 4. Import official associations and star observations separately. Copy your
    reviewed repository manifest into the backend and run
-   `python local-dev/repository_catalog.py /tmp/repositories.json` there; add
+   `python local-dev/repository_catalog.py /path/to/work/repositories.json` there; add
    `--execute` after preview. Each link requires a source and an evidence note.
    Snapshots need a precise timestamp within 24 hours; use `--fetch-current`
    to obtain new public observations for a stale manifest. The optional
@@ -161,7 +165,7 @@ For a static release, build with the same public values and a new output directo
 ```sh
 cd frontend && npm ci && cd ..
 python3 local-dev/build_catalog_site.py --environment production \
-  --site https://your-domain.example --output /tmp/catalog-site-release
+  --site https://your-domain.example --output /path/to/work/catalog-site-release
 ```
 
 Build on a case-sensitive filesystem. The command turns off auth, chat, and agent
@@ -280,10 +284,10 @@ observation for those repos. GitHub's contributors endpoint can omit identities
 it cannot resolve to an account.
 
 ```sh
-python3 local-dev/fetch_developers.py /tmp/developers.json
-sh local-dev/compose.sh cp /tmp/developers.json backend:/tmp/developers.json
-sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /tmp/developers.json
-sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /tmp/developers.json --execute
+python3 local-dev/fetch_developers.py /path/to/work/developers.json
+sh local-dev/compose.sh cp /path/to/work/developers.json backend:/path/to/work/developers.json
+sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /path/to/work/developers.json
+sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /path/to/work/developers.json --execute
 ```
 
 The import applies the Developers migration to an existing local catalog. A
@@ -306,9 +310,9 @@ what the Developers tab and star-based Trending count. Run it after the review
 fields are loaded, then the developer collector above:
 
 ```sh
-sh local-dev/compose.sh cp bundle/v2-fields.json backend:/tmp/v2-fields.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json --execute
+sh local-dev/compose.sh cp bundle/v2-fields.json backend:/path/to/work/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /path/to/work/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /path/to/work/v2-fields.json --execute
 ```
 
 `/api/v1/catalog/repositories/{owner}/{name}` lists the papers and posts citing
@@ -322,8 +326,8 @@ checked against the GitHub profile's name and website), applied like the
 other organization seeds:
 
 ```sh
-sh local-dev/compose.sh cp local-dev/seeds/publisher-organizations/organizations.json backend:/tmp/publisher-organizations.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_catalog_organizations.py /tmp/publisher-organizations.json --execute
+sh local-dev/compose.sh cp local-dev/seeds/publisher-organizations/organizations.json backend:/path/to/work/publisher-organizations.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_catalog_organizations.py /path/to/work/publisher-organizations.json --execute
 ``` Read the directory at `/api/v1/developers/`
 and profiles at `/api/v1/developers/{github_id}`.
 
@@ -350,12 +354,25 @@ widget or challenge wording in a page with under 3,000 characters of text), or a
 pixels within 8 grey levels of the most common one). Challenges are not worked
 around. Details are in `post_previews.py`.
 
+Preview destinations must be public HTTP(S) URLs on ports 80 or 443. Initial
+pages, redirects, frames and subresources are checked against every resolved
+IPv4/IPv6 address; loopback, private, link-local, unique-local and other non-public
+ranges are refused. The browser uses a local filtering proxy that connects to
+checked IPs, preventing DNS rebinding between validation and connection. Request
+interception is enabled, service workers and WebSockets are blocked, and direct
+WebRTC/QUIC traffic is disabled. A refused destination rejects the screenshot
+with a reason in the report. Publisher artwork uses the backend's pinned,
+redirect-aware public fetcher for both the page and image; if that is refused,
+the title card requires no network. Catalog-derived URLs follow the same path.
+The explicitly configured catalog API is trusted operator input for ID lookup;
+its returned source URL is still untrusted and checked before previewing.
+
 Screenshots run on the host, not in the backend container. They need Node on
 `PATH`, a Playwright package and an installed Chromium; nothing is downloaded:
 
 ```sh
-export PWC_PLAYWRIGHT_CORE=~/.npm/_npx/<hash>/node_modules/playwright-core
-export PWC_CHROMIUM=~/Library/Caches/ms-playwright/chromium-1217/chrome-mac-arm64/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"
+export PWC_PLAYWRIGHT_CORE="/path/to/node_modules/playwright-core"
+export PWC_CHROMIUM="/path/to/chromium-executable"
 ```
 
 Without `PWC_CHROMIUM`, Playwright's own expected build is used. The commands
@@ -369,11 +386,11 @@ refresh posts already in the catalog, write the images to a new folder, check
 the contact sheet, then load them as a separate step:
 
 ```sh
-uv run python local-dev/refresh_post_previews.py shoot /tmp/post-previews 1008 https://example.com/post --api http://localhost:8095
-uv run python local-dev/refresh_post_previews.py sheet /tmp/post-previews
-sh local-dev/compose.sh cp /tmp/post-previews backend:/tmp/post-previews
-sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json
-sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json --execute
+uv run python local-dev/refresh_post_previews.py shoot /path/to/work/post-previews 1008 https://example.com/post --api http://localhost:8095
+uv run python local-dev/refresh_post_previews.py sheet /path/to/work/post-previews
+sh local-dev/compose.sh cp /path/to/work/post-previews backend:/path/to/work/post-previews
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /path/to/work/post-previews/manifest.json
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /path/to/work/post-previews/manifest.json --execute
 ```
 
 `shoot` takes paper ids (resolved through the catalog API) or post URLs, or
@@ -464,9 +481,13 @@ key is required by the frontend or MCP. Settings:
 | Setting | Default |
 | --- | --- |
 | `PWC_ASSISTANT_BASE_URL` | `https://ollama.com/v1` |
-| `PWC_ASSISTANT_MODEL` | `glm-5.3-flash` (provisional until evaluation) |
+| `PWC_ASSISTANT_MODEL` | `deepseek-v4.1-flash:1017` |
 | `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
 | `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
+| `PWC_ASSISTANT_TURNS_PER_HOUR` | `30` (rolling hour) |
+| `PWC_ASSISTANT_TURNS_PER_DAY` | `100` (rolling 24 hours) |
+| `PWC_ASSISTANT_CONVERSATIONS_PER_HOUR` | `10` new chats (rolling hour) |
+| `PWC_ASSISTANT_CONVERSATIONS_PER_DAY` | `30` new chats (rolling 24 hours) |
 | `PWC_ASSISTANT_RETENTION_DAYS` | `90`, measured from last activity |
 
 Compose permits the internal `mcp:7860` Host header and forces
@@ -475,22 +496,52 @@ PostHog session id. No key produces a plain 503. A provider usage limit is store
 in the database and disables every composer until the reset; status checks do
 not call a model. Temporary provider concurrency errors are retried briefly.
 
+The backend caches the public MCP tool list per endpoint for ten minutes, with
+one shared refresh for concurrent cache misses. Catalog/schema failures invalidate
+it for the next discovery; 429s keep the valid cache to avoid extra traffic.
+An MCP 429 gets one half-second wait and one retry inside the turn deadline,
+then a retryable "The catalog is busy. Please try again in a moment." error.
+It does not trigger provider cooldown or appear as a model-provider failure.
+
+**Production must set `PWC_MCP_REQUEST_LIMIT` on the MCP service too.** Compose
+defaults to **600 requests per client per minute**: ten visitors making two turns
+per minute at the ten-tool-call ceiling need 200 requests/minute; allowing one
+retry per request brings that to 400, leaving 200 for discovery and burst
+headroom. This sizes short bursts, not sustained visitor usage; the assistant's
+rolling visitor quotas still apply. The MCP server's separate semantic-search
+and concurrency limits remain in effect and may also produce the busy response.
+
+The pinned MCP server accepts `X-PwC-MCP-Client` only from a direct loopback peer
+without `X-Forwarded-For` (with its default `trust_proxy_headers=true`). For a
+loopback MCP URL, the backend sends `assistant-` plus the server-derived visitor
+cookie hash, giving each visitor a separate MCP bucket. It never forwards the
+browser's identity/proxy headers or raw cookie. Compose's `http://mcp:7860/mcp`
+connection is between containers, so it still shares the backend's IP bucket;
+the increased request limit covers that topology. A same-host production backend
+can use a direct loopback MCP URL for per-visitor limits. Do not widen the MCP
+server's header-trust boundary to public or container-network callers.
+
 **Production must set `PWC_PUBLIC_SITE_URL` to the public HTTPS origin**, for
 example `https://paperswithcode-cyber.com` (no path, query or fragment). This is
-the authoritative origin for cookie-authenticated assistant writes, even when
+the authoritative origin for every unsafe assistant request, even when
 TLS ends at nginx and the backend receives HTTP with an internal Host. An unset
 value falls back to the request Host and HTTP(S) `X-Forwarded-Proto`, matching
 the repository's existing nginx trust in `backend/routers/auth.py`; it does not
 trust `X-Forwarded-Host`. Keep the backend behind the trusted proxy, and have the
 proxy overwrite `Host` and `X-Forwarded-Proto` on every assistant API location.
-Local direct HTTP development can leave the public origin unset.
+Local direct HTTP development can leave the public origin unset; the Vite proxy
+must preserve the browser's Host. POST, PATCH and DELETE are checked before a
+visitor identity is issued. A mismatched Origin or `Sec-Fetch-Site: cross-site`
+is refused. Without Origin, only `Sec-Fetch-Site: same-origin` is accepted;
+non-browser clients must send a matching Origin. Bodies require
+`Content-Type: application/json` (an optional charset is accepted).
 
 Before enabling on an existing **local** database, the reviewer applies the
-three additive migrations in order (a new empty database's `init-db.sh` uses
+four additive migrations in order (a new empty database's `init-db.sh` uses
 ORM `create_all`, which includes these tables):
 
 ```sh
-for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql
+for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql add_assistant_admission.sql
 do
   sh local-dev/compose.sh exec -T db psql -U pwc_local -d pwc_local -v ON_ERROR_STOP=1 < "backend/database/migrations/$migration"
 done
@@ -508,17 +559,29 @@ key):
 ```sh
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli list --days 7
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli show RUN_ID
-sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export --days 7 > /tmp/assistant-runs.jsonl
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export --days 7 > /path/to/work/assistant-runs.jsonl
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli purge
 ```
 
-Schedule the purge command daily in the review/deployment environment when
-chat is enabled. It removes chats older than the configured last-activity
+**A scheduled, monitored daily purge is a prerequisite for enabling the
+assistant.** Configure the job in the target environment, verify a successful
+run, and alert on failures or a missed daily run before enabling chat. Access
+checks hide and reject expired chats immediately, even if the purge has not
+run; they do not replace physical deletion by the scheduled job. It removes chats older than the configured last-activity
 retention, including messages, tools, runs, steps and feedback. Sending,
 completing, renaming and giving feedback update last activity; reading does not.
-The disclosed default is 90 days; update the privacy page if changing it.
+Expired chats cannot be reopened, continued, renamed or given feedback; late
+completions cannot revive them. The disclosed default is 90 days; update the
+privacy page if changing it.
 
 ### Model evaluation
+
+The 20-question local-stack evaluation selected `deepseek-v4.1-flash:1017` as
+the default: its mean score was 2.90/3, compared with 2.30 for `glm-5.3-flash`
+and 2.55 for `kimi-k3.1-pro`. It invented no links and used about 1.3 times the
+GLM baseline's allowance. Research keeps `reasoning_effort=low` and the finalizer
+uses `none` (thinking off): Ollama's model metadata lists `false`, `low`, `high`
+and `max`, and its [compatibility API maps `none` to `false`](https://docs.ollama.com/api/openai-compatibility#v1chatcompletions).
 
 `backend.assistant_eval` asks the same 20 fixed questions in order, with fresh
 history per question and the application's normal bounded loop. Its JSON Lines
@@ -529,26 +592,28 @@ writes chat history to the database nor sends analytics. Like chat, it makes
 bounded read-only post-metadata lookups with the backend database settings;
 unavailable enrichment is marked in the tool result and does not fail the turn.
 
-The specification author has authorized the **reviewer** to evaluate up to
-three named models, 20 questions per model. The implementer must not run this
-live evaluation; implementation tests use fake providers. Each model's run can
-make up to 160 model requests within the existing per-question limits.
+Evaluate one named model at a time and reserve enough provider allowance before
+starting. Each full run asks 20 questions and can make up to 160 model requests
+within the per-question limits; comparing three models can use up to 480
+requests. Live evaluation shares the provider allowance with the assistant.
+Use fake providers for implementation tests, and stop live runs when the
+remaining allowance is needed for interactive use.
 
-Inside the already-running backend container, the reviewer can use its existing
-process environment (including the backend-only key) and internal MCP hostname:
+Inside an already-running backend container, use its process environment
+(including the backend-only key) and internal MCP hostname:
 
 ```sh
 python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://mcp:7860/mcp \
+  --output /path/to/work/assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
-From the host, the equivalent reviewer command is:
+From the host, the equivalent command is:
 
 ```sh
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://mcp:7860/mcp \
+  --output /path/to/work/assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
 Retain the JSONL outside the container before it is replaced. To run directly on
@@ -556,25 +621,37 @@ the host instead, use the externally published local MCP endpoint:
 
 ```sh
 uv run --env-file .local.env python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://localhost:8095/mcp \
-  --output .assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://localhost:8095/mcp \
+  --output .assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
 Outputs are ignored by Git and exclusive-created (use a new name for a repeat).
 Review all 20 answers against their recorded tool evidence: supported facts,
 real catalog links, no invented result for the deliberately missing title,
 useful answers, failures, latency and token usage. Record the chosen model and
-reason in the local implementation report; only then update the default if
+reason in evaluation notes kept outside Git; only then update the default if
 needed. No evaluation results or model choice are claimed by the script itself.
 
 ### Nginx review configuration
 
 Include `nginx-assistant-http.conf` once inside nginx's `http` block, then include
 `nginx-public-pages.conf` inside the Cyber `server` block. The exact assistant
-turn location has a generous **2 requests/second per IP with a burst of 60**,
-returns 429 for excess traffic, disables proxy buffering and caching, and allows
-120 seconds for streaming. This is a proxy abuse limit, not a per-visitor daily
-or concurrent-turn quota. Other assistant paths use the existing API proxy.
+turn location permits **10 requests/minute per IP with a burst of 3**, returns a
+plain, friendly 429 for excess traffic, disables proxy buffering and caching,
+and allows 120 seconds for streaming. **Production must install this proxy
+limit before enabling the assistant**: cookie limits alone cannot stop a caller
+from discarding its cookie. Keep the backend inaccessible except through this
+proxy and configure trusted real-client addressing if another proxy fronts it.
+IP addresses are used only in nginx memory; none are stored in the database.
+
+The backend atomically admits at most one turn per visitor and applies the
+rolling quotas above to the hashed visitor cookie. Deleting chats does not
+reset quotas. Completed, failed and disconnected streams release admission;
+a 120-second stream timeout bounds provider work, and a five-minute lease
+recovers admission after a crashed worker. Purge removes quota rows after a day
+of inactivity. There are no global daily or concurrency caps; the existing
+provider-allowance cooldown still switches the assistant off until reset.
+Other assistant paths use the existing API proxy.
 Production must set backend `PWC_PUBLIC_SITE_URL` to the public HTTPS origin.
 Preserve the visitor's Host and overwrite `X-Forwarded-Proto` with `$scheme` in
 that API proxy too, including conversation PATCH/DELETE and feedback POST paths.

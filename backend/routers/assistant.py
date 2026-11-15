@@ -12,6 +12,7 @@ from contextlib import aclosing
 import anyio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from starlette.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
@@ -19,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from backend.assistant_config import AssistantSettings, get_assistant_settings
 from backend.config import get_settings
 from backend.models.assistant import AssistantTurnRequest, AssistantFeedbackRequest, AssistantRenameRequest
+from backend.services.assistant_admission import TURN_TIMEOUT_SECONDS, VisitorLimitReached
 from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
 from backend.services.assistant_store import (
@@ -31,9 +33,8 @@ COOKIE_NAME = "pwc_assistant_visitor"
 logger = logging.getLogger(__name__)
 
 
-def visitor_cookie(request: Request) -> str:
-    cookie = request.cookies.get(COOKIE_NAME, "")
-    if cookie and request.method not in {"GET", "HEAD", "OPTIONS"}:
+async def visitor_cookie(request: Request) -> str:
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         expected = get_settings().public_site_url
         if not expected:
@@ -42,8 +43,13 @@ def visitor_cookie(request: Request) -> str:
             proto = request.headers.get("x-forwarded-proto", "")
             scheme = proto if proto in {"http", "https"} else request.url.scheme
             expected = str(request.base_url.replace(scheme=scheme)).rstrip("/")
-        if origin != expected or request.headers.get("sec-fetch-site") == "cross-site":
+        fetch_site = request.headers.get("sec-fetch-site")
+        if (origin != expected and not (origin is None and fetch_site == "same-origin")) or fetch_site == "cross-site":
             raise HTTPException(403, "Please send this request from the catalog page.")
+        if await request.body() and request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+            raise HTTPException(415, "Please send the request body as application/json.")
+    # Validate writes before issuing even an anonymous visitor identity.
+    cookie = request.cookies.get(COOKIE_NAME, "")
     return cookie if re.fullmatch(r"[A-Za-z0-9_-]{43}", cookie) else secrets.token_urlsafe(32)
 
 
@@ -71,25 +77,29 @@ class AssistantStreamResponse(StreamingResponse):
     """Listen for disconnect even while a model is silent (ASGI 2.4 included)."""
 
     async def __call__(self, scope, receive, send):
-        async with anyio.create_task_group() as group:
-            async def stream():
-                try:
-                    await self.stream_response(send)
-                except OSError:
-                    pass  # ASGI server reports a disconnected socket.
-                finally:
-                    with anyio.CancelScope(shield=True):
-                        await self.body_iterator.aclose()
+        try:
+            async with anyio.create_task_group() as group:
+                async def stream():
+                    try:
+                        with anyio.move_on_after(TURN_TIMEOUT_SECONDS):
+                            await self.stream_response(send)
+                    except OSError:
+                        pass  # ASGI server reports a disconnected socket.
+                    finally:
+                        with anyio.CancelScope(shield=True):
+                            await self.body_iterator.aclose()
+                        group.cancel_scope.cancel()
+
+                async def disconnected():
+                    await self.listen_for_disconnect(receive)
                     group.cancel_scope.cancel()
 
-            async def disconnected():
-                await self.listen_for_disconnect(receive)
-                group.cancel_scope.cancel()
-
-            group.start_soon(stream)
-            group.start_soon(disconnected)
-        if self.background:
-            await self.background()
+                group.start_soon(stream)
+                group.start_soon(disconnected)
+        finally:
+            if self.background:
+                with anyio.CancelScope(shield=True):
+                    await self.background()
 
 
 async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings, saved: SavedTurn, store):
@@ -108,7 +118,7 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
     try:
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
-            events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions), settings.model, saved.history, turn,
+            events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions, visitor_hash=saved.visitor_hash), settings.model, saved.history, turn,
                               on_step=record, on_provider_limit=provider_limit)
             async with aclosing(events):
                 async for event in events:
@@ -151,6 +161,8 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
                                        site_path=payload.site_path,
                                        analytics_session_id=str(payload.analytics_session_id)
                                        if settings.store_analytics_session and payload.analytics_session_id else None)
+    except VisitorLimitReached as error:
+        raise HTTPException(429, str(error)) from None
     except ConversationNotFound:
         raise HTTPException(404, "Chat not found.") from None
     except QuestionLimitReached:
@@ -159,6 +171,7 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     response = AssistantStreamResponse(
         turn_events(payload, settings, saved, store), media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        background=BackgroundTask(store.release, saved),
     )
     set_visitor_cookie(response, visitor, settings)
     return response

@@ -5,7 +5,7 @@ from __future__ import annotations
 import asyncio
 import socket
 from dataclasses import dataclass
-from ipaddress import IPv6Address, ip_address
+from ipaddress import IPv6Address, ip_address, ip_network
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import aiohttp
@@ -14,6 +14,9 @@ from backend.utils.public_urls import PublicUrlValidationError, normalize_public
 
 SAFE_FETCH_USER_AGENT = "PapersWithCode-SafeFetch/1.0"
 SUPPORTED_PORTS = frozenset({80, 443})
+# Reject transition mechanisms and site-local/multicast targets as well as
+# ordinary private ranges. A public-looking transition address can embed a LAN IP.
+UNSAFE_TRANSITION_RANGES = tuple(map(ip_network, ("64:ff9b::/96", "64:ff9b:1::/48", "2001::/23", "2002::/16")))
 
 
 class SafeOutboundHttpError(RuntimeError):
@@ -38,9 +41,15 @@ class SafeFetchResult:
 
 
 def _address_is_public(value: str) -> bool:
+    if "%" in value:
+        return False
     address = ip_address(value)
     if isinstance(address, IPv6Address) and address.ipv4_mapped is not None:
-        return address.ipv4_mapped.is_global
+        return _address_is_public(str(address.ipv4_mapped))
+    if isinstance(address, IPv6Address) and address.is_site_local:
+        return False
+    if address.is_multicast or address.is_reserved or any(address in network for network in UNSAFE_TRANSITION_RANGES):
+        return False
     return address.is_global
 
 

@@ -1,11 +1,17 @@
 """Credential-free, bounded access to the catalog's stateless MCP server.
 
-Adapted from chat_pwc_mcp's JSON-RPC transport. No chat identity, credentials,
-or arbitrary URL supplied by the model is forwarded to the catalog.
+Adapted from chat_pwc_mcp's JSON-RPC transport. Only a server-derived visitor
+hash may identify direct loopback requests; raw cookies, credentials and
+arbitrary URLs supplied by the model are never forwarded to the catalog.
 """
 
 import asyncio
 import json
+import re
+import time
+from copy import deepcopy
+from ipaddress import ip_address
+from urllib.parse import urlsplit
 import uuid
 from dataclasses import dataclass
 from typing import Any
@@ -30,6 +36,11 @@ READ_PAPER_BYTES = 8 * 1024
 TRUNCATION = "\n[Result truncated; narrow the request.]"
 FILTER_CACHE = {}
 FILTER_LOCKS = {}
+TOOL_CACHE = {}
+TOOL_LOCKS = {}
+TOOL_CACHE_TTL_SECONDS = 600
+BUSY_RETRY_SECONDS = 0.5
+CATALOG_BUSY_MESSAGE = "The catalog is busy. Please try again in a moment."
 
 META = {
     "io.modelcontextprotocol/protocolVersion": "2026-07-28",
@@ -39,6 +50,23 @@ META = {
 
 class AssistantMcpError(Exception):
     """A public error containing no upstream response or request contents."""
+
+
+class AssistantMcpBusy(AssistantMcpError):
+    """Catalog admission refused a request; retrying later is safe."""
+
+    def __init__(self):
+        super().__init__(CATALOG_BUSY_MESSAGE)
+
+
+def loopback_endpoint(endpoint):
+    host = urlsplit(endpoint).hostname
+    if host == "localhost":
+        return True
+    try:
+        return ip_address(host or "").is_loopback
+    except ValueError:
+        return False
 
 
 @dataclass(frozen=True)
@@ -72,22 +100,54 @@ def cap_payload(payload, *, limit, is_json, is_error):
 
 
 class CatalogMcp:
-    def __init__(self, client: httpx.AsyncClient, endpoint: str, *, lookup=lookup_post_metadata, sessions=None):
+    def __init__(self, client: httpx.AsyncClient, endpoint: str, *, lookup=lookup_post_metadata, sessions=None, visitor_hash=None):
         self.client = client
         self.endpoint = endpoint
         self.lookup = lookup
         self.sessions = sessions
+        self.rate_limited = False
+        if visitor_hash is not None and not re.fullmatch(r"[0-9a-f]{64}", visitor_hash):
+            raise ValueError("Expected a hashed visitor identity")
+        # The pinned MCP server honors this only for direct loopback peers with
+        # no forwarded headers. Remote/Compose connections retain the IP bucket.
+        self.client_identity = f"assistant-{visitor_hash}" if visitor_hash and loopback_endpoint(endpoint) else None
 
     async def _request(self, method: str, params: dict) -> dict:
+        self.rate_limited = False
+        for attempt in range(2):
+            try:
+                result = await self._request_once(method, params)
+            except AssistantMcpBusy:
+                self.rate_limited = True
+                if attempt:
+                    raise
+                # The loop's research deadline includes this one short retry.
+                # Keep valid discovery cached while the catalog is busy.
+                await asyncio.sleep(BUSY_RETRY_SECONDS)
+            except AssistantMcpError:
+                self.rate_limited = False
+                TOOL_CACHE.pop(self.endpoint, None)
+                raise
+            else:
+                self.rate_limited = False
+                return result
+        raise AssertionError("unreachable")
+
+    async def _request_once(self, method: str, params: dict) -> dict:
         request_id = str(uuid.uuid4())
+        headers = {"Accept": "application/json", "Accept-Encoding": "identity"}
+        if self.client_identity:
+            headers["X-PwC-MCP-Client"] = self.client_identity
         try:
             async with asyncio.timeout(30):
                 async with self.client.stream(
                     "POST", self.endpoint,
-                    headers={"Accept": "application/json", "Accept-Encoding": "identity"},
+                    headers=headers,
                     json={"jsonrpc": "2.0", "id": request_id, "method": method,
                           "params": {**params, "_meta": META}},
                 ) as response:
+                    if response.status_code == 429:
+                        raise AssistantMcpBusy()
                     if response.status_code != 200:
                         raise AssistantMcpError("The catalog tools are unavailable. Please try again.")
                     raw = bytearray()
@@ -118,6 +178,17 @@ class CatalogMcp:
             return FILTER_CACHE[self.endpoint]
 
     async def tools(self) -> list[dict]:
+        lock = TOOL_LOCKS.setdefault(self.endpoint, asyncio.Lock())
+        async with lock:
+            cached = TOOL_CACHE.get(self.endpoint)
+            if cached and cached[0] > time.monotonic():
+                return deepcopy(cached[1])
+            TOOL_CACHE.pop(self.endpoint, None)
+            tools = await self._discover_tools()
+            TOOL_CACHE[self.endpoint] = (time.monotonic() + TOOL_CACHE_TTL_SECONDS, tools)
+            return deepcopy(tools)
+
+    async def _discover_tools(self) -> list[dict]:
         result = await self._request("tools/list", {})
         tools = result.get("tools")
         if not isinstance(tools, list) or any(not isinstance(t, dict) for t in tools):
@@ -150,6 +221,8 @@ class CatalogMcp:
         result = await self._request("tools/call", {"name": name, "arguments": upstream_arguments})
         payload, is_json = result_payload(result)
         is_error = bool(result.get("isError"))
+        if is_error:
+            TOOL_CACHE.pop(self.endpoint, None)
         if is_json and not is_error:
             payload = compact_result(name, add_catalog_urls(name, payload), arguments)
             payload = await enrich_posts(payload, self.lookup)

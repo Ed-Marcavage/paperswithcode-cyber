@@ -2,6 +2,7 @@
 
 import json
 import logging
+import time
 
 import anyio
 from sqlalchemy import text
@@ -17,7 +18,10 @@ QUERY_SECONDS = 3
 DESCRIPTION = """Prefer find_posts for ANY question about industry posts: engineering,
 agent harnesses, benchmarking findings, defender reports and vulnerability triage/repair.
 Matches keywords across titles and curated summaries, with English stemming; all terms
-must match. Prefer topic/type filters without a query when they express the question.
+match first. With fewer than three matches, an implicit relevance filter is removed
+first, then any-word matching ranks by text relevance before score if still sparse.
+Results disclose these relaxations. Explicit relevance filters are always kept.
+Prefer topic/type filters without a query when they express the question.
 Combines reviewed post filters and ranks useful
 posts instead of just newest titles. For best harness designs use harness_engineering=true
 and sort=score, with one topic; avoid an over-specific query. Default relevance is 3;
@@ -57,22 +61,32 @@ WITH posts AS (
            score * power(0.5, greatest(anchor.day - date_published::date, 0)::double precision / :half_life)
            END AS score_recent
       FROM scored CROSS JOIN anchor
-     WHERE coalesce((post_details ->> 'agent_relevance')::integer, -1) >= :min_agent_relevance
+     WHERE true
 """
 ORDERS = {"score": "score DESC", "recent": "date_published DESC NULLS LAST", "score_recent": "score_recent DESC"}
 
 
-def search_statement(arguments):
+TEXT_VECTOR = "to_tsvector('english', coalesce(title, '') || ' ' || coalesce(post_details ->> 'tldr', ''))"
+ALL_WORDS = "plainto_tsquery('english', :query)"
+# Assemble OR from PostgreSQL-normalized, individually quoted lexemes. The raw
+# query is always a bound value, never SQL or tsquery syntax supplied by a model.
+ANY_WORD = """CAST((SELECT string_agg(quote_literal(term), ' | ')
+    FROM unnest(tsvector_to_array(to_tsvector('english', :query))) AS words(term)) AS tsquery)"""
+
+
+def search_statement(arguments, *, any_word=False, relax_relevance=False):
     args = FindPostsArguments.model_validate(arguments)
     params = {"min_agent_relevance": args.min_agent_relevance, "limit": args.limit,
               "anchor": trending_posts.ANCHOR_DATE, "half_life": trending_posts.DECAY_HALF_LIFE_DAYS,
               "publisher_hosts": json.dumps(host_table())}
     clauses = []
+    if not relax_relevance:
+        clauses.append("AND coalesce((post_details ->> 'agent_relevance')::integer, -1) >= :min_agent_relevance")
     if args.query:
         # The model supplies keywords, not necessarily a verbatim phrase. Use
         # PostgreSQL's built-in English stemming, as the catalog paper search does.
         params["query"] = args.query
-        clauses.append("AND to_tsvector('english', coalesce(title, '') || ' ' || coalesce(post_details ->> 'tldr', '')) @@ plainto_tsquery('english', :query)")
+        clauses.append(f"AND {TEXT_VECTOR} @@ {ANY_WORD if any_word else ALL_WORDS}")
     if args.topic:
         params["topic"] = json.dumps({"topic": [args.topic]})
         clauses.append("AND facets @> CAST(:topic AS jsonb)")
@@ -92,9 +106,10 @@ def search_statement(arguments):
     if args.published_after:
         params["published_after"] = args.published_after
         clauses.append("AND date_published::date > :published_after")
+    order = f"ts_rank_cd({TEXT_VECTOR}, {ANY_WORD}) DESC, score DESC" if any_word else ORDERS[args.sort]
     sql = BASE_SQL + "\n".join(clauses) + """
 ) SELECT id, title, date_published, source_url, post_details, publisher,
-         count(*) OVER () AS total FROM matched ORDER BY """ + ORDERS[args.sort] + ", date_published DESC NULLS LAST, id DESC LIMIT :limit"
+         count(*) OVER () AS total FROM matched ORDER BY """ + order + ", date_published DESC NULLS LAST, id DESC LIMIT :limit"
     return text(sql), params
 
 
@@ -116,19 +131,45 @@ def post_item(row):
             "catalog_url": paper_path(row["id"])}
 
 
-def read_posts(arguments, sessions=None):
-    statement, params = search_statement(arguments)
+def read_posts(arguments, sessions=None, deadline=None):
+    args = FindPostsArguments.model_validate(arguments)
+    deadline = time.monotonic() + QUERY_SECONDS if deadline is None else deadline
     if sessions is None:
         from backend.database.assistant import assistant_sessions
         sessions = assistant_sessions()
-    # A fresh short transaction from the assistant's existing pool. Never share
-    # the writer's active Session across threads or commit a catalog transaction.
+    relaxations = []
+    relaxed_relevance = False
+    any_word = False
+    # All attempts share one read-only transaction and one wall-clock budget.
     with sessions() as db:
         db.execute(text("SET TRANSACTION READ ONLY"))
-        db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"), {"timeout": "1500"})
-        rows = list(db.execute(statement, params).mappings())
+
+        def search():
+            remaining_ms = int((deadline - time.monotonic()) * 1000)
+            if remaining_ms <= 0:
+                raise TimeoutError()
+            db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"),
+                       {"timeout": str(min(1500, remaining_ms))})
+            statement, params = search_statement(arguments, any_word=any_word, relax_relevance=relaxed_relevance)
+            return list(db.execute(statement, params).mappings())
+
+        def sparse(rows):
+            # A requested limit of one must not loosen a query with many matches.
+            return not rows or int(rows[0]["total"]) < 3
+
+        rows = search()
+        if args.query and sparse(rows) and "min_agent_relevance" not in arguments:
+            relaxed_relevance = True
+            relaxations.append("Removed the default agent relevance filter to include broader reporting.")
+            rows = search()
+        if args.query and sparse(rows):
+            any_word = True
+            relaxations.append("Loosened text matching from all words to any word; ranked by text relevance, then score.")
+            rows = search()
     result = {"total": int(rows[0]["total"]) if rows else 0, "results": [post_item(row) for row in rows],
-              "sort": arguments.get("sort", "score")}
+              "sort": "text_rank_then_score" if any_word else args.sort,
+              "match_mode": "any_word" if any_word else "all_words" if args.query else "filters",
+              "relaxations": relaxations}
     if not rows:
         # Keep the advice specific to the strongest optional restriction.
         field = next((key for key in ("query", "subtopic", "publisher", "post_type", "published_after", "topic", "tier") if arguments.get(key)), None)
@@ -140,7 +181,8 @@ def read_posts(arguments, sessions=None):
 async def find_posts(arguments, sessions=None):
     try:
         with anyio.fail_after(QUERY_SECONDS):
-            return await anyio.to_thread.run_sync(read_posts, arguments, sessions, abandon_on_cancel=True), False
+            return await anyio.to_thread.run_sync(read_posts, arguments, sessions, time.monotonic() + QUERY_SECONDS,
+                                                abandon_on_cancel=True), False
     except (SQLAlchemyError, OSError, TimeoutError) as error:
         # Never include DB connection details, SQL or bound arguments in errors.
         # Log the failure by type only, so a broken query is visible to the operator.

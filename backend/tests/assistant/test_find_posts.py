@@ -185,3 +185,90 @@ def test_find_posts_obeys_turn_trace_cache_and_tool_budget():
     assert turn.status == 'limit_reached' and 'tools' not in services.model_requests[-1]
     assert any(event['type'] == 'tool_finished' and event['name'] == 'find_posts' for event in events)
     assert all(s['cumulative_input_tokens'] > 0 for s in turn.steps if s['kind'] == 'model')
+
+
+class SequencedSessions(FakeSessions):
+    def __init__(self, totals):
+        super().__init__()
+        self.totals = iter(totals)
+
+    def mappings(self):
+        total = next(self.totals)
+        return [{**ROW, 'total': total}] if total else []
+
+    @property
+    def searches(self):
+        return [(sql, params) for sql, params in self.calls if 'FROM matched' in sql]
+
+
+def test_sparse_default_query_relaxes_relevance_then_uses_ranked_any_words():
+    db = SequencedSessions([1, 2, 560])
+    result, _ = call_posts({'query': 'ARTEX agentic attack frameworks'}, db)
+    data = json.loads(result.text)
+    assert len(db.searches) == 3
+    first, broader, any_word = [sql for sql, _ in db.searches]
+    assert '>= :min_agent_relevance' in first
+    assert '>= :min_agent_relevance' not in broader and '>= :min_agent_relevance' not in any_word
+    assert '@@ plainto_tsquery' in broader
+    assert 'ORDER BY ts_rank_cd(' in any_word
+    assert 'DESC, score DESC, date_published DESC NULLS LAST, id DESC' in any_word
+    assert data['total'] == 560 and data['match_mode'] == 'any_word'
+    assert data['sort'] == 'text_rank_then_score'
+    assert len(data['relaxations']) == 2
+    assert 'default agent relevance' in data['relaxations'][0]
+    assert 'all words to any word' in data['relaxations'][1]
+
+
+def test_relevance_relaxation_keeps_all_words_when_enough_match():
+    db = SequencedSessions([0, 10])
+    result = assistant_posts.read_posts({'query': 'ARTEX'}, db)
+    assert len(db.searches) == 2 and result['total'] == 10
+    assert result['match_mode'] == 'all_words' and len(result['relaxations']) == 1
+
+
+@pytest.mark.parametrize('minimum', [0, 3, 4])
+def test_explicit_relevance_is_never_removed(minimum):
+    db = SequencedSessions([1, 20])
+    result, _ = call_posts({'query': 'ARTEX agentic attack frameworks', 'min_agent_relevance': minimum}, db)
+    assert len(db.searches) == 2
+    assert all('>= :min_agent_relevance' in sql and params['min_agent_relevance'] == minimum
+               for sql, params in db.searches)
+    assert len(json.loads(result.text)['relaxations']) == 1
+
+
+@pytest.mark.parametrize('arguments,total', [({}, 0), ({'query': 'ARTEX'}, 3), ({'query': 'ARTEX', 'limit': 1}, 10)])
+def test_no_unnecessary_fallback_for_filters_or_small_requested_limit(arguments, total):
+    db = SequencedSessions([total])
+    assert assistant_posts.read_posts(arguments, db)['relaxations'] == []
+    assert len(db.searches) == 1
+
+
+def test_relevance_omission_survives_repeated_normalization_and_cache_keys():
+    implicit = bounded_arguments('find_posts', {'query': 'ARTEX'})
+    explicit = bounded_arguments('find_posts', {'query': 'ARTEX', 'min_agent_relevance': 3})
+    assert 'min_agent_relevance' not in implicit and explicit['min_agent_relevance'] == 3
+    assert bounded_arguments('find_posts', implicit) == implicit
+    assert bounded_arguments('find_posts', explicit) == explicit
+    assert implicit != explicit
+
+
+def test_any_word_sql_quotes_normalized_lexemes_and_binds_every_user_value():
+    query = "ARTEX' | !attack:* ; DROP TABLE papers; --"
+    statement, params = assistant_posts.search_statement({'query': query}, any_word=True, relax_relevance=True)
+    sql = str(statement.compile(dialect=postgresql.dialect()))
+    assert query not in sql and params['query'] == query
+    assert "string_agg(quote_literal(term), ' | ')" in sql
+    assert "tsvector_to_array(to_tsvector('english'," in sql
+    assert 'ORDER BY ts_rank_cd(' in sql
+
+
+def test_extra_queries_share_the_original_deadline(monkeypatch):
+    db = SequencedSessions([0, 0])
+    times = iter([98, 99.75, 100.01])
+    monkeypatch.setattr(assistant_posts.time, 'monotonic', lambda: next(times))
+    with pytest.raises(TimeoutError):
+        assistant_posts.read_posts({'query': 'ARTEX'}, db, deadline=100)
+    assert len(db.searches) == 2
+    timeouts = [params['timeout'] for sql, params in db.calls if 'set_config' in sql]
+    assert timeouts == ['1500', '250']
+    assert db.closed == 1

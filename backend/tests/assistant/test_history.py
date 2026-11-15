@@ -20,6 +20,7 @@ def test_persist_history_and_atomic_question_limit(store):
     store.finish(first, Turn(text="First answer", status="done"))
     for number in range(2, 11):
         saved = store.begin("visitor", first.conversation_id, f"Question {number}")
+        store.finish(saved, Turn(status="done"))
         assert saved.question_count == number
     assert saved.history[:2] == [{"role": "user", "content": "First question"}, {"role": "assistant", "content": "First answer"}]
     with pytest.raises(QuestionLimitReached):
@@ -107,8 +108,8 @@ def test_cancelled_route_saves_partial_answer(store, monkeypatch):
 
 def test_retention_command_deletes_cascading_history(store, capsys):
     old = store.begin("owner", None, "Expired")
-    current = store.begin("owner", None, "Current")
     store.finish(old, Turn(text="Answer", status="done", steps=[{"kind": "tool", "name": "search_papers"}]))
+    current = store.begin("owner", None, "Current")
     with store.sessions.begin() as db:
         db.execute(update(AssistantConversation).where(AssistantConversation.id == old.conversation_id)
                    .values(updated_at=datetime.now(UTC) - timedelta(days=91)))

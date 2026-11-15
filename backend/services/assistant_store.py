@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from sqlalchemy import delete, select, update
 
+from backend.assistant_config import get_assistant_settings
+from backend.services import assistant_admission
 from backend.models.database.assistant import (
     AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep,
     AssistantProviderLimit,
@@ -40,6 +42,7 @@ class SavedTurn:
     question_count: int
     history: list[dict]
     run_id: str
+    visitor_hash: str
 
     def metadata(self) -> dict:
         return {"conversation_id": self.conversation_id, "message_id": self.message_id, "run_id": self.run_id,
@@ -50,20 +53,24 @@ class AssistantStore:
     def __init__(self, sessions):
         self.sessions = sessions
 
-    @staticmethod
-    def owned(db, conversation_id, visitor, *, lock=False):
+    def retention_cutoff(self):
+        return datetime.now(UTC) - timedelta(days=get_assistant_settings().retention_days)
+
+    def owned(self, db, conversation_id, visitor, *, lock=False):
         query = select(AssistantConversation).where(
             AssistantConversation.id == conversation_id,
-            AssistantConversation.visitor_hash == visitor_hash(visitor))
+            AssistantConversation.visitor_hash == visitor_hash(visitor),
+            AssistantConversation.updated_at >= self.retention_cutoff())
         row = db.scalar(query.with_for_update() if lock else query)
         if row is None:
             raise ConversationNotFound()
         return row
 
     def begin(self, visitor: str, conversation_id: str | None, question: str, *,
-              model: str = "glm-5.3-flash", surface: str = "panel", site_path: str = "/",
-              analytics_session_id: str | None = None) -> SavedTurn:
-        now = datetime.now(UTC)
+              model: str | None = None, surface: str = "panel", site_path: str = "/",
+              analytics_session_id: str | None = None, now: datetime | None = None) -> SavedTurn:
+        now = now or datetime.now(UTC)
+        run_id = identifier()
         # The title is the first question, cut at a word boundary with an ellipsis to fit 60 characters.
         title = " ".join(question.split())
         if len(title) > 60:
@@ -72,6 +79,8 @@ class AssistantStore:
                 head = head.rsplit(" ", 1)[0]
             title = head.rstrip(" ,;:.-") + "…"
         with self.sessions.begin() as db:
+            assistant_admission.admit(db, visitor_hash(visitor), run_id, conversation_id is None,
+                                      get_assistant_settings(), now)
             if conversation_id is None:
                 conversation_id = identifier()
                 db.add(AssistantConversation(id=conversation_id, visitor_hash=visitor_hash(visitor),
@@ -100,19 +109,23 @@ class AssistantStore:
                                  position=count * 2, role="assistant", content="", status="running", created_at=now),
             ])
             db.flush()
-            run_id = identifier()
             db.add(AssistantRun(id=run_id, conversation_id=conversation_id, message_id=answer_id,
-                               question=question, started_at=now, status="running", model=model,
+                               question=question, started_at=now, status="running", model=model if model is not None else get_assistant_settings().model,
                                prompt_hash=hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
                                prompt_version=PROMPT_VERSION, surface=surface, site_path=site_path,
                                analytics_session_id=analytics_session_id))
             history.append({"role": "user", "content": question})
-            return SavedTurn(conversation_id, answer_id, count, history, run_id)
+            return SavedTurn(conversation_id, answer_id, count, history, run_id, visitor_hash(visitor))
+
+    def release(self, saved: SavedTurn):
+        with self.sessions.begin() as db:
+            assistant_admission.release(db, saved.run_id)
 
     def record_step(self, saved: SavedTurn, position: int, step: dict):
         with self.sessions.begin() as db:
             if db.scalar(select(AssistantConversation).where(
-                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                AssistantConversation.id == saved.conversation_id,
+                AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update()) is None:
                 return
             if db.get(AssistantRun, saved.run_id) is not None:
                 db.add(AssistantRunStep(id=identifier(), run_id=saved.run_id, position=position,
@@ -120,8 +133,10 @@ class AssistantStore:
 
     def finish(self, saved: SavedTurn, turn):
         with self.sessions.begin() as db:
+            assistant_admission.release(db, saved.run_id)
             if db.scalar(select(AssistantConversation).where(
-                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                AssistantConversation.id == saved.conversation_id,
+                AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update()) is None:
                 return
             message = db.get(AssistantMessage, saved.message_id)
             if message is None:
@@ -158,7 +173,8 @@ class AssistantStore:
     def list_conversations(self, visitor):
         with self.sessions() as db:
             return [self.summary(row) for row in db.scalars(select(AssistantConversation).where(
-                AssistantConversation.visitor_hash == visitor_hash(visitor))
+                AssistantConversation.visitor_hash == visitor_hash(visitor),
+                AssistantConversation.updated_at >= self.retention_cutoff())
                 .order_by(AssistantConversation.updated_at.desc(), AssistantConversation.id))]
 
     def get_conversation(self, visitor, conversation_id):
@@ -212,7 +228,8 @@ class AssistantStore:
 
     def show_run(self, run_id):
         with self.sessions() as db:
-            run = db.get(AssistantRun, run_id)
+            run = db.scalar(select(AssistantRun).join(AssistantConversation).where(
+                AssistantRun.id == run_id, AssistantConversation.updated_at >= self.retention_cutoff()))
             if run is None:
                 raise ConversationNotFound()
             return self.trace(db, run)
@@ -220,15 +237,18 @@ class AssistantStore:
     def runs(self, days):
         cutoff = datetime.now(UTC) - timedelta(days=days)
         with self.sessions() as db:
-            rows = db.scalars(select(AssistantRun).where(AssistantRun.started_at >= cutoff)
+            rows = db.scalars(select(AssistantRun).join(AssistantConversation).where(
+                AssistantRun.started_at >= cutoff, AssistantConversation.updated_at >= self.retention_cutoff())
                               .order_by(AssistantRun.started_at.desc(), AssistantRun.id)
                               .execution_options(yield_per=100))
             for row in rows:
                 yield self.trace(db, row)
 
     def purge(self, retention_days: int, *, now: datetime | None = None) -> int:
-        cutoff = (now or datetime.now(UTC)) - timedelta(days=retention_days)
+        now = now or datetime.now(UTC)
+        cutoff = now - timedelta(days=retention_days)
         with self.sessions.begin() as db:
+            assistant_admission.purge(db, now)
             return db.execute(delete(AssistantConversation).where(
                 AssistantConversation.updated_at < cutoff)).rowcount
 

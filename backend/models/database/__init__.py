@@ -9,6 +9,7 @@ module only re-exports them, and importing it registers every table on
 
 from backend.models.database.base import Base
 from backend.models.database.assistant import (
+    AssistantAdmission,
     AssistantConversation,
     AssistantMessage,
     AssistantToolCall,
@@ -196,6 +197,13 @@ from backend.models.database.taxonomy import (
 
 
 __all__ = [
+    "AssistantAdmission",
+    "AssistantConversation",
+    "AssistantMessage",
+    "AssistantToolCall",
+    "AssistantRun",
+    "AssistantRunStep",
+    "AssistantProviderLimit",
     "ResearchFollow",
     "ResearchSubscription",
     "ResearchSuppression",

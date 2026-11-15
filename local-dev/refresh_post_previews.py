@@ -30,12 +30,12 @@ SHEET_CARD = (160, 220)  # the card's thumbnail size on the site
 
 
 def parse_item(item: str) -> dict:
-    """A numeric paper id or an http(s) post URL."""
+    """A numeric id or supplied URL; the preparer records unsafe URLs as rejected."""
     if item.isdigit():
         return {"item": item, "paper_id": int(item), "url": None, "title": None}
     parsed = urlparse(item)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
-        raise ValueError(f"Expected a paper id or an http(s) URL: {item!r}")
+    if not parsed.scheme:
+        raise ValueError(f"Expected a paper id or a URL: {item!r}")
     return {"item": item, "paper_id": None, "url": item, "title": None}
 
 
@@ -70,7 +70,7 @@ async def shoot(items: list, output: Path, api: str, use_screenshots: bool = Tru
     posts = [parse_item(item) for item in items]
     if output.exists():
         raise FileExistsError(output)
-    preparer = default_preparer(use_screenshots)  # fails early when the browser is missing
+    preparer = default_preparer(use_screenshots)  # Shared destination checks cover direct and catalog-derived URLs.
     posts = [resolve(post, api) for post in posts]
     output.mkdir(parents=True)
     entries = []
