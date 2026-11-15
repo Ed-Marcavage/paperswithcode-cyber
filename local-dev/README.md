@@ -7,6 +7,10 @@ are off. Keyword search and reading the cache do not require a model key.
 
 ## Start the review environment
 
+Paths beginning `/path/to/` in these examples are placeholders. Choose existing
+writable directories on the host or inside the backend container as appropriate;
+keep generated reports and imported data outside Git.
+
 From the repository root, using a Docker context that can build Linux images:
 
     python3 local-dev/configure.py
@@ -71,9 +75,9 @@ raw exports, document indexes, bundles and dumps outside Git.
    the paper's source link. Copy the complete bundle into the backend, then
    preview and apply the same file:
 
-       sh local-dev/compose.sh cp data/bundle backend:/tmp/reviewed
-       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /tmp/reviewed/catalog.json
-       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /tmp/reviewed/catalog.json --execute
+       sh local-dev/compose.sh cp data/bundle backend:/path/to/work/reviewed
+       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /path/to/work/reviewed/catalog.json
+       sh local-dev/compose.sh exec -T backend python local-dev/import_catalog.py /path/to/work/reviewed/catalog.json --execute
 
    Preview rolls back schema and data together. The import reuses native papers
    (versioned arXiv ID or canonical external URL) and author/topic links. Catalog
@@ -83,7 +87,7 @@ raw exports, document indexes, bundles and dumps outside Git.
    repeat preview must report zero new papers and zero added or removed topic links.
 4. Import official associations and star observations separately. Copy your
    reviewed repository manifest into the backend and run
-   `python local-dev/repository_catalog.py /tmp/repositories.json` there; add
+   `python local-dev/repository_catalog.py /path/to/work/repositories.json` there; add
    `--execute` after preview. Each link requires a source and an evidence note.
    Snapshots need a precise timestamp within 24 hours; use `--fetch-current`
    to obtain new public observations for a stale manifest. The optional
@@ -161,7 +165,7 @@ For a static release, build with the same public values and a new output directo
 ```sh
 cd frontend && npm ci && cd ..
 python3 local-dev/build_catalog_site.py --environment production \
-  --site https://your-domain.example --output /tmp/catalog-site-release
+  --site https://your-domain.example --output /path/to/work/catalog-site-release
 ```
 
 Build on a case-sensitive filesystem. The command turns off auth, chat, and agent
@@ -280,10 +284,10 @@ observation for those repos. GitHub's contributors endpoint can omit identities
 it cannot resolve to an account.
 
 ```sh
-python3 local-dev/fetch_developers.py /tmp/developers.json
-sh local-dev/compose.sh cp /tmp/developers.json backend:/tmp/developers.json
-sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /tmp/developers.json
-sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /tmp/developers.json --execute
+python3 local-dev/fetch_developers.py /path/to/work/developers.json
+sh local-dev/compose.sh cp /path/to/work/developers.json backend:/path/to/work/developers.json
+sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /path/to/work/developers.json
+sh local-dev/compose.sh exec -T backend python /app/local-dev/import_developers.py /path/to/work/developers.json --execute
 ```
 
 The import applies the Developers migration to an existing local catalog. A
@@ -306,9 +310,9 @@ what the Developers tab and star-based Trending count. Run it after the review
 fields are loaded, then the developer collector above:
 
 ```sh
-sh local-dev/compose.sh cp bundle/v2-fields.json backend:/tmp/v2-fields.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /tmp/v2-fields.json --execute
+sh local-dev/compose.sh cp bundle/v2-fields.json backend:/path/to/work/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /path/to/work/v2-fields.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_post_links.py /path/to/work/v2-fields.json --execute
 ```
 
 `/api/v1/catalog/repositories/{owner}/{name}` lists the papers and posts citing
@@ -322,8 +326,8 @@ checked against the GitHub profile's name and website), applied like the
 other organization seeds:
 
 ```sh
-sh local-dev/compose.sh cp local-dev/seeds/publisher-organizations/organizations.json backend:/tmp/publisher-organizations.json
-sh local-dev/compose.sh exec -T backend python local-dev/import_catalog_organizations.py /tmp/publisher-organizations.json --execute
+sh local-dev/compose.sh cp local-dev/seeds/publisher-organizations/organizations.json backend:/path/to/work/publisher-organizations.json
+sh local-dev/compose.sh exec -T backend python local-dev/import_catalog_organizations.py /path/to/work/publisher-organizations.json --execute
 ``` Read the directory at `/api/v1/developers/`
 and profiles at `/api/v1/developers/{github_id}`.
 
@@ -367,8 +371,8 @@ Screenshots run on the host, not in the backend container. They need Node on
 `PATH`, a Playwright package and an installed Chromium; nothing is downloaded:
 
 ```sh
-export PWC_PLAYWRIGHT_CORE=~/.npm/_npx/<hash>/node_modules/playwright-core
-export PWC_CHROMIUM=~/Library/Caches/ms-playwright/chromium-1217/chrome-mac-arm64/"Google Chrome for Testing.app"/Contents/MacOS/"Google Chrome for Testing"
+export PWC_PLAYWRIGHT_CORE="/path/to/node_modules/playwright-core"
+export PWC_CHROMIUM="/path/to/chromium-executable"
 ```
 
 Without `PWC_CHROMIUM`, Playwright's own expected build is used. The commands
@@ -382,11 +386,11 @@ refresh posts already in the catalog, write the images to a new folder, check
 the contact sheet, then load them as a separate step:
 
 ```sh
-uv run python local-dev/refresh_post_previews.py shoot /tmp/post-previews 1008 https://example.com/post --api http://localhost:8095
-uv run python local-dev/refresh_post_previews.py sheet /tmp/post-previews
-sh local-dev/compose.sh cp /tmp/post-previews backend:/tmp/post-previews
-sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json
-sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /tmp/post-previews/manifest.json --execute
+uv run python local-dev/refresh_post_previews.py shoot /path/to/work/post-previews 1008 https://example.com/post --api http://localhost:8095
+uv run python local-dev/refresh_post_previews.py sheet /path/to/work/post-previews
+sh local-dev/compose.sh cp /path/to/work/post-previews backend:/path/to/work/post-previews
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /path/to/work/post-previews/manifest.json
+sh local-dev/compose.sh exec -T backend python local-dev/load_post_previews.py /path/to/work/post-previews/manifest.json --execute
 ```
 
 `shoot` takes paper ids (resolved through the catalog API) or post URLs, or
@@ -528,7 +532,7 @@ key):
 ```sh
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli list --days 7
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli show RUN_ID
-sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export --days 7 > /tmp/assistant-runs.jsonl
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export --days 7 > /path/to/work/assistant-runs.jsonl
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli purge
 ```
 
@@ -554,26 +558,28 @@ writes chat history to the database nor sends analytics. Like chat, it makes
 bounded read-only post-metadata lookups with the backend database settings;
 unavailable enrichment is marked in the tool result and does not fail the turn.
 
-The specification author has authorized the **reviewer** to evaluate up to
-three named models, 20 questions per model. The implementer must not run this
-live evaluation; implementation tests use fake providers. Each model's run can
-make up to 160 model requests within the existing per-question limits.
+Evaluate one named model at a time and reserve enough provider allowance before
+starting. Each full run asks 20 questions and can make up to 160 model requests
+within the per-question limits; comparing three models can use up to 480
+requests. Live evaluation shares the provider allowance with the assistant.
+Use fake providers for implementation tests, and stop live runs when the
+remaining allowance is needed for interactive use.
 
-Inside the already-running backend container, the reviewer can use its existing
-process environment (including the backend-only key) and internal MCP hostname:
+Inside an already-running backend container, use its process environment
+(including the backend-only key) and internal MCP hostname:
 
 ```sh
 python -m backend.assistant_eval \
   --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+  --output /path/to/work/assistant-evals/glm-5.3-flash.jsonl
 ```
 
-From the host, the equivalent reviewer command is:
+From the host, the equivalent command is:
 
 ```sh
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_eval \
   --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+  --output /path/to/work/assistant-evals/glm-5.3-flash.jsonl
 ```
 
 Retain the JSONL outside the container before it is replaced. To run directly on
@@ -589,7 +595,7 @@ Outputs are ignored by Git and exclusive-created (use a new name for a repeat).
 Review all 20 answers against their recorded tool evidence: supported facts,
 real catalog links, no invented result for the deliberately missing title,
 useful answers, failures, latency and token usage. Record the chosen model and
-reason in the local implementation report; only then update the default if
+reason in evaluation notes kept outside Git; only then update the default if
 needed. No evaluation results or model choice are claimed by the script itself.
 
 ### Nginx review configuration

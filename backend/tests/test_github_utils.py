@@ -42,7 +42,7 @@ def test_normalize_github_url_drops_clone_suffix():
         ("https://github.com/owner/name.github.io", ("owner", "name.github.io")),
         # Not one repository:
         ("https://github.com/org", None),
-        ("https://github.com/Xpos587?tab=repositories", None),
+        ("https://github.com/synthetic-user?tab=repositories", None),
         ("https://github.com/advisories/GHSA-abcd-1234", None),
         ("https://github.com/orgs/acme/repositories", None),
         ("https://github.com/topics/security", None),

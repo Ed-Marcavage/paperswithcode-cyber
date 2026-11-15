@@ -58,11 +58,11 @@ def test_organizations_use_slug_not_id_and_link_nested_work(tool):
 
 @pytest.mark.parametrize("tool", ["list_developers", "get_developer"])
 def test_developers_use_github_id_and_tracked_repositories(tool):
-    dev = {"github_id": 40309309, "login": "NickNameInvalid", "repositories": [{"github_repo_id": 7, "full_name": "org/repo", "commits": 4}]}
+    dev = {"github_id": 123456, "login": "synthetic-developer", "repositories": [{"github_repo_id": 7, "full_name": "org/repo", "commits": 4}]}
     raw = {"count": 1, "results": [dev]} if tool == "list_developers" else dev
     result = add_catalog_urls(tool, raw)
     item = result["results"][0] if tool == "list_developers" else result
-    assert item["catalog_url"] == "/developers/40309309"
+    assert item["catalog_url"] == "/developers/123456"
     assert item["repositories"][0]["catalog_url"] == "/repos/org/repo"
     assert "catalog_url" not in add_catalog_urls(tool, {"login": "name-only", "github_id": "name-only"})
     assert "catalog_url" not in add_catalog_urls(tool, {"github_id": "1" * 19})
