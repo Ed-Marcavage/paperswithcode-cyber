@@ -405,12 +405,13 @@
 .assistant-panel .assistant-dock { padding: 0 14px 14px; }
 .assistant-panel .assistant-question { font-size: 16.5px; }
 .assistant-panel .assistant-markdown { font-size: 14px; line-height: 1.62; }
-.assistant-panel .assistant-empty-title { font-size: 24px; }
+.assistant-panel .assistant-empty-title { display: none; }
+.assistant-panel .assistant-empty p { margin-top: 0; }
 @media (min-width: 1024px) {
   /* Wide screens: a column below the sticky header; the page makes room. */
   .assistant-panel { top: var(--assistant-header-height, 61px); z-index: 45; box-shadow: none; border-left-color: var(--hairline); }
   .assistant-panel-backdrop { display: none; }
-  html.assistant-panel-open :is(main, .site-footer, .reader-route-content) { padding-right: var(--assistant-panel-width); }
+  html.assistant-panel-open :is(main:not(main main), .site-footer, .reader-route-content) { padding-right: var(--assistant-panel-width); }
 }
 @media (max-width: 640px) {
   .assistant-panel { border-left: 0; box-shadow: none; }
@@ -601,3 +602,5 @@
 .assistant-modal-actions button:disabled { opacity: 0.5; cursor: not-allowed; }
 .assistant-panel:focus { outline: none; }
 .assistant-panel .assistant-composer-hint { display: none; }
+/* Desktop: the sidebar marks the open chat and the question heads the transcript, so the title bar is phone-only. */
+@media (min-width: 901px) { .assistant-page-bar { display: none; } }
