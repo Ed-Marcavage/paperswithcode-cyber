@@ -88,14 +88,14 @@ def test_identical_effective_calls_reuse_the_first_result_without_network_or_evi
 
 
 def test_reported_input_budget_stops_research_and_still_finalizes():
-    services = FakeServices([[tool_chunk(), chunk(usage={"prompt_tokens": 25000, "completion_tokens": 20, "total_tokens": 25020})], [text_chunk("Limited evidence answer")]])
+    services = FakeServices([[tool_chunk(), chunk(usage={"prompt_tokens": 33000, "completion_tokens": 20, "total_tokens": 33020})], [text_chunk("Limited evidence answer")]])
     turn, _ = asyncio.run(services.run())
     assert turn.status == "limit_reached" and turn.text == "Limited evidence answer"
     assert len(services.model_requests) == 2 and "tools" not in services.model_requests[-1]
     assert not services.tool_requests
-    assert turn.steps[0]["input_token_charge"] == 25000
+    assert turn.steps[0]["input_token_charge"] == 33000
     assert not turn.steps[0]["input_tokens_estimated"]
-    assert turn.steps[0]["input_token_budget"] == INPUT_TOKEN_BUDGET == 40000
+    assert turn.steps[0]["input_token_budget"] == INPUT_TOKEN_BUDGET == 64000
 
 
 def test_unknown_usage_is_estimated_and_charged_to_cumulative_budget():
@@ -120,14 +120,14 @@ def test_finalizer_input_is_bounded_preserves_question_and_marks_shortened_evide
 
 def test_reported_cumulative_growth_in_review_trace_goes_to_finalizer_before_fourth_research_call():
     replies = []
-    for i, tokens in enumerate((1753, 7546, 20801)):
+    for i, tokens in enumerate((1753, 7546, 24801)):
         replies.append([tool_chunk(arguments=json.dumps({"query": str(i)})), chunk(usage={
             "prompt_tokens": tokens, "completion_tokens": 20, "total_tokens": tokens + 20})])
     services = FakeServices([*replies, [text_chunk("Answer from bounded evidence")]])
     turn, _ = asyncio.run(services.run())
     model_steps = [s for s in turn.steps if s["kind"] == "model"]
     assert len(model_steps) == 4 and model_steps[-1]["phase"] == "finalizer"
-    assert model_steps[2]["cumulative_input_tokens"] == 30100
+    assert model_steps[2]["cumulative_input_tokens"] == 34100
     assert model_steps[-1]["cumulative_input_tokens"] < INPUT_TOKEN_BUDGET
     assert model_steps[-1]["input_messages"] == services.model_requests[-1]["messages"]
     assert len(services.tool_requests) == 2
