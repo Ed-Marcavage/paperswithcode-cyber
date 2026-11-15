@@ -13,10 +13,11 @@
 //
 // Consent banners and dimming layers are removed before capture. Bot challenges
 // are reported, never worked around.
+import { publicDestination, publicProxy, interceptPublicRequest } from "./public_network.mjs";
 import { createRequire } from "node:module";
 
 const require = createRequire(import.meta.url);
-const { chromium } = require(process.env.PWC_PLAYWRIGHT_CORE || "playwright-core");
+
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/147.0.0.0 Safari/537.36";
@@ -110,12 +111,30 @@ const PROBE = () => {
 };
 
 const result = { url };
-const browser = await chromium.launch({
-  headless: true,
-  ...(process.env.PWC_CHROMIUM ? { executablePath: process.env.PWC_CHROMIUM } : {}),
-});
+// Validate even direct CLI inputs before loading Playwright or starting Chromium.
+try { await publicDestination(url); }
+catch (error) {
+  process.stdout.write(JSON.stringify({ url, ok: false, rejected: error.message }) + "\n");
+  process.exit(0);
+}
+const { chromium } = require(process.env.PWC_PLAYWRIGHT_CORE || "playwright-core");
+const reject = (reason) => { result.rejected ||= reason; };
+const proxy = await publicProxy(reject);
+let browser;
 try {
-  const context = await browser.newContext({ viewport: VIEW, userAgent: UA, locale: "en-US", deviceScaleFactor: 1 });
+  browser = await chromium.launch({
+    proxy: { server: proxy.server },
+    args: ["--proxy-bypass-list=<-loopback>", "--disable-quic",
+           "--force-webrtc-ip-handling-policy=disable_non_proxied_udp"],
+    headless: true,
+    ...(process.env.PWC_CHROMIUM ? { executablePath: process.env.PWC_CHROMIUM } : {}),
+  });
+  const context = await browser.newContext({ viewport: VIEW, userAgent: UA, locale: "en-US",
+    deviceScaleFactor: 1, serviceWorkers: "block", acceptDownloads: false });
+  // Context routes cover frames and popups too. The proxy checks every socket,
+  // including redirects and connections that bypass Playwright routing.
+  await context.route("**/*", (route) => interceptPublicRequest(route, reject));
+  await context.routeWebSocket("**/*", (socket) => socket.close());
   const page = await context.newPage();
   const started = Date.now();
   try {
@@ -133,15 +152,18 @@ try {
     result.removed = await page.evaluate(CLEAN);
     Object.assign(result, await page.evaluate(PROBE));
     const height = Math.min(CAPTURE_HEIGHT, Math.max(VIEW.height, result.doc_height));
+    await publicDestination(page.url());
+    if (result.rejected) throw new Error(result.rejected);
     await page.screenshot({ path: outPath, fullPage: true, clip: { x: 0, y: 0, width: VIEW.width, height } });
     result.captured_height = height;
-    result.ok = true;
+    result.ok = !result.rejected;
   } catch (error) {
     result.ok = false;
     result.error = String(error.message || error).split("\n")[0];
   }
   result.seconds = (Date.now() - started) / 1000;
 } finally {
-  await browser.close();
+  if (browser) await browser.close();
+  await proxy.close();
 }
 process.stdout.write(JSON.stringify(result) + "\n");

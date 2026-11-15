@@ -23,7 +23,7 @@ from post_previews import default_preparer, jpeg_bytes  # noqa: E402
 async def prepare(source, output, use_screenshots=True):
     if output.exists():
         raise FileExistsError(output)
-    preparer = default_preparer(use_screenshots)  # fails early when the browser is missing
+    preparer = default_preparer(use_screenshots)  # Shared destination checks also cover URLs from the catalog.
     shutil.copytree(source, output)
     catalog_path = output / "catalog.json"
     catalog = json.loads(catalog_path.read_text())

@@ -350,6 +350,19 @@ widget or challenge wording in a page with under 3,000 characters of text), or a
 pixels within 8 grey levels of the most common one). Challenges are not worked
 around. Details are in `post_previews.py`.
 
+Preview destinations must be public HTTP(S) URLs on ports 80 or 443. Initial
+pages, redirects, frames and subresources are checked against every resolved
+IPv4/IPv6 address; loopback, private, link-local, unique-local and other non-public
+ranges are refused. The browser uses a local filtering proxy that connects to
+checked IPs, preventing DNS rebinding between validation and connection. Request
+interception is enabled, service workers and WebSockets are blocked, and direct
+WebRTC/QUIC traffic is disabled. A refused destination rejects the screenshot
+with a reason in the report. Publisher artwork uses the backend's pinned,
+redirect-aware public fetcher for both the page and image; if that is refused,
+the title card requires no network. Catalog-derived URLs follow the same path.
+The explicitly configured catalog API is trusted operator input for ID lookup;
+its returned source URL is still untrusted and checked before previewing.
+
 Screenshots run on the host, not in the backend container. They need Node on
 `PATH`, a Playwright package and an installed Chromium; nothing is downloaded:
 

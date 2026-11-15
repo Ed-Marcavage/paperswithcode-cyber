@@ -21,6 +21,7 @@ package with a Chromium build (see `check_browser`).
 """
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass, field
 from io import BytesIO
 import json
@@ -34,6 +35,8 @@ import time
 from typing import Callable, Optional
 
 from PIL import Image
+
+from public_network import SafeOutboundHttpError, validate_destination
 
 CARD_SIZE = (400, 550)
 CAPTURE_SIZE = (1280, 1760)
@@ -89,6 +92,11 @@ def check_browser() -> str:
 def run_capture(url: str, png_path: Path) -> dict:
     """One page load and capture in a fresh browser; returns the script's report."""
     try:
+        validate_destination(url)
+    except SafeOutboundHttpError as exc:
+        return {"ok": False, "rejected": str(exc)}
+    check_browser()
+    try:
         done = subprocess.run(["node", str(SCRIPT), url, str(png_path)], capture_output=True, text=True,
                               timeout=CAPTURE_TIMEOUT_SECONDS, cwd=SCRIPT.parent)
     except subprocess.TimeoutExpired:
@@ -117,6 +125,8 @@ def challenge_reason(report: dict) -> Optional[str]:
 
 def load_reason(report: dict) -> Optional[str]:
     """Why the page load itself is unusable, or None."""
+    if report.get("rejected"):
+        return "destination rejected: " + report["rejected"]
     if not report.get("ok"):
         return "load failed: " + (report.get("error") or "unknown error")
     status = report.get("status")
@@ -126,6 +136,8 @@ def load_reason(report: dict) -> Optional[str]:
 
 
 def retryable(report: dict) -> bool:
+    if report.get("rejected"):
+        return False
     status = report.get("status")
     return not report.get("ok") or status == 429 or (status is not None and status >= 500)
 
@@ -164,7 +176,7 @@ class Screenshot:
 
 
 def _attempt_summary(report: dict) -> dict:
-    keep = ("ok", "status", "final_url", "title", "text_length", "seconds", "error", "removed", "captured_height")
+    keep = ("ok", "status", "final_url", "title", "text_length", "seconds", "error", "removed", "captured_height", "rejected")
     return {key: report[key] for key in keep if key in report}
 
 
@@ -224,13 +236,18 @@ async def prepare_preview(url: str, title: Optional[str], shoot: Callable[[str],
     `artwork(url)` is awaited and returns (image or None, note); `title_card(title, url)`
     returns an image (with no title given, the page title the browser saw, if any).
     Returns the image and a record of how it was made."""
-    shot = shoot(url)
+    rejection = None
+    try:
+        await asyncio.to_thread(validate_destination, url)
+    except SafeOutboundHttpError as exc:
+        rejection = "destination rejected: " + str(exc)
+    shot = Screenshot(None, rejection) if rejection else shoot(url)
     record = {"method": None, "screenshot_rejected": shot.rejected, "artwork_note": None,
               "blank_share": shot.blank_share, "attempts": shot.attempts}
     if shot.image is not None:
         record["method"] = METHOD_SCREENSHOT
         return shot.image, record
-    image, note = await artwork(url)
+    image, note = (None, rejection) if rejection else await artwork(url)
     record["artwork_note"] = note
     if image is not None:
         record["method"] = METHOD_ARTWORK
@@ -242,8 +259,6 @@ async def prepare_preview(url: str, title: Optional[str], shoot: Callable[[str],
 
 def default_preparer(use_screenshots: bool = True):
     """A `prepare(url, title)` coroutine with the real screenshot, artwork and title card."""
-    if use_screenshots:
-        check_browser()
     service = artwork_service()
 
     def skipped(url):
