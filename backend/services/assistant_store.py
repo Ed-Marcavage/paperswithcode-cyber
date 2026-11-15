@@ -15,6 +15,7 @@ from backend.models.database.assistant import (
 )
 from backend.services.assistant_loop import SYSTEM_PROMPT, PROMPT_VERSION
 from backend.services.assistant_provider import USAGE_LIMIT_MESSAGE
+from backend.services.assistant_history import build_history
 
 QUESTION_LIMIT = 10
 
@@ -99,9 +100,18 @@ class AssistantStore:
                 .returning(AssistantConversation.question_count))
             if count is None:
                 raise QuestionLimitReached()
-            history = [{"role": m.role, "content": m.content} for m in db.scalars(
+            previous_messages = list(db.scalars(
                 select(AssistantMessage).where(AssistantMessage.conversation_id == conversation_id)
-                .order_by(AssistantMessage.position)) if m.content]
+                .order_by(AssistantMessage.position)))
+            mode = get_assistant_settings().history_context
+            steps = {}
+            if mode != 'answers':
+                for message_id, detail in db.execute(select(AssistantRun.message_id, AssistantRunStep.detail)
+                        .join(AssistantRunStep, AssistantRunStep.run_id == AssistantRun.id)
+                        .where(AssistantRun.conversation_id == conversation_id)
+                        .order_by(AssistantRunStep.position)):
+                    steps.setdefault(message_id, []).append(detail)
+            history = build_history(previous_messages, steps, mode)
             answer_id = identifier()
             db.add_all([
                 AssistantMessage(id=identifier(), conversation_id=conversation_id,

@@ -483,6 +483,7 @@ key is required by the frontend or MCP. Settings:
 | `PWC_ASSISTANT_BASE_URL` | `https://ollama.com/v1` |
 | `PWC_ASSISTANT_MODEL` | `deepseek-v4.1-flash:1017` |
 | `PWC_ASSISTANT_FOLLOW_UPS_ENABLED` | `true` (optional suggestions after the answer) |
+| `PWC_ASSISTANT_HISTORY_CONTEXT` | `full` (`answers`, `digest`, or `full`) |
 | `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
 | `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
 | `PWC_ASSISTANT_TURNS_PER_HOUR` | `30` (rolling hour) |
@@ -604,9 +605,43 @@ skips the phase. The terminal `done` and reloaded assistant messages keep their
 `follow_ups` string array. Trace model/tool steps have `phase=follow_ups`, including
 submitted questions, support sentences and any duplicate/no-search drops; run
 token totals include every model call. Research prompts and answering are unchanged.
+The last submit-only pass is reserved even if reported usage exceeded its estimate;
+each call is capped at 256,000 estimated input tokens, so four phase calls admit
+at most 1,024,000 estimated input tokens. Context too large even for submission
+returns no follow-ups. These are character-based admission estimates, not an
+exact provider tokenizer; actual provider usage is recorded separately.
 Reapply the
 idempotent `add_assistant_topics_followups.sql` if only its topic column was
 previously installed; it now also adds the message `follow_ups` column.
+
+### Earlier conversation evidence
+
+`PWC_ASSISTANT_HISTORY_CONTEXT=full` replays earlier research tool calls and their
+bounded results as paired assistant/tool messages, followed by the saved answer.
+It reads existing run steps; no migration or new storage is needed. Follow-up-phase
+steps and working notes are excluded. Interrupted calls without results are omitted,
+and empty/failed/cancelled turns still retain their saved question and answer.
+`digest` instead appends a system-authored evidence note after each earlier answer:
+title, publisher, date, post type, code-release evidence (null if unknown), catalog
+path and original source. `answers` restores question/answer-only history.
+
+History has a 128,000-token estimated allowance. The oldest turn is reduced from
+full to digest to answers as needed, before touching the next oldest. The newest
+turn is never degraded, and a short model-visible note records reductions.
+If even older answers plus the protected newest turn cannot fit, the request
+returns a plain 409 asking for a new chat; its admission/question-count transaction
+rolls back. Ordinary histories under the existing per-turn result caps fit.
+
+Each new turn has a **256,000-token cumulative growth allowance**, with 64,000
+reserved for two finalizer attempts (32,000 each for new evidence). Replayed
+history is estimated separately and retained in the finalizer; only the current
+turn's optional evidence may be shortened there. Requests admit at most 256,000
+estimated input tokens including history. When usage is reported, growth is
+charged proportionally to its estimated share of that request; when absent,
+character-based estimates apply. Traces retain full provider token totals plus
+`new_turn_input_token_charge`, `cumulative_new_turn_input_tokens` and the history
+estimate. Thus a four-question chat keeps its tool context without charging the
+same old evidence against the research allowance at every model pass.
 
 ### Model evaluation
 

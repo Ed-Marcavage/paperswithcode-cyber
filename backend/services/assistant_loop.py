@@ -14,14 +14,14 @@ from backend.assistant_config import AssistantSettings, get_assistant_settings
 from backend.services.assistant_mcp import AssistantMcpBusy, AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
 from backend.services.assistant_input_budget import (
     INPUT_TOKEN_BUDGET, FINAL_INPUT_TOKENS, FINAL_INPUT_RESERVE, MIN_FINAL_INPUT_TOKENS,
-    estimate_input_tokens, finalizer_messages,
+    MAX_CONTEXT_INPUT_TOKENS, estimate_input_tokens, finalizer_messages, history_token_estimate, growth_charge,
 )
 from backend.services.assistant_tool_budget import bounded_arguments
 from backend.services.assistant_context import paired_messages
 from backend.services.assistant_topics import topic_instruction, scoped_result
 from backend.services.assistant_provider import is_busy, is_usage_limit, USAGE_LIMIT_MESSAGE
 
-PROMPT_VERSION = "cyber-assistant-v10"
+PROMPT_VERSION = "cyber-assistant-v11"
 SYSTEM_PROMPT = """You are the assistant for Papers with Code Cyber, a curated
 catalog of security research papers, industry posts, repositories, organizations
 and developers. The audience builds and uses AI agent harnesses for security
@@ -194,7 +194,7 @@ async def run_turn(
 ):
     """Yield UI events; keep bounded results and partial answers on ``turn``.
 
-    History is server-owned user/assistant text, never browser-supplied roles,
+    History is server-owned answers and paired tool evidence, never browser-supplied roles,
     visitor metadata or application configuration. Cancellation propagates.
     """
     started = time.monotonic()
@@ -207,6 +207,8 @@ async def run_turn(
     model_attempts = 0
     output_used = 0
     input_used = 0
+    total_input_used = 0
+    history_estimate = history_token_estimate(history)
     tool_cache = {}
     terminal = False
 
@@ -216,7 +218,7 @@ async def run_turn(
             await on_step(step)
 
     async def generate_once(tools, room, *, final=False, retry=False):
-        nonlocal model_attempts, output_used, input_used
+        nonlocal model_attempts, output_used, input_used, total_input_used
         model_attempts += 1
         result = ModelPass()
         input_estimate = estimate_input_tokens(messages, tools)
@@ -243,7 +245,9 @@ async def run_turn(
         finally:
             output_used += len(result.text)
             charge = result.input_tokens if result.input_tokens is not None else input_estimate
-            input_used += charge
+            new_charge = growth_charge(result.input_tokens, input_estimate, history_estimate)
+            input_used += new_charge
+            total_input_used += charge
             # Keep a partial answer on failure/cancellation, but never promote
             # text from a pass that already requested tools to answer history.
             if tools and not result.calls and status != "done":
@@ -255,9 +259,11 @@ async def run_turn(
                     "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
                     "reasoning_tokens": result.reasoning_tokens, "reasoning_chars": result.reasoning_chars,
                     "input_token_charge": charge, "input_tokens_estimated": result.input_tokens is None,
+                    "new_turn_input_token_charge": new_charge, "history_token_estimate": history_estimate,
                     "input_token_estimate": input_estimate,
                     "input_messages": messages if final else None,
-                    "cumulative_input_tokens": input_used, "input_token_budget": limits.input_tokens,
+                    "cumulative_input_tokens": total_input_used, "cumulative_new_turn_input_tokens": input_used,
+                    "input_token_budget": limits.input_tokens,
                     "phase": "finalizer_retry" if retry else "finalizer" if final else "research",
                     **generation_options(final=final, retry=retry)})
         if tools and result.text:
@@ -279,7 +285,7 @@ async def run_turn(
             except APIError as error:
                 if (not is_busy(error) or output_used != previous_output or retry == 2
                         or model_attempts >= limits.model_turns - 2
-                        or input_used + estimate_input_tokens(messages, tools) + FINAL_INPUT_RESERVE > limits.input_tokens):
+                        or input_used + growth_charge(None, estimate_input_tokens(messages, tools), history_estimate) + FINAL_INPUT_RESERVE > limits.input_tokens):
                     raise
                 # Brief retries use the existing per-turn time/model budgets.
                 await asyncio.sleep(0.5 * (retry + 1))
@@ -291,7 +297,8 @@ async def run_turn(
             # failure so the next model pass can use the new definitions.
             tools = await mcp.tools()
             room = limits.output_chars - limits.final_chars - output_used
-            if (room <= 0 or input_used + estimate_input_tokens(messages, tools)
+            if (room <= 0 or estimate_input_tokens(messages, tools) > MAX_CONTEXT_INPUT_TOKENS
+                    or input_used + growth_charge(None, estimate_input_tokens(messages, tools), history_estimate)
                     + FINAL_INPUT_RESERVE > limits.input_tokens):
                 return
             async with aclosing(generate(tools, room)) as stream:
@@ -391,7 +398,8 @@ async def run_turn(
                     break
                 remaining = limits.input_tokens - input_used
                 token_limit = max(MIN_FINAL_INPUT_TOKENS, min(FINAL_INPUT_TOKENS, remaining // (2 - attempt)))
-                messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, turn.steps, token_limit, scope_prompt=scope_prompt)
+                messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, turn.steps,
+                    min(MAX_CONTEXT_INPUT_TOKENS, history_estimate + token_limit), scope_prompt=scope_prompt)
                 # The first attempt must leave time for the one empty retry.
                 seconds_left = deadline - time.monotonic()
                 allowance = seconds_left / 2 if attempt == 0 else seconds_left

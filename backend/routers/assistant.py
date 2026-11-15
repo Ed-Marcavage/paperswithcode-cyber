@@ -28,6 +28,7 @@ from backend.services.assistant_store import (
 )
 from backend.services.assistant_provider import quota_reset, safe_provider_message
 from backend.services.assistant_topics import get_topics, resolve_topic, UnknownTopic, TOPICS_PUBLIC_MAX_AGE
+from backend.services.assistant_history import HistoryContextTooLarge
 from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -182,6 +183,8 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     except QuestionLimitReached:
         raise HTTPException(409, {"code": "question_limit", "message": "This chat has reached 10 questions. Start a new chat.",
                                   "question_count": 10, "question_limit": 10}) from None
+    except HistoryContextTooLarge as error:
+        raise HTTPException(409, str(error)) from None
     response = AssistantStreamResponse(
         turn_events(payload, settings, saved, store), media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},

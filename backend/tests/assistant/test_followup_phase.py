@@ -89,6 +89,7 @@ def test_four_pass_limit_includes_the_submit_only_last_pass():
     turn, _ = asyncio.run(services.run(follow_ups_enabled=True))
     assert len(services.model_requests) == 5 and turn.follow_ups == [] and turn.status == 'done'
     assert all(tool_names(r) == {'submit_follow_ups'} for r in services.model_requests[2:])
+    assert services.model_requests[-1]['messages'][-1]['content'] == phase.SUBMIT_INSTRUCTION
 
 
 def test_six_search_limit_and_final_submission_gate():
@@ -96,6 +97,7 @@ def test_six_search_limit_and_final_submission_gate():
     turn, _ = asyncio.run(services.run(follow_ups_enabled=True))
     assert len(services.tool_requests) == 6 and turn.follow_ups == [QUESTION]
     assert tool_names(services.model_requests[-1]) == {'submit_follow_ups'}
+    assert services.model_requests[-1]['messages'][-1]['content'] == phase.SUBMIT_INSTRUCTION
     assert paired_messages(services.model_requests[-1]['messages']) == services.model_requests[-1]['messages']
 
 
@@ -147,8 +149,8 @@ def test_phase_input_budget_uses_reported_usage_and_forces_last_gate(monkeypatch
     services = FakeServices([[text_chunk('Answer')], [tool_chunk(), chunk(usage={'prompt_tokens': 6000, 'completion_tokens': 5, 'total_tokens': 6005})], [submission()]])
     turn, _ = asyncio.run(services.run(follow_ups_enabled=True))
     assert turn.status == 'done'
-    if len(services.model_requests) == 3:
-        assert tool_names(services.model_requests[-1]) == {'submit_follow_ups'}
+    assert len(services.model_requests) == 3
+    assert tool_names(services.model_requests[-1]) == {'submit_follow_ups'}
     assert turn.steps[1]['input_token_charge'] == 6000
 
 
