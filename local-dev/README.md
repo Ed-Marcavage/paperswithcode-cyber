@@ -475,13 +475,18 @@ not call a model. Temporary provider concurrency errors are retried briefly.
 
 **Production must set `PWC_PUBLIC_SITE_URL` to the public HTTPS origin**, for
 example `https://paperswithcode-cyber.com` (no path, query or fragment). This is
-the authoritative origin for cookie-authenticated assistant writes, even when
+the authoritative origin for every unsafe assistant request, even when
 TLS ends at nginx and the backend receives HTTP with an internal Host. An unset
 value falls back to the request Host and HTTP(S) `X-Forwarded-Proto`, matching
 the repository's existing nginx trust in `backend/routers/auth.py`; it does not
 trust `X-Forwarded-Host`. Keep the backend behind the trusted proxy, and have the
 proxy overwrite `Host` and `X-Forwarded-Proto` on every assistant API location.
-Local direct HTTP development can leave the public origin unset.
+Local direct HTTP development can leave the public origin unset; the Vite proxy
+must preserve the browser's Host. POST, PATCH and DELETE are checked before a
+visitor identity is issued. A mismatched Origin or `Sec-Fetch-Site: cross-site`
+is refused. Without Origin, only `Sec-Fetch-Site: same-origin` is accepted;
+non-browser clients must send a matching Origin. Bodies require
+`Content-Type: application/json` (an optional charset is accepted).
 
 Before enabling on an existing **local** database, the reviewer applies the
 three additive migrations in order (a new empty database's `init-db.sh` uses

@@ -31,9 +31,8 @@ COOKIE_NAME = "pwc_assistant_visitor"
 logger = logging.getLogger(__name__)
 
 
-def visitor_cookie(request: Request) -> str:
-    cookie = request.cookies.get(COOKIE_NAME, "")
-    if cookie and request.method not in {"GET", "HEAD", "OPTIONS"}:
+async def visitor_cookie(request: Request) -> str:
+    if request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
         expected = get_settings().public_site_url
         if not expected:
@@ -42,8 +41,13 @@ def visitor_cookie(request: Request) -> str:
             proto = request.headers.get("x-forwarded-proto", "")
             scheme = proto if proto in {"http", "https"} else request.url.scheme
             expected = str(request.base_url.replace(scheme=scheme)).rstrip("/")
-        if origin != expected or request.headers.get("sec-fetch-site") == "cross-site":
+        fetch_site = request.headers.get("sec-fetch-site")
+        if (origin != expected and not (origin is None and fetch_site == "same-origin")) or fetch_site == "cross-site":
             raise HTTPException(403, "Please send this request from the catalog page.")
+        if await request.body() and request.headers.get("content-type", "").split(";", 1)[0].strip().lower() != "application/json":
+            raise HTTPException(415, "Please send the request body as application/json.")
+    # Validate writes before issuing even an anonymous visitor identity.
+    cookie = request.cookies.get(COOKIE_NAME, "")
     return cookie if re.fullmatch(r"[A-Za-z0-9_-]{43}", cookie) else secrets.token_urlsafe(32)
 
 
