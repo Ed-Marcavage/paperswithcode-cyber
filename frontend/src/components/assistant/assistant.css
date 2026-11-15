@@ -206,10 +206,13 @@
 .assistant-tools li { padding: 2px 0; font-family: var(--mono); font-size: 11.5px; }
 .assistant-tools li.is-error { color: var(--negative-text); }
 .assistant-pulse { display: inline-flex; gap: 3px; flex: none; }
-.assistant-pulse i { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); animation: assistant-pulse 1.2s ease-in-out infinite; }
+.assistant-pulse { --assistant-pulse-color: var(--accent); --assistant-pulse-rest: 0.3; }
+/* Dark mode: the lighter accent text colour and a brighter resting state, so the dots read on the dark ground. */
+.dark .assistant-pulse { --assistant-pulse-color: var(--accent-text); --assistant-pulse-rest: 0.55; }
+.assistant-pulse i { width: 5px; height: 5px; border-radius: 50%; background: var(--assistant-pulse-color); animation: assistant-pulse 1.2s ease-in-out infinite; }
 .assistant-pulse i:nth-child(2) { animation-delay: 0.15s; }
 .assistant-pulse i:nth-child(3) { animation-delay: 0.3s; }
-@keyframes assistant-pulse { 0%, 80%, 100% { opacity: 0.25; transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
+@keyframes assistant-pulse { 0%, 80%, 100% { opacity: var(--assistant-pulse-rest); transform: translateY(0); } 40% { opacity: 1; transform: translateY(-2px); } }
 @media (prefers-reduced-motion: reduce) {
   .assistant-pulse i { animation: none; opacity: 0.7; }
   .assistant-tools-toggle .assistant-icon { transition: none; }
