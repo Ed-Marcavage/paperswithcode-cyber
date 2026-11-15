@@ -118,7 +118,7 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
     try:
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
-            events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions), settings.model, saved.history, turn,
+            events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions, visitor_hash=saved.visitor_hash), settings.model, saved.history, turn,
                               on_step=record, on_provider_limit=provider_limit)
             async with aclosing(events):
                 async for event in events:

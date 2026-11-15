@@ -11,7 +11,7 @@ import anyio
 from openai import APIError, AsyncOpenAI
 
 from backend.assistant_config import AssistantSettings
-from backend.services.assistant_mcp import AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
+from backend.services.assistant_mcp import AssistantMcpBusy, AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
 from backend.services.assistant_input_budget import (
     INPUT_TOKEN_BUDGET, FINAL_INPUT_TOKENS, FINAL_INPUT_RESERVE, MIN_FINAL_INPUT_TOKENS,
     estimate_input_tokens, finalizer_messages,
@@ -276,8 +276,10 @@ async def run_turn(
 
     async def research():
         nonlocal tools_used
-        tools = await mcp.tools()
         while model_attempts < limits.model_turns - 2:
+            # Normally a process-cache hit; refresh after a schema/catalog
+            # failure so the next model pass can use the new definitions.
+            tools = await mcp.tools()
             room = limits.output_chars - limits.final_chars - output_used
             if (room <= 0 or input_used + estimate_input_tokens(messages, tools)
                     + FINAL_INPUT_RESERVE > limits.input_tokens):
@@ -317,6 +319,12 @@ async def run_turn(
                         tool_result = ToolResult(note, len(note.encode()), False, previous.is_error)
                     else:
                         tool_result = await mcp.call(name, parsed)
+                except AssistantMcpBusy as busy:
+                    error = str(busy)
+                    tool_result = ToolResult(error, len(error.encode()), False, True)
+                    yield {"type": "tool_finished", "id": call["id"], "name": name,
+                           "error": True, "result": error}
+                    raise
                 except (ValueError, AssistantMcpError):
                     error = "The catalog tool failed. Try a narrower query."
                     tool_result = ToolResult(error, len(error.encode()), False, True)
@@ -350,6 +358,8 @@ async def run_turn(
                     async for event in stream:
                         yield event
         except TimeoutError:
+            if getattr(mcp, "rate_limited", False):
+                raise AssistantMcpBusy() from None
             # A timed-out model/tool step must not leave unmatched tool calls
             # in the finalizer request. Rebuild from completed evidence below.
             pass
@@ -408,7 +418,15 @@ async def run_turn(
             turn.status = "failed"
             turn.error = PROVIDER_ERROR
             yield {"type": "error", "code": "provider_error", "message": turn.error}
-    except (AssistantProviderError, AssistantMcpError):
+    except AssistantMcpBusy as error:
+        turn.status = "catalog_busy"
+        turn.error = str(error)
+        yield {"type": "error", "code": "catalog_busy", "message": turn.error, "retryable": True}
+    except AssistantMcpError as error:
+        turn.status = "failed"
+        turn.error = str(error)
+        yield {"type": "error", "code": "catalog_error", "message": turn.error, "retryable": True}
+    except AssistantProviderError:
         turn.status = "failed"
         turn.error = PROVIDER_ERROR
         yield {"type": "error", "code": "provider_error", "message": turn.error}

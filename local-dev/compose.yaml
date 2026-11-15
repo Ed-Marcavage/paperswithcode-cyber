@@ -65,6 +65,7 @@ services:
       PWC_API_URL: http://backend:8000/api/v1
       PWC_CATALOG_ONLY: "1"
       PWC_SITE_URL: http://localhost:${CATALOG_PORT:-8095}
+      PWC_MCP_REQUEST_LIMIT: ${PWC_MCP_REQUEST_LIMIT:-600}
       PWC_MCP_ALLOWED_HOSTS: localhost:*,127.0.0.1:*,mcp:7860
       PWC_MCP_ALLOWED_ORIGINS: http://localhost:${CATALOG_PORT:-8095},http://127.0.0.1:${CATALOG_PORT:-8095}
       PWC_MCP_CURSOR_KEY_CURRENT: ${PWC_MCP_CURSOR_KEY_CURRENT:?Run configure.py}

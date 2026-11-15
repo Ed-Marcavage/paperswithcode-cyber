@@ -494,6 +494,31 @@ PostHog session id. No key produces a plain 503. A provider usage limit is store
 in the database and disables every composer until the reset; status checks do
 not call a model. Temporary provider concurrency errors are retried briefly.
 
+The backend caches the public MCP tool list per endpoint for ten minutes, with
+one shared refresh for concurrent cache misses. Catalog/schema failures invalidate
+it for the next discovery; 429s keep the valid cache to avoid extra traffic.
+An MCP 429 gets one half-second wait and one retry inside the turn deadline,
+then a retryable "The catalog is busy. Please try again in a moment." error.
+It does not trigger provider cooldown or appear as a model-provider failure.
+
+**Production must set `PWC_MCP_REQUEST_LIMIT` on the MCP service too.** Compose
+defaults to **600 requests per client per minute**: ten visitors making two turns
+per minute at the ten-tool-call ceiling need 200 requests/minute; allowing one
+retry per request brings that to 400, leaving 200 for discovery and burst
+headroom. This sizes short bursts, not sustained visitor usage; the assistant's
+rolling visitor quotas still apply. The MCP server's separate semantic-search
+and concurrency limits remain in effect and may also produce the busy response.
+
+The pinned MCP server accepts `X-PwC-MCP-Client` only from a direct loopback peer
+without `X-Forwarded-For` (with its default `trust_proxy_headers=true`). For a
+loopback MCP URL, the backend sends `assistant-` plus the server-derived visitor
+cookie hash, giving each visitor a separate MCP bucket. It never forwards the
+browser's identity/proxy headers or raw cookie. Compose's `http://mcp:7860/mcp`
+connection is between containers, so it still shares the backend's IP bucket;
+the increased request limit covers that topology. A same-host production backend
+can use a direct loopback MCP URL for per-visitor limits. Do not widen the MCP
+server's header-trust boundary to public or container-network callers.
+
 **Production must set `PWC_PUBLIC_SITE_URL` to the public HTTPS origin**, for
 example `https://paperswithcode-cyber.com` (no path, query or fragment). This is
 the authoritative origin for every unsafe assistant request, even when

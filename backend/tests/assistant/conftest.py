@@ -64,3 +64,5 @@ def isolated_filter_cache(monkeypatch):
     from backend.services import assistant_mcp
     monkeypatch.setattr(assistant_mcp, "FILTER_CACHE", {})
     monkeypatch.setattr(assistant_mcp, "FILTER_LOCKS", {})
+    monkeypatch.setattr(assistant_mcp, "TOOL_CACHE", {})
+    monkeypatch.setattr(assistant_mcp, "TOOL_LOCKS", {})

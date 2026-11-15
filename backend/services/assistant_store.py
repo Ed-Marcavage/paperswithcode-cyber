@@ -42,6 +42,7 @@ class SavedTurn:
     question_count: int
     history: list[dict]
     run_id: str
+    visitor_hash: str
 
     def metadata(self) -> dict:
         return {"conversation_id": self.conversation_id, "message_id": self.message_id, "run_id": self.run_id,
@@ -107,7 +108,7 @@ class AssistantStore:
                                prompt_version=PROMPT_VERSION, surface=surface, site_path=site_path,
                                analytics_session_id=analytics_session_id))
             history.append({"role": "user", "content": question})
-            return SavedTurn(conversation_id, answer_id, count, history, run_id)
+            return SavedTurn(conversation_id, answer_id, count, history, run_id, visitor_hash(visitor))
 
     def release(self, saved: SavedTurn):
         with self.sessions.begin() as db:
