@@ -1,6 +1,7 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import type { AssistantSurface } from "@/lib/api/assistant";
+import { followUps, type AssistantSurface } from "@/lib/api/assistant";
+import { assistantEvent } from "@/lib/catalogAnalytics";
 import { useAssistant } from "./context";
 import { AssistantMarkdown } from "./AssistantMarkdown";
 import { AssistantToolSteps } from "./AssistantToolSteps";
@@ -31,6 +32,10 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
   const label = topicLabel(chat.topics, topic);
   const chooseTopic = (slug: string | null) => { chat.setTopic(slug, surface); field.current?.focus(); };
   const menu = useCommandMenu({ topics: chat.topics, draft: chat.draft, setDraft: chat.setDraft, onTopic: chooseTopic, field, surface, enabled: !disabled });
+  const last = messages[messages.length - 1];
+  // Only the latest finished answer offers next questions, and only while one can be asked.
+  const suggestions = !disabled && last?.role === "assistant" && last.status === "done" ? followUps(last.follow_ups) : [];
+  const ask = (question: string) => { assistantEvent("follow_up_clicked", surface); void chat.send(question, surface, pathname, { keepDraft: true }); };
   const offerTopics = chat.topics.length > 0 && !paused;
   const placeholder = !chat.availability.available ? chat.availability.reason ?? "The assistant is unavailable."
     : atLimit ? "Start a new chat to ask more"
@@ -77,6 +82,11 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
                 {message.content && <AssistantMarkdown text={message.content} streaming={running} evidence={evidence} surface={surface} />}
                 {message.status === "cancelled" && <p className="assistant-message-note">Stopped. Your partial answer is saved.</p>}
                 <AssistantFeedback message={message} surface={surface} />
+                {message === last && suggestions.length > 0 && <div className="assistant-follow-ups" role="group" aria-labelledby={`assistant-next-${surface}`}>
+                  <p id={`assistant-next-${surface}`} className="assistant-follow-ups-label">Ask next</p>
+                  <ul>{suggestions.map(question => <li key={question}><button type="button" onClick={() => ask(question)}>
+                    <AssistantIcon name="next" size={14} /><span>{question}</span></button></li>)}</ul>
+                </div>}
               </>}
             </article>;
           })}

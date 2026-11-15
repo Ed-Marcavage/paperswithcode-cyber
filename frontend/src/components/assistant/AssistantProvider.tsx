@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { assistantApi, assistantKeys, AssistantError, type AssistantConversation, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
+import { assistantApi, assistantKeys, AssistantError, followUps, type AssistantConversation, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
 import { AssistantContext } from "./context";
 import "./assistant.css";
 import { useAvailability } from "./useAvailability";
@@ -111,7 +111,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
         else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
-        else if (event.type === "done") { updateAnswer(m => ({ ...m, status: event.status })); assistantEvent("answer_done", surface); if (event.status === "limit_reached") assistantEvent("limit_hit", surface); }
+        else if (event.type === "done") { updateAnswer(m => ({ ...m, status: event.status, follow_ups: followUps(event.follow_ups) })); assistantEvent("answer_done", surface); if (event.status === "limit_reached") assistantEvent("limit_hit", surface); }
         else if (event.type === "error") throw new AssistantError(event.message, event.code, 0, event.retry_at);
       }
     } catch (failure) {

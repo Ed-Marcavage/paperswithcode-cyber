@@ -1,9 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import posthog from "posthog-js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { assistantApi, type AssistantEvent, type AssistantTopic } from "@/lib/api/assistant";
+import { assistantApi, type AssistantConversation, type AssistantEvent, type AssistantTopic } from "@/lib/api/assistant";
 import { assistantEvent, catalogOptions } from "@/lib/catalogAnalytics";
 import { AssistantProvider } from "./AssistantProvider";
 import { AssistantConversationView } from "./AssistantConversation";
@@ -20,6 +20,16 @@ const TOPICS: AssistantTopic[] = [
   { slug: "fuzzing", label: "Fuzzing", count: 24 },
 ];
 const available = { available: true, code: null, reason: null, retry_at: null };
+const NEXT = ["Which of these publish benchmarks?", "How do they compare on real CVEs?"];
+const saved = (overrides: Partial<AssistantConversation> = {}): AssistantConversation => ({
+  id: "saved", title: "Saved", updated_at: "", question_count: 2, question_limit: 10, messages: [
+    { id: "u1", role: "user", content: "First question", status: "done", tool_steps: [] },
+    { id: "a1", role: "assistant", content: "First answer", status: "done", tool_steps: [], run_id: "r1", follow_ups: ["An older suggestion"] },
+    { id: "u2", role: "user", content: "Second question", status: "done", tool_steps: [] },
+    { id: "a2", role: "assistant", content: "Second answer", status: "done", tool_steps: [], run_id: "r2", follow_ups: NEXT },
+  ], ...overrides,
+});
+
 function mount(node = <AssistantConversationView surface="chat_page" />, path = "/") {
   return render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
     <MemoryRouter initialEntries={[path]}><AssistantProvider>{node}</AssistantProvider></MemoryRouter>
@@ -252,7 +262,104 @@ describe("slash command list", () => {
   });
 });
 
+describe("follow-up questions", () => {
+  beforeEach(() => { localStorage.setItem("pwc:assistant:conversation", "saved"); });
+
+  it("restores from the conversation fetch, only under the latest answer", async () => {
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved());
+    mount();
+    await screen.findByText("Second answer");
+    const group = screen.getByRole("group", { name: "Ask next" });
+    expect(within(group).getAllByRole("button").map(button => button.textContent)).toEqual(NEXT);
+    expect(screen.queryByText("An older suggestion")).not.toBeInTheDocument();
+    expect(group.closest(".ph-mask")).not.toBeNull();
+  });
+
+  it("treats absent or empty follow-ups on older messages as none", async () => {
+    const conversation = saved();
+    delete conversation.messages[3].follow_ups;
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(conversation);
+    mount();
+    await screen.findByText("Second answer");
+    expect(screen.queryByRole("group", { name: "Ask next" })).not.toBeInTheDocument();
+  });
+
+  it("sends a clicked suggestion at once, keeps the draft, hides them while streaming and shows the new ones", async () => {
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved());
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const turn = vi.spyOn(assistantApi, "turn").mockImplementation(async function* (): AsyncGenerator<AssistantEvent> {
+      yield { type: "meta", conversation_id: "saved", message_id: "m", run_id: "r3", question_count: 3, question_limit: 10 };
+      yield { type: "text_delta", text: "Third answer" };
+      await gate;
+      yield { type: "done", status: "done", follow_ups: ["A fresh suggestion"] };
+    });
+    mount();
+    await screen.findByText("Second answer");
+    const input = await box();
+    fireEvent.change(input, { target: { value: "Half typed" } });
+    fireEvent.click(screen.getByRole("button", { name: NEXT[0] }));
+    await screen.findByText("Third answer");
+    expect(turn).toHaveBeenCalledWith(NEXT[0], "saved", "chat_page", "/", expect.any(AbortSignal));
+    expect(screen.queryByRole("group", { name: "Ask next" })).not.toBeInTheDocument();
+    await act(async () => { finish(); });
+    expect(await screen.findByRole("button", { name: "A fresh suggestion" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: NEXT[1] })).not.toBeInTheDocument();
+    expect(input).toHaveValue("Half typed");
+  });
+
+  it("carries the topic only when the composer still shows one", async () => {
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved());
+    const turn = answering();
+    mount();
+    await screen.findByText("Second answer");
+    const input = await box();
+    fireEvent.click(screen.getByRole("button", { name: "Topics" }));
+    fireEvent.keyDown(input, { key: "ArrowDown" });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: NEXT[1] }));
+    await waitFor(() => expect(turn).toHaveBeenCalledWith(NEXT[1], "saved", "chat_page", "/", expect.any(AbortSignal), "ai-system-security"));
+  });
+
+  it("hides them at the question limit and while the assistant is unavailable", async () => {
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved({ question_count: 10 }));
+    const view = mount();
+    await screen.findByText("Second answer");
+    await screen.findByText(/reached its 10-question limit/);
+    expect(screen.queryByRole("group", { name: "Ask next" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Topics" })).not.toBeInTheDocument();
+    view.unmount();
+
+    vi.mocked(assistantApi.conversation).mockResolvedValue(saved());
+    vi.mocked(assistantApi.status).mockResolvedValue({ available: false, code: "usage_limit", reason: "The assistant is resting.", retry_at: null });
+    mount();
+    await screen.findByText("Second answer");
+    await screen.findByPlaceholderText("The assistant is resting.");
+    expect(screen.queryByRole("group", { name: "Ask next" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Topics" })).not.toBeInTheDocument();
+  });
+});
+
 describe("topic analytics", () => {
+  it("records a chosen topic's slug, slash-menu use and follow-up clicks, never text", async () => {
+    vi.stubEnv("VITE_LOCAL_CATALOG", "true"); vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "phc_test");
+    const capture = vi.spyOn(posthog, "capture").mockReturnValue(undefined);
+    localStorage.setItem("pwc:assistant:conversation", "saved");
+    vi.spyOn(assistantApi, "conversation").mockResolvedValue(saved());
+    answering();
+    mount();
+    await screen.findByText("Second answer");
+    const input = await box();
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "/pen" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.click(screen.getByRole("button", { name: NEXT[0] }));
+    await waitFor(() => expect(capture).toHaveBeenCalledWith("assistant_follow_up_clicked", { surface: "chat_page", catalog_environment: "preview" }));
+    expect(capture).toHaveBeenCalledWith("assistant_slash_menu_used", { surface: "chat_page", catalog_environment: "preview" });
+    expect(capture).toHaveBeenCalledWith("assistant_topic_chosen", { surface: "chat_page", topic: "penetration-testing", catalog_environment: "preview" });
+    expect(JSON.stringify(capture.mock.calls)).not.toContain("benchmarks");
+  });
+
   it("lets only topic_chosen carry a slug-shaped topic and keeps Do Not Track", () => {
     const send = (event: string, properties: Record<string, unknown>) =>
       catalogOptions.before_send({ uuid: "test", event, properties: { catalog_environment: "preview", surface: "panel", ...properties } })?.properties;

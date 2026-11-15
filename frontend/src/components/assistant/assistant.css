@@ -761,6 +761,29 @@
 /* The question's heading names the topic it was asked under. */
 .assistant-question-topic { margin-bottom: 6px; font-family: var(--mono); font-size: 11px; color: var(--accent-text); }
 
+/* Next questions under the latest answer: a ruled list, unlike the answer text and the chips. */
+.assistant-follow-ups { max-width: 640px; margin-top: 16px; }
+.assistant-follow-ups-label { margin-bottom: 5px; font-size: 12px; color: var(--ink-faint); }
+.assistant-follow-ups ul { list-style: none; border-top: 1px solid var(--hairline); }
+.assistant-follow-ups li { border-bottom: 1px solid var(--hairline); }
+.assistant-follow-ups button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px 9px 2px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition: color 0.15s;
+}
+.assistant-follow-ups button .assistant-icon { margin-top: 2px; color: var(--ink-faint); transition: color 0.15s, transform 0.15s; }
+.assistant-follow-ups button:hover { color: var(--ink); }
+.assistant-follow-ups button:hover .assistant-icon { color: var(--accent-text); transform: translateX(2px); }
+.assistant-page .assistant-follow-ups button { font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .assistant-follow-ups button .assistant-icon { transition: none; } }
 /* The panel is narrow: smaller chips, so more share a row. */
 .assistant-panel .assistant-topics { margin-top: 18px; }
 .assistant-panel .assistant-topic-chips { gap: 6px; }
