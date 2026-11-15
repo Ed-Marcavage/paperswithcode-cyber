@@ -31,3 +31,19 @@ describe("assistant transport", () => {
     await expect(events.next()).rejects.toBeInstanceOf(AssistantError);
   });
 });
+
+
+it("preserves working-note events separately from answer deltas", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+    'data: {"type":"working_note","text":"Checking posts"}\n\n' +
+    'data: {"type":"text_delta","text":"Answer"}\n\n' +
+    'data: {"type":"done","status":"done"}\n\n',
+  )));
+  const events = [];
+  for await (const event of assistantApi.turn("Question", null, "panel", "/", new AbortController().signal)) events.push(event);
+  expect(events).toEqual([
+    { type: "working_note", text: "Checking posts" },
+    { type: "text_delta", text: "Answer" },
+    { type: "done", status: "done" },
+  ]);
+});

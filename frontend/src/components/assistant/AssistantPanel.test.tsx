@@ -75,3 +75,35 @@ it("uses its own build flag even with the local catalog enabled", () => {
   vi.stubEnv("VITE_ASSISTANT_ENABLED", "true"); expect(isAssistantEnabled()).toBe(true);
   vi.stubEnv("VITE_ASSISTANT_ENABLED", "false"); expect(isAssistantEnabled()).toBe(false);
 });
+
+
+it.each(["done", "error", "stop"])("keeps working notes in the tool line until %s, never in the answer", async terminal => {
+  let finish!: () => void;
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  vi.spyOn(assistantApi, "turn").mockImplementation(async function* (_q, _id, _surface, _path, signal): AsyncGenerator<AssistantEvent> {
+    signal.addEventListener("abort", finish, { once: true });
+    yield { type: "working_note", text: "Let me also check the engineering posts." };
+    yield { type: "tool_started", id: "one", name: "browse_catalog" };
+    await gate;
+    signal.throwIfAborted();
+    if (terminal === "error") { yield { type: "error", code: "provider_error", message: "Please retry." }; return; }
+    yield { type: "tool_finished", id: "one", name: "browse_catalog", result: "{}" };
+    yield { type: "text_delta", text: "The final answer." };
+    yield { type: "done", status: "done" };
+  });
+  const { container } = mount();
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  const input = screen.getByRole("textbox", { name: "Your question" });
+  await waitFor(() => expect(input).toBeEnabled());
+  fireEvent.change(input, { target: { value: "Find papers" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  const note = await screen.findByText(/Let me also check the engineering posts/);
+  expect(note.tagName).toBe("SUMMARY");
+  expect(note.closest(".ph-mask")).not.toBeNull();
+  expect(container.querySelector(".assistant-markdown")).not.toHaveTextContent("Let me");
+  if (terminal === "stop") fireEvent.click(screen.getByRole("button", { name: "Stop" }));
+  else await act(async () => { finish(); });
+  await waitFor(() => expect(screen.queryByText(/Let me also check/)).not.toBeInTheDocument());
+  if (terminal === "done") expect(await screen.findByText("The final answer.")).toBeInTheDocument();
+  expect(JSON.stringify(localStorage)).not.toContain("engineering posts");
+});

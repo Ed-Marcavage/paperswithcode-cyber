@@ -26,7 +26,7 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
           <strong>{message.role === "user" ? "You" : "Assistant"}</strong>
           {message.role === "user" ? <div className="assistant-text">{message.content}</div> :
             <AssistantMarkdown text={message.content} streaming={message.status === "running"} evidence={evidence} surface={surface} />}
-          <AssistantToolSteps steps={message.tool_steps} />
+          <AssistantToolSteps steps={message.tool_steps} workingNote={message.status === "running" ? message.working_note : undefined} />
           {message.status === "cancelled" && <small>Stopped. Your partial answer is saved.</small>}
           {message.role === "assistant" && <AssistantFeedback message={message} surface={surface} />}
           {message.tool_steps.some(step => step.pending) && <span role="status">Searching the catalog…</span>}

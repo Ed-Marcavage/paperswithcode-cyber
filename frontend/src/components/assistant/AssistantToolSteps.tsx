@@ -6,9 +6,11 @@ const labels: Record<string, string> = {
   list_organizations: "Listed organizations", get_organization: "Read organization details", list_recent_papers: "Checked recent papers",
   list_trending_papers: "Checked trending papers", get_related_papers: "Found related papers", read_paper: "Read a paper",
 };
-export function AssistantToolSteps({ steps }: { steps: AssistantToolStep[] }) {
-  if (!steps.length) return null;
-  return <details className="assistant-tools"><summary>Searched the catalog · {steps.length} {steps.length === 1 ? "step" : "steps"}</summary>
+export function AssistantToolSteps({ steps, workingNote }: { steps: AssistantToolStep[]; workingNote?: string }) {
+  if (!steps.length && !workingNote) return null;
+  return <details className="assistant-tools"><summary>
+    {workingNote || "Searched the catalog"}{steps.length > 0 && <> · {steps.length} {steps.length === 1 ? "step" : "steps"}</>}
+  </summary>
     <ol>{steps.map((step, i) => <li key={`${step.call_id}-${i}`}>
       {labels[step.name] ?? "Catalog tool"}{step.pending ? "…" : step.error ? " — could not complete" : ""}
     </li>)}</ol>

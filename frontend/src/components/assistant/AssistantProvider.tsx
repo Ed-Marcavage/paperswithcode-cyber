@@ -86,7 +86,8 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
           setConversation(previous => ({ ...previous, id: event.conversation_id,
             question_count: event.question_count, question_limit: event.question_limit }));
           updateAnswer(m => ({ ...m, run_id: event.run_id }));
-        } else if (event.type === "text_delta") updateAnswer(m => ({ ...m, content: m.content + event.text }));
+        } else if (event.type === "working_note") updateAnswer(m => ({ ...m, working_note: event.text }));
+        else if (event.type === "text_delta") updateAnswer(m => ({ ...m, content: m.content + event.text, working_note: undefined }));
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
         else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
@@ -107,6 +108,7 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         updateAnswer(m => ({ ...m, status: "failed", error: problem.message }));
       }
     } finally {
+      updateAnswer(m => ({ ...m, working_note: undefined }));
       if (version === revision.current) { active.current = null; setBusy(false); }
       void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
     }

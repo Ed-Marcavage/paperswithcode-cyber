@@ -6,13 +6,14 @@ export interface AssistantToolStep { name: string; call_id?: string; result?: st
 export interface AssistantMessage {
   id: string; role: "user" | "assistant"; content: string; status: string;
   tool_steps: AssistantToolStep[]; run_id?: string | null; error?: string | null;
+  working_note?: string; // Transient stream state; never persisted as answer text.
   feedback?: { rating: "good" | "bad" | null; note: string | null } | null;
 }
 export interface AssistantSummary { id: string; title: string; updated_at: string; question_count: number; question_limit: number }
 export interface AssistantConversation extends AssistantSummary { messages: AssistantMessage[] }
 export type AssistantEvent =
   | { type: "meta"; conversation_id: string; message_id: string; run_id: string; question_count: number; question_limit: number }
-  | { type: "text_delta"; text: string }
+  | { type: "text_delta" | "working_note"; text: string }
   | { type: "tool_started" | "tool_finished"; id: string; name: string; error?: boolean; result?: string }
   | { type: "done"; status: string }
   | { type: "error"; code: string; message: string; retry_at?: string | null };
