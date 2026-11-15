@@ -465,6 +465,10 @@ key is required by the frontend or MCP. Settings:
 | `PWC_ASSISTANT_MODEL` | `glm-5.3-flash` (provisional until evaluation) |
 | `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
 | `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
+| `PWC_ASSISTANT_TURNS_PER_HOUR` | `30` (rolling hour) |
+| `PWC_ASSISTANT_TURNS_PER_DAY` | `100` (rolling 24 hours) |
+| `PWC_ASSISTANT_CONVERSATIONS_PER_HOUR` | `10` new chats (rolling hour) |
+| `PWC_ASSISTANT_CONVERSATIONS_PER_DAY` | `30` new chats (rolling 24 hours) |
 | `PWC_ASSISTANT_RETENTION_DAYS` | `90`, measured from last activity |
 
 Compose permits the internal `mcp:7860` Host header and forces
@@ -489,11 +493,11 @@ non-browser clients must send a matching Origin. Bodies require
 `Content-Type: application/json` (an optional charset is accepted).
 
 Before enabling on an existing **local** database, the reviewer applies the
-three additive migrations in order (a new empty database's `init-db.sh` uses
+four additive migrations in order (a new empty database's `init-db.sh` uses
 ORM `create_all`, which includes these tables):
 
 ```sh
-for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql
+for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql add_assistant_admission.sql
 do
   sh local-dev/compose.sh exec -T db psql -U pwc_local -d pwc_local -v ON_ERROR_STOP=1 < "backend/database/migrations/$migration"
 done
@@ -574,10 +578,22 @@ needed. No evaluation results or model choice are claimed by the script itself.
 
 Include `nginx-assistant-http.conf` once inside nginx's `http` block, then include
 `nginx-public-pages.conf` inside the Cyber `server` block. The exact assistant
-turn location has a generous **2 requests/second per IP with a burst of 60**,
-returns 429 for excess traffic, disables proxy buffering and caching, and allows
-120 seconds for streaming. This is a proxy abuse limit, not a per-visitor daily
-or concurrent-turn quota. Other assistant paths use the existing API proxy.
+turn location permits **10 requests/minute per IP with a burst of 3**, returns a
+plain, friendly 429 for excess traffic, disables proxy buffering and caching,
+and allows 120 seconds for streaming. **Production must install this proxy
+limit before enabling the assistant**: cookie limits alone cannot stop a caller
+from discarding its cookie. Keep the backend inaccessible except through this
+proxy and configure trusted real-client addressing if another proxy fronts it.
+IP addresses are used only in nginx memory; none are stored in the database.
+
+The backend atomically admits at most one turn per visitor and applies the
+rolling quotas above to the hashed visitor cookie. Deleting chats does not
+reset quotas. Completed, failed and disconnected streams release admission;
+a 120-second stream timeout bounds provider work, and a five-minute lease
+recovers admission after a crashed worker. Purge removes quota rows after a day
+of inactivity. There are no global daily or concurrency caps; the existing
+provider-allowance cooldown still switches the assistant off until reset.
+Other assistant paths use the existing API proxy.
 Production must set backend `PWC_PUBLIC_SITE_URL` to the public HTTPS origin.
 Preserve the visitor's Host and overwrite `X-Forwarded-Proto` with `$scheme` in
 that API proxy too, including conversation PATCH/DELETE and feedback POST paths.

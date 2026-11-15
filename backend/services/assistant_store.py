@@ -7,6 +7,8 @@ from uuid import uuid4
 
 from sqlalchemy import delete, select, update
 
+from backend.assistant_config import get_assistant_settings
+from backend.services import assistant_admission
 from backend.models.database.assistant import (
     AssistantConversation, AssistantMessage, AssistantToolCall, AssistantRun, AssistantRunStep,
     AssistantProviderLimit,
@@ -62,9 +64,12 @@ class AssistantStore:
 
     def begin(self, visitor: str, conversation_id: str | None, question: str, *,
               model: str = "glm-5.3-flash", surface: str = "panel", site_path: str = "/",
-              analytics_session_id: str | None = None) -> SavedTurn:
-        now = datetime.now(UTC)
+              analytics_session_id: str | None = None, now: datetime | None = None) -> SavedTurn:
+        now = now or datetime.now(UTC)
+        run_id = identifier()
         with self.sessions.begin() as db:
+            assistant_admission.admit(db, visitor_hash(visitor), run_id, conversation_id is None,
+                                      get_assistant_settings(), now)
             if conversation_id is None:
                 conversation_id = identifier()
                 db.add(AssistantConversation(id=conversation_id, visitor_hash=visitor_hash(visitor),
@@ -93,7 +98,6 @@ class AssistantStore:
                                  position=count * 2, role="assistant", content="", status="running", created_at=now),
             ])
             db.flush()
-            run_id = identifier()
             db.add(AssistantRun(id=run_id, conversation_id=conversation_id, message_id=answer_id,
                                question=question, started_at=now, status="running", model=model,
                                prompt_hash=hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
@@ -101,6 +105,10 @@ class AssistantStore:
                                analytics_session_id=analytics_session_id))
             history.append({"role": "user", "content": question})
             return SavedTurn(conversation_id, answer_id, count, history, run_id)
+
+    def release(self, saved: SavedTurn):
+        with self.sessions.begin() as db:
+            assistant_admission.release(db, saved.run_id)
 
     def record_step(self, saved: SavedTurn, position: int, step: dict):
         with self.sessions.begin() as db:
@@ -113,6 +121,7 @@ class AssistantStore:
 
     def finish(self, saved: SavedTurn, turn):
         with self.sessions.begin() as db:
+            assistant_admission.release(db, saved.run_id)
             if db.scalar(select(AssistantConversation).where(
                 AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
                 return
@@ -220,8 +229,10 @@ class AssistantStore:
                 yield self.trace(db, row)
 
     def purge(self, retention_days: int, *, now: datetime | None = None) -> int:
-        cutoff = (now or datetime.now(UTC)) - timedelta(days=retention_days)
+        now = now or datetime.now(UTC)
+        cutoff = now - timedelta(days=retention_days)
         with self.sessions.begin() as db:
+            assistant_admission.purge(db, now)
             return db.execute(delete(AssistantConversation).where(
                 AssistantConversation.updated_at < cutoff)).rowcount
 

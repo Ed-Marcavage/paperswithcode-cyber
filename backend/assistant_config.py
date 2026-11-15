@@ -15,6 +15,10 @@ class AssistantSettings(BaseSettings):
     base_url: str = "https://ollama.com/v1"
     model: str = "glm-5.3-flash"
     retention_days: int = Field(default=90, ge=1)
+    turns_per_hour: int = Field(default=30, ge=1)
+    turns_per_day: int = Field(default=100, ge=1)
+    conversations_per_hour: int = Field(default=10, ge=1)
+    conversations_per_day: int = Field(default=30, ge=1)
     store_analytics_session: bool = False
     limit_cooldown_minutes: int = Field(default=30, ge=1)
 

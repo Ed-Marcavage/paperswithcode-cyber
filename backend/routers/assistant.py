@@ -12,6 +12,7 @@ from contextlib import aclosing
 import anyio
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
+from starlette.background import BackgroundTask
 from starlette.responses import StreamingResponse
 from starlette.responses import JSONResponse, Response
 from starlette.concurrency import run_in_threadpool
@@ -19,6 +20,7 @@ from starlette.concurrency import run_in_threadpool
 from backend.assistant_config import AssistantSettings, get_assistant_settings
 from backend.config import get_settings
 from backend.models.assistant import AssistantTurnRequest, AssistantFeedbackRequest, AssistantRenameRequest
+from backend.services.assistant_admission import TURN_TIMEOUT_SECONDS, VisitorLimitReached
 from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
 from backend.services.assistant_store import (
@@ -75,25 +77,29 @@ class AssistantStreamResponse(StreamingResponse):
     """Listen for disconnect even while a model is silent (ASGI 2.4 included)."""
 
     async def __call__(self, scope, receive, send):
-        async with anyio.create_task_group() as group:
-            async def stream():
-                try:
-                    await self.stream_response(send)
-                except OSError:
-                    pass  # ASGI server reports a disconnected socket.
-                finally:
-                    with anyio.CancelScope(shield=True):
-                        await self.body_iterator.aclose()
+        try:
+            async with anyio.create_task_group() as group:
+                async def stream():
+                    try:
+                        with anyio.move_on_after(TURN_TIMEOUT_SECONDS):
+                            await self.stream_response(send)
+                    except OSError:
+                        pass  # ASGI server reports a disconnected socket.
+                    finally:
+                        with anyio.CancelScope(shield=True):
+                            await self.body_iterator.aclose()
+                        group.cancel_scope.cancel()
+
+                async def disconnected():
+                    await self.listen_for_disconnect(receive)
                     group.cancel_scope.cancel()
 
-            async def disconnected():
-                await self.listen_for_disconnect(receive)
-                group.cancel_scope.cancel()
-
-            group.start_soon(stream)
-            group.start_soon(disconnected)
-        if self.background:
-            await self.background()
+                group.start_soon(stream)
+                group.start_soon(disconnected)
+        finally:
+            if self.background:
+                with anyio.CancelScope(shield=True):
+                    await self.background()
 
 
 async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings, saved: SavedTurn, store):
@@ -155,6 +161,8 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
                                        site_path=payload.site_path,
                                        analytics_session_id=str(payload.analytics_session_id)
                                        if settings.store_analytics_session and payload.analytics_session_id else None)
+    except VisitorLimitReached as error:
+        raise HTTPException(429, str(error)) from None
     except ConversationNotFound:
         raise HTTPException(404, "Chat not found.") from None
     except QuestionLimitReached:
@@ -163,6 +171,7 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     response = AssistantStreamResponse(
         turn_events(payload, settings, saved, store), media_type="text/event-stream",
         headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"},
+        background=BackgroundTask(store.release, saved),
     )
     set_visitor_cookie(response, visitor, settings)
     return response

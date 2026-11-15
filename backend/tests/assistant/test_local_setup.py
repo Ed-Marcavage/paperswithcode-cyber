@@ -63,6 +63,7 @@ def test_nginx_turn_location_streams_before_completion_and_limits_bursts(tmp_pat
             port = probe.getsockname()[1]
         zone = (ROOT / "local-dev/nginx-assistant-http.conf").read_text()
         route = location_block((ROOT / "local-dev/nginx-public-pages.conf").read_text(), "location = /api/v1/assistant/turn")
+        route += "\n" + location_block((ROOT / "local-dev/nginx-public-pages.conf").read_text(), "location @cyber_assistant_rate_limited")
         route = route.replace("http://127.0.0.1:8018", f"http://127.0.0.1:{upstream.server_port}")
         config = tmp_path / "nginx.conf"
         config.write_text(f"""worker_processes 1;
@@ -102,6 +103,10 @@ http {{
                     finish.set()
                 statuses = [client.post(base + "/api/v1/assistant/turn").status_code for _ in range(100)]
                 assert 200 in statuses and 429 in statuses
+                rejected = client.post(base + "/api/v1/assistant/turn")
+                assert rejected.status_code == 429
+                assert rejected.json()["detail"] == "Please wait a minute before asking another question."
+                assert rejected.headers["retry-after"] == "60"
         finally:
             finish.set()
             process.terminate()

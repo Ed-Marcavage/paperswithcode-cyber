@@ -82,3 +82,14 @@ class AssistantProviderLimit(Base):
     occurred_at = Column(DateTime(timezone=True), nullable=False)
     off_until = Column(DateTime(timezone=True), nullable=False, index=True)
     provider_message = Column(Text, nullable=False)
+
+
+class AssistantAdmission(Base):
+    __tablename__ = "assistant_admission"
+
+    visitor_hash = Column(String(64), primary_key=True)
+    turns = Column(JSON, nullable=False)
+    conversations = Column(JSON, nullable=False)
+    active_run_id = Column(String(36), index=True)
+    active_until = Column(DateTime(timezone=True))
+    updated_at = Column(DateTime(timezone=True), nullable=False, index=True)
