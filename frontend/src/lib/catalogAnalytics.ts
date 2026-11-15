@@ -4,12 +4,15 @@ import type { Axis, DiscoveryWork } from "./api/discovery";
 import { catalogRecordingOptions, posthogPrivacyOptions } from "./posthogPrivacy";
 
 type Resource = "pdf" | "reader" | "cached_text" | "source" | "code" | "artifact";
-const assistantActions = ["opened", "asked_from_landing", "message_sent", "answer_done", "link_clicked", "new_chat", "feedback_given", "limit_hit", "error"] as const;
+const assistantActions = ["opened", "asked_from_landing", "message_sent", "answer_done", "link_clicked", "new_chat", "feedback_given", "limit_hit", "error",
+  "topic_chosen", "slash_menu_used", "follow_up_clicked"] as const;
 type AssistantAction = typeof assistantActions[number];
 type AssistantSurface = "landing" | "panel" | "chat_page";
 type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | `assistant_${AssistantAction}`;
 const assistantEvents = new Set(assistantActions.map(action => `assistant_${action}`));
 const assistantFields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version", "catalog_environment", "surface"]);
+// A topic slug is a fixed catalog identifier, never chat text; only assistant_topic_chosen carries one.
+const topicSlug = /^[a-z0-9][a-z0-9-]{0,63}$/;
 const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version",
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
   "topic", "target", "contribution", "kind", "year", "catalog_environment",
@@ -39,7 +42,8 @@ export const catalogOptions = {
     const assistant = assistantEvents.has(event.event);
     if (assistant && !["landing", "panel", "chat_page"].includes(String(event.properties.surface))) return null;
     // The SDK otherwise adds raw URLs, referrers, search strings and initial person properties.
-    const properties = Object.fromEntries(Object.entries(event.properties).filter(([key]) => (assistant ? assistantFields : fields).has(key)));
+    const properties = Object.fromEntries(Object.entries(event.properties).filter(([key, value]) => (assistant ? assistantFields : fields).has(key)
+      || (event.event === "assistant_topic_chosen" && key === "topic" && typeof value === "string" && topicSlug.test(value))));
     return { uuid: event.uuid, timestamp: event.timestamp, event: event.event,
       properties: { ...properties, $geoip_disable: true, $process_person_profile: false } };
   },
@@ -56,10 +60,14 @@ function capture(event: Event, properties: Record<string, unknown>) {
   if (!isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || catalogPrivacySignal()) return;
   posthog.capture(event, { ...properties, catalog_environment: import.meta.env.VITE_CATALOG_ANALYTICS_ENV || "preview" });
 }
-/** Deliberately accepts no question, answer, title, note, URL, run or browser ID. */
-export function assistantEvent(action: AssistantAction, surface: AssistantSurface) {
+/**
+ * Deliberately accepts no question, answer, title, note, URL, run or browser ID. The one
+ * extra is the topic slug on topic_chosen (a catalog identifier); follow_up_clicked does
+ * not say which suggestion was clicked.
+ */
+export function assistantEvent(action: AssistantAction, surface: AssistantSurface, topic?: string) {
   if (!assistantActions.includes(action) || !["landing", "panel", "chat_page"].includes(surface)) return;
-  capture(`assistant_${action}`, { surface });
+  capture(`assistant_${action}`, { surface, ...(action === "topic_chosen" && topic && topicSlug.test(topic) ? { topic } : {}) });
 }
 /** Recognize our public README links without collecting arbitrary campaign or URL text. */
 export function catalogReferral(search: string) {

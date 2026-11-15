@@ -8,14 +8,17 @@ export interface AssistantMessage {
   tool_steps: AssistantToolStep[]; run_id?: string | null; error?: string | null;
   working_note?: string; // Transient stream state; never persisted as answer text.
   feedback?: { rating: "good" | "bad" | null; note: string | null } | null;
+  follow_ups?: string[]; // Assistant messages: up to three suggested next questions.
+  topic?: string | null; // User messages sent in this visit: the topic slug they were asked under.
 }
+export interface AssistantTopic { slug: string; label: string; count: number }
 export interface AssistantSummary { id: string; title: string; updated_at: string; question_count: number; question_limit: number }
 export interface AssistantConversation extends AssistantSummary { messages: AssistantMessage[] }
 export type AssistantEvent =
   | { type: "meta"; conversation_id: string; message_id: string; run_id: string; question_count: number; question_limit: number }
   | { type: "text_delta" | "working_note"; text: string }
   | { type: "tool_started" | "tool_finished"; id: string; name: string; error?: boolean; result?: string }
-  | { type: "done"; status: string }
+  | { type: "done"; status: string; follow_ups?: string[] }
   | { type: "error"; code: string; message: string; retry_at?: string | null };
 
 export class AssistantError extends Error {
@@ -45,9 +48,9 @@ function json(method: string, body: unknown): RequestInit {
   return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
 }
 
-async function* turn(question: string, conversationId: string | null, surface: AssistantSurface, sitePath: string, signal: AbortSignal): AsyncGenerator<AssistantEvent> {
+async function* turn(question: string, conversationId: string | null, surface: AssistantSurface, sitePath: string, signal: AbortSignal, topic?: string | null): AsyncGenerator<AssistantEvent> {
   const response = await fetch(apiUrl(root + "/turn"), { ...json("POST", {
-    question, conversation_id: conversationId, surface, site_path: sitePath,
+    question, conversation_id: conversationId, surface, site_path: sitePath, ...(topic ? { topic } : {}),
   }), credentials: "same-origin", signal });
   await check(response);
   if (!response.body) throw new AssistantError("The answer stream could not start. Please try again.");
@@ -93,11 +96,26 @@ export const assistantApi = {
       throw error;
     }
   },
+  /** Topics worth asking about, by count. Any failure means no topic UI, never an error. */
+  topics: async (): Promise<AssistantTopic[]> => {
+    try {
+      const body = await request<{ topics?: unknown }>("/topics");
+      if (!Array.isArray(body?.topics)) return [];
+      return body.topics.filter((topic): topic is AssistantTopic => typeof topic?.slug === "string" && Boolean(topic.slug)
+        && typeof topic.label === "string" && Boolean(topic.label.trim()) && typeof topic.count === "number");
+    } catch { return []; }
+  },
   turn,
 };
+
+/** Follow-ups as stored or streamed: absent on older messages, so treat anything else as none. */
+export function followUps(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && Boolean(item.trim())).slice(0, 3) : [];
+}
 
 export const assistantKeys = {
   list: ["assistant", "conversations"] as const,
   conversation: (id: string) => ["assistant", "conversation", id] as const,
   status: ["assistant", "status"] as const,
+  topics: ["assistant", "topics"] as const,
 };
