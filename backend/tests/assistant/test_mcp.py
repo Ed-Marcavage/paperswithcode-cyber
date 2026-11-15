@@ -43,11 +43,36 @@ def test_disallowed_tool_never_contacts_network():
 
 @pytest.mark.parametrize("name,cap", [("search_papers", MAX_RESULT_BYTES), ("read_paper", READ_PAPER_BYTES)])
 def test_result_cap_is_utf8_safe_and_records_original_size(name, cap):
-    result = run(lambda m: m.call(name, {}), lambda r: response(r, {"text": "🦊" * cap}))
+    result = run(lambda m: m.call(name, {}), lambda r: response(r, {"content": [{"type": "text", "text": "🦊" * cap}]}))
     assert len(result.text.encode()) <= cap
     assert result.full_bytes > cap
     assert result.truncated
     assert result.text.endswith("[Result truncated; narrow the request.]")
+    assert result.full_bytes == len(("🦊" * cap).encode())
+
+
+def test_structured_content_is_one_compact_copy_before_capping():
+    data = {"results": [{"title": "Catalog item", "abstract": "Evidence " * 20} for _ in range(45)]}
+    envelope = {"content": [{"type": "text", "text": json.dumps(data, indent=2)}],
+                "structuredContent": data, "isError": False}
+    assert len(json.dumps(envelope).encode()) > MAX_RESULT_BYTES
+    result = run(lambda m: m.call("browse_catalog", {}), lambda r: response(r, envelope))
+    compact = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
+    assert result.text == compact
+    assert result.full_bytes == len(compact.encode())
+    assert not result.truncated and not result.is_error
+
+
+@pytest.mark.parametrize("structured", [None, {}])
+def test_text_fallback_and_structured_error_preserve_is_error(structured):
+    envelope = {"isError": True, "content": [{"type": "text", "text": "No cached text."},
+                 {"type": "image", "data": "ignored"}, {"type": "text", "text": "Try the source."}]}
+    if structured is not None:
+        envelope["structuredContent"] = structured
+    result = run(lambda m: m.call("read_paper", {}), lambda r: response(r, envelope))
+    assert result.text == ("{}" if structured is not None else "No cached text.\nTry the source.")
+    assert result.full_bytes == len(result.text.encode())
+    assert result.is_error
 
 
 @pytest.mark.parametrize("kind", ["http", "transport", "json", "rpc", "oversize"])

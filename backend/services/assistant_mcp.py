@@ -40,9 +40,17 @@ class ToolResult:
 
 
 def cap_result(value: dict[str, Any], limit: int) -> ToolResult:
-    raw = json.dumps(value, ensure_ascii=False, separators=(",", ":")).encode()
+    # MCP often repeats the same payload in text and structuredContent. Give
+    # the model one copy; full_bytes measures that uncapped model input, not
+    # the transport envelope (whose independent wire limit remains above).
+    if value.get("structuredContent") is not None:
+        text = json.dumps(value["structuredContent"], ensure_ascii=False, separators=(",", ":"))
+    else:
+        text = "\n".join(block["text"] for block in value.get("content", [])
+                         if isinstance(block, dict) and block.get("type") == "text"
+                         and isinstance(block.get("text"), str))
+    raw = text.encode()
     truncated = len(raw) > limit
-    text = raw.decode()
     if truncated:
         text = raw[:limit - len(TRUNCATION.encode())].decode("utf-8", errors="ignore") + TRUNCATION
     return ToolResult(text, len(raw), truncated, bool(value.get("isError")))
