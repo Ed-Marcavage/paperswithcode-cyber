@@ -13,7 +13,8 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from backend.models.assistant_tools import FollowUpPostCheck, SuggestFollowUpsArguments
 from backend.models.database import Paper as DBPaper
-from backend.services.assistant_posts import search_statement
+from backend.services.assistant_posts import ranked_search, search_statement
+from backend.services.assistant_post_verification import SUBJECT_RULE
 
 MIN_FOLLOW_UP_MATCHES = 3
 MIN_NEW_FOLLOW_UP_MATCHES = 2
@@ -70,6 +71,28 @@ def question_terms(question):
     return {word[:-1] if len(word) > 4 and word.endswith('s') else word for word in words if word not in STOP_WORDS}
 
 
+# Search derivation is separate from near-duplicate normalization. Keep subject
+# words (sandboxing, isolation, static analysis, etc.); strip question scaffolding
+# and the publisher already expressed by an exact structured filter.
+QUERY_STOP_WORDS = STOP_WORDS | frozenset('has have had been be being its our your their them us into inside through than then also s published publishes publish'.split())
+
+
+def effective_check(candidate):
+    check = candidate.check
+    if isinstance(check, str):
+        return check, {'effective_query': check, 'effective_filters': {'kind': 'paper'}}
+    if not check.query:
+        publisher_words = set(re.findall(r'[^\W_]+(?:-[^\W_]+)*', check.publisher.casefold()))
+        excluded = QUERY_STOP_WORDS | publisher_words
+        question = re.sub(r"['’]s\b", '', candidate.question.casefold())
+        words = re.findall(r'[^\W_]+(?:-[^\W_]+)*', question)
+        query = ' '.join(dict.fromkeys(word for word in words if word not in excluded))
+        check = check.model_copy(update={'query': query})
+    filters = {key: value for key, value in check.model_dump(mode='json').items()
+               if key != 'query' and value is not None and value != ''}
+    return check, {'effective_query': check.query, 'effective_filters': filters}
+
+
 def near_duplicate(first, second):
     left, right = question_terms(first), question_terms(second)
     if left and right and len(left & right) / len(left | right) >= 0.75:
@@ -101,8 +124,8 @@ def read_counts(check, seen, sessions, deadline):
             if remaining <= 0:
                 raise TimeoutError()
             db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"), {'timeout': str(min(1000, remaining))})
-        timeout()
         if isinstance(check, str):
+            timeout()
             from backend.config import get_settings
             from backend.services.paper_retrieval_service import PaperRetrievalService
             retrieval = PaperRetrievalService(db, settings=get_settings(), summary_factory=lambda rows: rows,
@@ -114,8 +137,20 @@ def read_counts(check, seen, sessions, deadline):
             timeout()
             row = db.execute(paper_count_statement(retrieval, check, seen)).mappings().one()
         else:
-            statement, params = search_statement(check.model_dump(mode='json'), seen=seen)
-            row = db.execute(statement, params).mappings().one()
+            # Preserve omission of the default: find_posts may relax an implicit
+            # relevance filter, but never an explicit one or a structured filter.
+            arguments = check.model_dump(mode='json', exclude_unset=True)
+            def search(**options):
+                timeout()
+                statement, params = search_statement(arguments, seen=seen, **options)
+                return dict(db.execute(statement, params).mappings().one())
+            row, mode = ranked_search(arguments, search, lambda row: int(row['match_count']))
+            filters = {key: value for key, value in check.model_dump(mode='json').items()
+                       if key != 'query' and value is not None and value != ''}
+            if mode['relevance_relaxed']:
+                filters.pop('min_agent_relevance', None)
+            return {**row, **mode, 'effective_filters': filters,
+                    'subject_rule': SUBJECT_RULE if mode['match_mode'] == 'any_word' else 'all_words'}
         return {'match_count': int(row['match_count']), 'new_match_count': int(row['new_match_count'])}
 
 
@@ -141,14 +176,18 @@ class FollowUpState:
         deadline = time.monotonic() + FOLLOW_UP_SECONDS
         decisions = []
         for candidate in args.candidates:
-            decision = {**candidate.model_dump(mode='json'), 'match_count': None, 'new_match_count': None, 'kept': False}
+            check, effective = effective_check(candidate)
+            decision = {**candidate.model_dump(mode='json', exclude_unset=True), **effective,
+                        'match_count': None, 'new_match_count': None, 'kept': False}
             reason = None
             if not self.researched:
                 reason = 'no_research_evidence'
+            elif isinstance(check, FollowUpPostCheck) and not check.query:
+                reason = 'generic'
             else:
                 try:
                     with anyio.fail_after(max(0, deadline - time.monotonic())):
-                        counts = await anyio.to_thread.run_sync(read_counts, candidate.check, self.seen,
+                        counts = await anyio.to_thread.run_sync(read_counts, check, self.seen,
                                                                self.sessions, deadline, abandon_on_cancel=True)
                     decision.update(counts)
                 except TimeoutError:
@@ -158,9 +197,7 @@ class FollowUpState:
                     # that deadline without exposing SQL or connection details.
                     reason = 'deadline' if getattr(getattr(error, 'orig', None), 'pgcode', None) == '57014' else 'verification_unavailable'
             if reason is None:
-                if len(question_terms(candidate.question)) < 2 or isinstance(candidate.check, FollowUpPostCheck) and not any(
-                    getattr(candidate.check, key) for key in ('query', 'topic', 'subtopic', 'post_type', 'publisher', 'harness_engineering', 'published_after')
-                ):
+                if len(question_terms(candidate.question)) < 2:
                     reason = 'generic'
                 elif near_duplicate(candidate.question, self.question):
                     reason = 'duplicate_question'

@@ -31,13 +31,15 @@ Allowed post filters: query (keywords, <=200 chars), topic (one catalog slug),
 subtopic, post_type, publisher (exact displayed name), harness_engineering
 (boolean), min_agent_relevance (integer 0..4, default 3), published_after
 (exclusive YYYY-MM-DD date). Omit unused filters. No other keys. Post checks
-use strict all-word matching, without search fallbacks. Verification needs at
+use ranked keyword matching with a subject-relevance floor. Verification needs at
 least three matching works, including two NOT already shown in this turn.
 Use topic only for the supplied topic.slug; otherwise omit it. Use subtopic
 exactly as shown in works.subtopics; a subtopic is not a topic. Copy publisher
-names exactly. The check must match the actual question: unrelated works by the
-same publisher do not support a narrow claim. Use a broader question for a
-publisher-only check, rather than promising details about one named work.
+names exactly. The check must be as specific as the question: use filters PLUS
+a short query naming its subject. A publisher alone is not a check; unrelated
+works by that publisher do not support a claim about sandboxing or patching.
+For example, a sandboxing question needs query="sandbox isolation" along with
+its publisher filter. Do not weaken the check just to get enough matches.
 Prefer follow-ups about works or publishers in the results but NOT covered in
 the answer: these are known to exist. Use them to find further evidence, not
 simply to reread an item already shown. Prefer well represented publishers or
@@ -132,7 +134,7 @@ def parse_candidates(raw):
             result[key] = value
         return result
     payload = json.loads(raw, object_pairs_hook=unique_object)
-    return SuggestFollowUpsArguments.model_validate(payload).model_dump(mode='json')
+    return SuggestFollowUpsArguments.model_validate(payload).model_dump(mode='json', exclude_unset=True)
 
 
 async def generate_followups(client, model, question, answer, steps, *, topic=None,

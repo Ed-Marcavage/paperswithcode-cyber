@@ -176,11 +176,23 @@ def test_sse_checkpoint_persistence_trace_cli_and_token_totals(client, store, mo
     step = run['steps'][-1]
     assert step['kind'] == 'follow_ups' and step['reasoning_tokens'] == 1 and step['input_tokens'] == 40
     assert step['proposed_candidates'][0]['question'] == QUESTION and step['candidates'][0]['kept']
+    decision = step['candidates'][0]
+    assert decision['effective_query'] == 'verify agent-generated patches'
+    assert decision['effective_filters'] == {'publisher': 'Example Labs', 'min_agent_relevance': 3}
+    assert decision['match_count'] == 5 and decision['new_match_count'] == 3 and decision['reason'] == 'kept'
     details = client.get('/api/v1/assistant/conversations/' + run['conversation_id']).json()
     assert details['messages'][-1]['follow_ups'] == [QUESTION]
     main(['show', run['id']], store=store)
     assert 'Step 4: follow_ups' in capsys.readouterr().out
     assert len(services.model_requests) == 3
+
+
+def test_candidate_parsing_preserves_implicit_relevance_and_prompt_requires_subject():
+    candidate = generation.parse_candidates(CANDIDATES)['candidates'][0]
+    assert 'min_agent_relevance' not in candidate['check']
+    assert 'short query naming its subject' in generation.PROMPT
+    assert 'A publisher alone is not a check' in generation.PROMPT
+    assert 'strict all-word matching' not in generation.PROMPT
 
 
 def test_followup_usage_limit_switches_off_assistant_but_keeps_done(client, store, monkeypatch):
