@@ -15,7 +15,7 @@ export const chatUrlTransform = (url: string): string => defaultUrlTransform(url
 // The model sometimes writes a catalog page as bare text, for example "(/paper/1699)", which
 // is not clickable. Turn such paths into links. Paths already inside a Markdown link, inline
 // code or a code block are left alone.
-const CATALOG_PATH = /(^|[\s(])(\/(?:paper|orgs|repos|developers)\/[A-Za-z0-9._~%\/-]*[A-Za-z0-9])/g;
+const CATALOG_PATH = /(^|[\s(])(\/(?:paper|orgs|repos|developers)\/[A-Za-z0-9._~%/-]*[A-Za-z0-9])/g;
 export function linkBareCatalogPaths(text: string): string {
   return text.split(/(```[\s\S]*?(?:```|$)|`[^`\n]*`)/).map((part, index) => {
     if (index % 2 === 1) return part; // code

@@ -29,7 +29,7 @@ if (catalog && posthogToken && !catalogPrivacySignal()) {
 const app = (
   <ThemeProvider
     attribute="class"
-    defaultTheme="system"
+    defaultTheme="dark"
     enableSystem
     disableTransitionOnChange
     storageKey="pwc-theme"

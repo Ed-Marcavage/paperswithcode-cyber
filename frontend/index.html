@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Paint the site theme before external styles or the app can load. -->
     <style>
-      :root { color-scheme: light; --bg: #FAF8F4; --ink: #1A1814; }
-      :root.dark { color-scheme: dark; --bg: #11100E; --ink: #F3EFE7; }
-      @media (prefers-color-scheme: dark) {
-        :root:not(.light):not(.dark) { color-scheme: dark; --bg: #11100E; --ink: #F3EFE7; }
-      }
+      /* The site is dark unless the visitor chose light with the header switch. */
+      :root { color-scheme: dark; --bg: #11100E; --ink: #F3EFE7; }
+      :root.light { color-scheme: light; --bg: #FAF8F4; --ink: #1A1814; }
       html, body { margin: 0; background: var(--bg); color: var(--ink); }
       /* Source HTML is for crawlers, never an intermediate browser layout. */
       html [data-pwc-initial-document], html .initial-discovery-footer { display: none !important; }
@@ -20,11 +18,10 @@
         try {
           theme = localStorage.getItem("pwc-theme");
         } catch (_) {
-          // Storage can be unavailable in embedded browsers; use system theme.
+          // Storage can be unavailable in embedded browsers; use the default.
         }
-        var dark = theme === "dark" ||
-          (theme !== "light" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-        document.documentElement.classList.add(dark ? "dark" : "light");
+        // Dark by default; light only when the visitor chose it.
+        document.documentElement.classList.add(theme === "light" ? "light" : "dark");
       })();
     </script>
     <title>Papers with Code</title>

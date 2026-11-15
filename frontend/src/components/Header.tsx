@@ -15,6 +15,7 @@ import {
 import { useAuth } from "@/lib/authContext";
 import { isAssistantEnabled } from "@/lib/apiUrl";
 import { AssistantAskButton } from "@/components/assistant/AssistantPanel";
+import { ThemeToggle } from "@/components/ThemeToggle";
 
 type HeaderIconName = "search" | "bookmark" | "menu" | "close" | "github";
 
@@ -237,6 +238,7 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           >
             <HeaderIcon name="search" size={14} />
           </button>
+          <ThemeToggle />
           {!authDisabled && (
             <NavLink
               to="/saved"
