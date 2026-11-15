@@ -31,7 +31,12 @@ def bounded_arguments(name, arguments):
         result.pop("include_facet_counts", None)
     if name == "find_posts" and isinstance(result.get("topic", ""), str):
         from backend.models.assistant_tools import FindPostsArguments
+        explicit_relevance = "min_agent_relevance" in result
         result = FindPostsArguments.model_validate(result).model_dump(mode="json")
+        if result["query"] and not explicit_relevance:
+            # This omission controls fallback behavior, including after repeated
+            # normalization in the loop/adapter and in the duplicate-call cache.
+            result.pop("min_agent_relevance")
     return result
 
 
