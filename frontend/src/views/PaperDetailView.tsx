@@ -625,7 +625,8 @@ const PaperDetailView: React.FC = () => {
           )}
             </div>
 
-            {(!isDiscoveryCatalog() || paper.thumbnail_url) && <div className="detail-hero-thumb detail-thumb-wrap">
+            {/* A post's screenshot sits in its Catalog details instead, beside the rows. */}
+            {(!isDiscoveryCatalog() || (paper.thumbnail_url && paper.catalog_kind !== "post")) && <div className="detail-hero-thumb detail-thumb-wrap">
               <PaperPreview
                 paperId={paper.arxiv_id || paper.id}
                 title={paper.title}
@@ -728,7 +729,7 @@ const PaperDetailView: React.FC = () => {
             </div>
           )}
 
-          {isDiscoveryCatalog() && <DiscoveryPaper paperId={paper.id} />}
+          {isDiscoveryCatalog() && <DiscoveryPaper paperId={paper.id} title={paper.title} thumbnailUrl={assetUrl(paper.thumbnail_url)} />}
           <PaperMetadataSections
             canEdit={!isDiscoveryCatalog()}
             onEditMethods={() => openEdit("methods")}

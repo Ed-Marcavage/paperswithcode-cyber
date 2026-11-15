@@ -64,6 +64,23 @@
 .discovery-paper dt {color:var(--ink-faint);}
 .discovery-paper dd a + a {margin-left:.5rem;}
 .discovery-post-tldr {margin:.8rem 0;}
+/* A post with a preview image: the rows take the remaining width, the screenshot (400x550)
+   sits in a second column, top-aligned with the first row, with "Read original post" under it. */
+.discovery-paper.has-preview .discovery-paper-body {display:grid;grid-template-columns:minmax(0,1fr) clamp(220px,22vw,260px);gap:1.5rem 2.5rem;align-items:start;margin-top:.8rem;}
+.discovery-paper.has-preview .discovery-paper-rows > dl {margin-top:0;}
+.discovery-paper-rows {min-width:0;}
+.discovery-paper-rows dd {min-width:0;overflow-wrap:anywhere;}
+.discovery-paper-preview {display:flex;flex-direction:column;gap:.6rem;min-width:0;}
+.discovery-paper-shot {display:block;overflow:hidden;border:1px solid var(--hairline-strong);border-radius:4px;background:#FDFCF9;box-shadow:0 1px 0 rgba(0,0,0,.04),0 4px 8px -4px rgba(0,0,0,.08);transition:border-color .15s,box-shadow .15s,transform .15s;}
+.discovery-paper-shot img {display:block;width:100%;height:auto;aspect-ratio:400/550;object-fit:cover;object-position:top;}
+.discovery-paper-shot:hover {border-color:var(--accent);box-shadow:0 1px 0 rgba(0,0,0,.04),0 10px 22px -10px rgba(0,0,0,.25);transform:translateY(-1px);}
+.discovery-paper-shot:focus-visible {outline:2px solid var(--accent-text);outline-offset:3px;}
+@media (prefers-reduced-motion: reduce) { .discovery-paper-shot, .discovery-paper-shot:hover {transition:none;transform:none;} }
+/* Narrow screens: the screenshot goes under the rows, at a modest width, so the details are read first. */
+@media (max-width: 760px) {
+  .discovery-paper.has-preview .discovery-paper-body {grid-template-columns:minmax(0,1fr);}
+  .discovery-paper-preview {width:min(220px,60%);}
+}
 .discovery-post-scores {display:flex;flex-wrap:wrap;gap:.3rem 1rem;}
 @media (max-width: 640px) {
   .discovery-list a {font-size:1.05rem;}
