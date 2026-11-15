@@ -57,8 +57,11 @@ async def visitor_cookie(request: Request) -> str:
 
 
 def set_visitor_cookie(response, visitor, settings):
-    response.set_cookie(COOKIE_NAME, visitor, httponly=True, samesite="lax",
-                        secure=get_settings().environment not in {"development", "local", "test"},
+    site = get_settings()
+    # Secure whenever the site is served over HTTPS, whatever the environment label says:
+    # the production catalog runs with the development label.
+    secure = site.environment not in {"development", "local", "test"} or site.public_site_url.startswith("https://")
+    response.set_cookie(COOKIE_NAME, visitor, httponly=True, samesite="lax", secure=secure,
                         max_age=settings.retention_days * 86400, path="/api/v1/assistant")
 
 

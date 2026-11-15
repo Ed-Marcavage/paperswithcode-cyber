@@ -75,6 +75,16 @@ def test_secure_cookie_outside_local(monkeypatch):
     assert "Secure" in response.headers["set-cookie"]
 
 
+def test_secure_cookie_when_the_site_is_https_even_with_the_development_label(monkeypatch):
+    from backend.config import get_settings
+    from starlette.responses import Response
+    monkeypatch.setattr(get_settings(), "environment", "development")
+    monkeypatch.setattr(get_settings(), "public_site_url", "https://catalog.test")
+    response = Response()
+    assistant.set_visitor_cookie(response, "test", AssistantSettings())
+    assert "Secure" in response.headers["set-cookie"]
+
+
 def test_cookie_mutations_require_same_origin(client, monkeypatch):
     async def fake(*args):
         yield assistant.sse({"type": "done"})
