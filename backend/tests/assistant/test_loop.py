@@ -215,6 +215,6 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
 
 def test_prompt_leaves_link_style_to_the_model_but_forbids_invented_addresses():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v5"
+    assert PROMPT_VERSION == "cyber-assistant-v6"
     assert "catalog_url" not in SYSTEM_PROMPT
     assert "Use only addresses present in tool results and never invent one" in SYSTEM_PROMPT

@@ -133,8 +133,8 @@ def test_database_lookup_is_one_parameterized_select_with_readonly_connection_li
     assert options[0]["echo"] is False and options[0]["pool_timeout"] == 1
 
 
-def test_prompt_v4_focuses_agent_harness_posts_without_overclaiming_rankings():
-    assert PROMPT_VERSION == "cyber-assistant-v5"
+def test_prompt_focuses_agent_harness_posts_without_overclaiming_rankings():
+    assert PROMPT_VERSION == "cyber-assistant-v6"
     for phrase in ("AI agent harnesses", "agent_relevance of 3", "vulnerabilities, malware or threats",
                    "tldr", "Group by publisher", "limited search samples"):
         assert phrase in SYSTEM_PROMPT

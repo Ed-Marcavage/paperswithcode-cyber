@@ -7,7 +7,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     services = FakeServices([[tool_chunk()], [text_chunk('Found one useful post.')]])
     turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
-    assert PROMPT_VERSION == 'cyber-assistant-v5' and turn.status == 'limit_reached'
+    assert PROMPT_VERSION == 'cyber-assistant-v6' and turn.status == 'limit_reached'
     assert services.model_requests[0]['messages'][0]['content'] == SYSTEM_PROMPT
     final_messages = services.model_requests[-1]['messages']
     assert final_messages[0]['content'] == SYSTEM_PROMPT
@@ -18,6 +18,10 @@ def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
         assert 'catalog_url' not in prompt and 'addresses present in' in prompt
         assert 'at most six items' in prompt and 'one short caveat' in prompt
         assert 'catalog-wide' in prompt
+    exact_paths = 'Use catalog page paths exactly as the tools return them and never add a domain to them.'
+    assert exact_paths in SYSTEM_PROMPT
+    assert exact_paths in final_messages[0]['content']
+    assert 'Link items however reads best' in SYSTEM_PROMPT
     assert 'one-sentence direct answer' in SYSTEM_PROMPT
     assert 'For industry posts, start with find_posts' in SYSTEM_PROMPT
     assert 'completed search actually supports that claim' in SYSTEM_PROMPT
