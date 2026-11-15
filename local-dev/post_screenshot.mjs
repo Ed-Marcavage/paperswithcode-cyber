@@ -67,6 +67,20 @@ const CLEAN = () => {
       el.remove();
     }
   }
+  // Some consent managers (Usercentrics, for one) render inside a shadow root,
+  // which the scan above cannot see into; remove such a host by its shadow text.
+  for (const host of Array.from(document.querySelectorAll("body *")).filter((el) => el.shadowRoot)) {
+    let text = ""; // visible text only: shadow roots often inline large <style> blocks
+    for (const node of host.shadowRoot.querySelectorAll("*")) {
+      if (node.tagName === "STYLE" || node.tagName === "SCRIPT") continue;
+      for (const child of node.childNodes) if (child.nodeType === Node.TEXT_NODE) text += child.textContent + " ";
+    }
+    text = text.trim().replace(/\s+/g, " ");
+    if (text.length < 5000 && consent.test(text)) {
+      removed.push({ why: "consent text (shadow root)", tag: host.tagName.toLowerCase(), text: text.slice(0, 80) });
+      host.remove();
+    }
+  }
   if (removed.length) {
     // Consent managers often lock scrolling; unlock so the full-page capture works.
     for (const node of [document.documentElement, document.body]) {
