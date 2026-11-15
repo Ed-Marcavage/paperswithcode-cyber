@@ -64,11 +64,18 @@ class AssistantStore:
               model: str = "glm-5.3-flash", surface: str = "panel", site_path: str = "/",
               analytics_session_id: str | None = None) -> SavedTurn:
         now = datetime.now(UTC)
+        # The title is the first question, cut at a word boundary with an ellipsis to fit 60 characters.
+        title = " ".join(question.split())
+        if len(title) > 60:
+            head = title[:59]
+            if title[59] != " " and " " in head:
+                head = head.rsplit(" ", 1)[0]
+            title = head.rstrip(" ,;:.-") + "…"
         with self.sessions.begin() as db:
             if conversation_id is None:
                 conversation_id = identifier()
                 db.add(AssistantConversation(id=conversation_id, visitor_hash=visitor_hash(visitor),
-                       title=" ".join(question.split())[:60], question_count=0,
+                       title=title, question_count=0,
                        created_at=now, updated_at=now))
                 db.flush()
             else:

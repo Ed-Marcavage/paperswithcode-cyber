@@ -29,7 +29,9 @@ def test_list_open_rename_and_delete(client, store):
     response = client.get("/api/v1/assistant/conversations")
     assert response.headers["cache-control"] == "no-store"
     assert [row["id"] for row in response.json()] == [second.conversation_id, first.conversation_id]
-    assert len(response.json()[1]["title"]) == 60
+    # Long first questions are cut at a word boundary with an ellipsis, within 60 characters.
+    assert response.json()[1]["title"] == "First question First question First question First question…"
+    assert response.json()[0]["title"] == "Second question"
     url = "/api/v1/assistant/conversations/" + first.conversation_id
     opened = client.get(url).json()
     assert opened["messages"][1]["tool_steps"][0]["name"] == "search_papers"
@@ -69,3 +71,23 @@ def test_history_stays_readable_during_provider_cooldown_and_bad_titles_fail(cli
     assert client.get("/api/v1/assistant/conversations").status_code == 200
     for title in ("", "   ", "x" * 61):
         assert client.patch(url, json={"title": title}).status_code == 422
+
+
+def test_titles_cut_at_a_word_boundary(client, store):
+    assert client.get("/api/v1/assistant/conversations").json() == []
+    visitor = client.cookies.get(COOKIE_NAME)
+    cases = {
+        "Compare the industry posts on agent sandboxing in a table: publisher, approach, escape rate":
+            "Compare the industry posts on agent sandboxing in a table…",
+        "Which posts show cutting-edge harness design for automated pentesting?":
+            "Which posts show cutting-edge harness design for automated…",
+        "x" * 70: "x" * 59 + "…",
+        "  Short   question  ": "Short question",
+        "a" * 60: "a" * 60,
+    }
+    for question, title in cases.items():
+        saved = store.begin(visitor, None, question)
+        with store.sessions() as db:
+            stored = db.get(AssistantConversation, saved.conversation_id).title
+        assert stored == title and len(stored) <= 60
+
