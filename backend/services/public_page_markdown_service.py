@@ -185,9 +185,14 @@ def render_discovery_markdown(page: DiscoveryPage) -> str:
         lines.extend(
             ["", "## Related research", "", *(f"- {item}" for item in related)]
         )
-    if page.paper_links:
-        lines.extend(["", "## Relevant papers", ""])
-        for index, paper in enumerate(page.paper_links[:20], start=1):
+    for heading, links in (
+        (page.post_heading or "", page.post_links),
+        ("Relevant papers", page.paper_links),
+    ):
+        if not links:
+            continue
+        lines.extend(["", f"## {_markdown_text(heading)}", ""])
+        for index, paper in enumerate(links[:20], start=1):
             rendered = _link(paper.title, f"/paper/{paper.route_identifier}")
             if rendered is None:
                 continue

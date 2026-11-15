@@ -18,14 +18,18 @@ from backend.utils.urls import get_paper_route_identifier
 PAGE_SIZE = 25
 SITEMAP_SIZE = 1000
 AXES = ("topic", "target", "contribution", "kind", "year")
-HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses | Papers With Code Cyber"
-HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
+# Keep aligned with frontend/src/lib/cyberCopy.ts (cyberHomeTitle, cyberHomeDescription).
+# "/" lists industry posts and papers, so both are named; the papers wording is unchanged.
+HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses: Papers & Posts | Papers With Code Cyber"
+HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, industry posts, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
 CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
 # Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote,
 # cyberTrendingPostsDescription, cyberTrendingPapersDescription).
 INDUSTRY_NOTE = "The block at the top shows hand-picked industry engineering posts."
-# Trending's feed lists posts by default, like the React switch; ?kind=paper lists papers.
+# React's Trending switch opens on posts (?kind=paper shows papers); the server page
+# lists both feeds, posts first, so crawlers keep the paper links.
+POSTS_HEADING = "Trending posts about AI agents"
 POSTS_FEED_DESCRIPTION = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
 PAPERS_FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
@@ -46,25 +50,13 @@ def homepage(db: Session, params) -> DiscoveryPage:
         for key in ("start_date", "end_date")
         if params.get(key)
     }
-    show_papers = params.get("kind") == "paper"
-    if show_papers:
-        papers = PaperService(db).get_papers(
-            page=1, page_size=20, order_by="trending", latest_only=True, **dates
-        )
-        feed_links = tuple(
-            DiscoveryPaperLink(
-                get_paper_route_identifier(p.source, p.arxiv_id, int(p.id)),
-                p.title,
-                p.published,
-                "",
-            )
-            for p in papers.results
-        )
-    else:
-        posts, _ = trending_posts.posts_feed(
-            db, 1, 20, dates.get("start_date"), dates.get("end_date")
-        )
-        feed_links = tuple(_post_link(row) for row in posts)
+    # ?kind only picks React's tab: every kind gets the same page, with both lists.
+    posts, _ = trending_posts.posts_feed(
+        db, 1, 20, dates.get("start_date"), dates.get("end_date")
+    )
+    papers = PaperService(db).get_papers(
+        page=1, page_size=20, order_by="trending", latest_only=True, **dates
+    )
     # The same industry block React shows above the feed, so the links are crawlable.
     block = trending_posts.industry_block(db)
     highlights = tuple(_post_link(row) for row in block["results"])
@@ -78,7 +70,9 @@ def homepage(db: Session, params) -> DiscoveryPage:
         + " "
         + INDUSTRY_NOTE
         + "\n\n"
-        + (PAPERS_FEED_DESCRIPTION if show_papers else POSTS_FEED_DESCRIPTION),
+        + POSTS_FEED_DESCRIPTION
+        + "\n\n"
+        + PAPERS_FEED_DESCRIPTION,
         highlight_heading=block["heading"],
         highlight_links=highlights,
         breadcrumbs=(),
@@ -86,9 +80,18 @@ def homepage(db: Session, params) -> DiscoveryPage:
             DiscoveryLink("/catalog", "Browse catalog"),
             DiscoveryLink("/mcp", "Connect an agent"),
         ),
-        paper_links=feed_links,
-        # The papers view and date windows share the canonical "/" (the default posts view).
-        robots="noindex,follow" if dates or show_papers else "index,follow",
+        post_heading=POSTS_HEADING,
+        post_links=tuple(_post_link(row) for row in posts),
+        paper_links=tuple(
+            DiscoveryPaperLink(
+                get_paper_route_identifier(p.source, p.arxiv_id, int(p.id)),
+                p.title,
+                p.published,
+                "",
+            )
+            for p in papers.results
+        ),
+        robots="noindex,follow" if dates else "index,follow",
     )
 
 

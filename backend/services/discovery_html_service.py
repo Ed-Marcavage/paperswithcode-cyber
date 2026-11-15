@@ -101,15 +101,19 @@ def render_discovery_document(page: DiscoveryPage) -> str:
     trends = "".join(
         f"<li>{markdown_inline_html(item)}</li>" for item in page.trends_markdown
     )
-    paper_links = "".join(
-        "<li><article><h3>"
-        f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
-        f"{escape(paper.title)}</a></h3><p>"
-        f"{escape(paper.context_label)}"
-        + (f" · {paper.published.isoformat()}" if paper.published else "")
-        + "</p></article></li>"
-        for paper in page.paper_links
-    )
+    def ranked_items(links: tuple[DiscoveryPaperLink, ...]) -> str:
+        return "".join(
+            "<li><article><h3>"
+            f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
+            f"{escape(paper.title)}</a></h3><p>"
+            f"{escape(paper.context_label)}"
+            + (f" · {paper.published.isoformat()}" if paper.published else "")
+            + "</p></article></li>"
+            for paper in links
+        )
+
+    paper_links = ranked_items(page.paper_links)
+    post_links = ranked_items(page.post_links)
     empty = "<p>No eligible public papers are currently linked to this page.</p>"
     highlights = "".join(
         "<li><article><h3>"
@@ -162,6 +166,13 @@ def render_discovery_document(page: DiscoveryPage) -> str:
         + (
             f'<nav aria-label="Related research topics"><ul>{entity_links}</ul></nav>'
             if entity_links
+            else ""
+        )
+        + (
+            '<section aria-labelledby="posts-heading">'
+            f'<h2 id="posts-heading">{escape(page.post_heading or "")}</h2>'
+            f"<ol>{post_links}</ol></section>"
+            if post_links
             else ""
         )
         + (
