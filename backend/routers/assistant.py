@@ -27,6 +27,8 @@ from backend.services.assistant_store import (
     ConversationNotFound, QuestionLimitReached, SavedTurn, get_assistant_store,
 )
 from backend.services.assistant_provider import quota_reset, safe_provider_message
+from backend.services.assistant_topics import get_topics, resolve_topic, UnknownTopic, TOPICS_PUBLIC_MAX_AGE
+from sqlalchemy.exc import SQLAlchemyError
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
 COOKIE_NAME = "pwc_assistant_visitor"
@@ -119,7 +121,7 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
             events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions, visitor_hash=saved.visitor_hash), settings.model, saved.history, turn,
-                              on_step=record, on_provider_limit=provider_limit)
+                              on_step=record, on_provider_limit=provider_limit, topic=saved.topic)
             async with aclosing(events):
                 async for event in events:
                     if event["type"] in {"done", "error"}:
@@ -151,13 +153,19 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
 @router.post("/turn")
 async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assistant),
                     visitor=Depends(visitor_cookie), store=Depends(get_assistant_store)):
+    try:
+        topic = await run_in_threadpool(resolve_topic, payload.topic, store.sessions)
+    except UnknownTopic as error:
+        raise HTTPException(422, str(error)) from None
+    except (SQLAlchemyError, OSError, TimeoutError):
+        raise HTTPException(503, "Topic choices are temporarily unavailable. Please try again.") from None
     status = await run_in_threadpool(store.provider_status)
     if not status["available"]:
         raise HTTPException(503, status)
     try:
         saved = await run_in_threadpool(store.begin, visitor,
                                        str(payload.conversation_id) if payload.conversation_id else None,
-                                       payload.question, model=settings.model, surface=payload.surface,
+                                       payload.question, model=settings.model, surface=payload.surface, topic=topic,
                                        site_path=payload.site_path,
                                        analytics_session_id=str(payload.analytics_session_id)
                                        if settings.store_analytics_session and payload.analytics_session_id else None)
@@ -175,6 +183,16 @@ async def post_turn(payload: AssistantTurnRequest, settings=Depends(require_assi
     )
     set_visitor_cookie(response, visitor, settings)
     return response
+
+
+@router.get("/topics")
+def topics(store=Depends(get_assistant_store)):
+    # Public catalog metadata: independent of provider cooldown and model keys.
+    try:
+        result = get_topics(store.sessions)
+    except (SQLAlchemyError, OSError, TimeoutError):
+        raise HTTPException(503, "Topic choices are temporarily unavailable. Please try again.") from None
+    return JSONResponse({"topics": result}, headers={"Cache-Control": f"public, max-age={TOPICS_PUBLIC_MAX_AGE}"})
 
 
 @router.get("/status")

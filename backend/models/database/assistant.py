@@ -29,6 +29,7 @@ class AssistantMessage(Base):
     position = Column(Integer, nullable=False)
     role = Column(String(16), nullable=False)
     content = Column(Text, nullable=False, default="")
+    follow_ups = Column(JSON, nullable=False, default=list, server_default="[]")
     status = Column(String(24), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
 
@@ -50,6 +51,7 @@ class AssistantRun(Base):
     conversation_id = Column(String(36), ForeignKey("assistant_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     message_id = Column(String(36), ForeignKey("assistant_messages.id", ondelete="CASCADE"), nullable=False, unique=True)
     question = Column(Text, nullable=False)
+    topic = Column(String(100))
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
     ended_at = Column(DateTime(timezone=True))
     status = Column(String(24), nullable=False)

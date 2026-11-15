@@ -16,12 +16,22 @@ import sys
 import time
 from pathlib import Path
 
+import anyio
 import httpx
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from backend.assistant_config import AssistantSettings
 from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
+from backend.services.assistant_topics import UnknownTopic, resolve_topic
+
+TOPIC_QUESTIONS = {
+    "Which pentesting posts explain how teams validate an agent's findings?": "penetration-testing",
+    "What have defenders learned about attacks on AI agents?": "ai-system-security",
+    "Which engineering practices make security agents more reliable?": "security-engineering",
+    "How do teams validate agent-generated vulnerability fixes?": "repair",
+}
 
 QUESTIONS = (
     "Which posts show cutting-edge harness design for automated pentesting?",
@@ -33,13 +43,10 @@ QUESTIONS = (
     "What is EVMbench, and where can I read its catalog page?",
     "Find Cybench and summarize what it evaluates, with catalog links.",
     "Find ChatAFL and its official repository in the catalog.",
-    "Which catalog topics and target categories can I browse?",
+    *TOPIC_QUESTIONS,
     "Find papers about fuzzing and test generation.",
     "Find research about smart-contract security.",
-    "Show catalog work on vulnerability repair.",
-    "Find security work involving AI systems.",
     "Which catalog repositories have the most stars? Explain what the counts mean.",
-    "List trending security papers and link their catalog pages.",
     "Pick a listed organization and describe its catalog work with a link to its organization page.",
     "Pick a listed developer and show their tracked repositories and profile link.",
     "Find related work for one recent security paper, citing catalog evidence.",
@@ -54,7 +61,12 @@ def result_row(index, question, model, turn, elapsed):
     for field in ("input_tokens", "output_tokens"):
         values = [s.get(field) for s in model_steps]
         tokens[field] = sum(values) if values and all(v is not None for v in values) else None
+    expected = question in TOPIC_QUESTIONS
+    follow_ups = turn.follow_ups if turn.status in {"done", "limit_reached"} else []
+    checked = any(s["kind"] == "tool" and s["name"] == "suggest_follow_ups" and not s.get("error") for s in turn.steps)
     return {"question_id": index, "question": question, "model": model,
+            "topic": TOPIC_QUESTIONS.get(question), "follow_ups": follow_ups,
+            "follow_ups_check": {"expected": expected, "passed": bool(checked and follow_ups) if expected else None},
             "answer": turn.text, "status": turn.status, "error": turn.error,
             "tools": [s for s in turn.steps if s["kind"] == "tool"],
             "links": sorted(set(re.findall(r"\]\((https?://[^\s)]+|/[^\s)]+)\)", turn.text))),
@@ -67,7 +79,9 @@ async def evaluate(client, mcp, model, output, *, questions=QUESTIONS):
     for index, question in enumerate(questions, 1):
         turn = Turn()
         began = time.monotonic()
-        async for _ in run_turn(client, mcp, model, [{"role": "user", "content": question}], turn):
+        slug = TOPIC_QUESTIONS.get(question)
+        topic = await anyio.to_thread.run_sync(resolve_topic, slug, mcp.sessions) if slug else None
+        async for _ in run_turn(client, mcp, model, [{"role": "user", "content": question}], turn, topic=topic):
             pass
         row = result_row(index, question, model, turn, time.monotonic() - began)
         output.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -99,8 +113,8 @@ def main(argv=None):
     args = parser.parse_args(argv)
     try:
         return asyncio.run(run(args))
-    except (OSError, httpx.HTTPError, ValidationError):
-        print("Evaluation could not finish. Check the local endpoint and output path.", file=sys.stderr)
+    except (OSError, httpx.HTTPError, ValidationError, SQLAlchemyError, UnknownTopic):
+        print("Evaluation could not finish. Check the local endpoints, database/topic choices and output path.", file=sys.stderr)
         return 2
 
 

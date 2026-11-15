@@ -31,11 +31,13 @@ def main(argv=None, *, store=None):
         print(f"Run {run['id']} | {run['status']} | {run['model']}")
         print(f"Prompt {run['prompt_version']} {run['prompt_hash']}")
         print(f"Asked from {run['surface']} at {run['site_path']}")
+        print(f"Topic: {run['topic'] or 'none'}")
         print(f"Question: {run['question']}")
         for position, step in enumerate(run["steps"], 1):
             print(f"\nStep {position}: {step['kind']}")
             print(json.dumps(step, ensure_ascii=False, indent=2))
         print(f"\nAnswer: {run['answer']}")
+        print(f"Follow-ups: {json.dumps(run['follow_ups'], ensure_ascii=False)}")
         print(f"Error: {run['error']}\nFeedback: {json.dumps(run['feedback'], ensure_ascii=False)}")
     else:
         for run in store.runs(args.days):

@@ -54,7 +54,7 @@ class FakeServices:
             result = {"structuredContent": {"title": "Evidence", "url": "/paper/evidence"}}
         return httpx.Response(200, json={"jsonrpc": "2.0", "id": payload["id"], "result": result})
 
-    async def run(self, limits=TurnLimits(), *, model_name="fake"):
+    async def run(self, limits=TurnLimits(), *, model_name="fake", topic=None):
         async with httpx.AsyncClient(transport=httpx.MockTransport(self.model)) as model_http:
             async with httpx.AsyncClient(transport=httpx.MockTransport(self.mcp)) as mcp_http:
                 async with AsyncOpenAI(api_key="fake", base_url="http://model.test/v1", max_retries=0,
@@ -62,7 +62,7 @@ class FakeServices:
                     turn = Turn()
                     events = [event async for event in run_turn(
                         model, CatalogMcp(mcp_http, "http://catalog.test/mcp", sessions=self.sessions), model_name,
-                        [{"role": "user", "content": "Find security papers"}], turn, limits=limits)]
+                        [{"role": "user", "content": "Find security papers"}], turn, limits=limits, topic=topic)]
                     return turn, events
 
 
@@ -72,7 +72,7 @@ def test_plain_answer_and_private_request_contract():
     turn, events = asyncio.run(services.run())
     assert turn.text == "An answer"
     assert turn.status == "done"
-    assert events[-1] == {"type": "done", "status": "done"}
+    assert events[-1] == {"type": "done", "status": "done", "follow_ups": []}
     request = services.model_requests[0]
     assert request["messages"][0]["content"] == SYSTEM_PROMPT
     assert "user" not in request and "tool_choice" not in request
@@ -215,6 +215,6 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
 
 def test_prompt_leaves_link_style_to_the_model_but_forbids_invented_addresses():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v6"
+    assert PROMPT_VERSION == "cyber-assistant-v8"
     assert "catalog_url" not in SYSTEM_PROMPT
     assert "Use only addresses present in tool results and never invent one" in SYSTEM_PROMPT
