@@ -9,6 +9,8 @@ export function AssistantMarkdown({ text, streaming, evidence, surface = "panel"
   return <div className="assistant-markdown"><ReactMarkdown skipHtml remarkPlugins={[remarkGfm]} urlTransform={chatUrlTransform}
     components={{
       img: () => null,
+      // Wide answer tables scroll inside their own frame instead of widening the column.
+      table: ({ children }) => <div className="assistant-table" tabIndex={0} role="region" aria-label="Table"><table>{children}</table></div>,
       a: ({ href, children }) => {
         const link = allowedLink(href ?? "", evidence);
         if (!link) return <span>{children}</span>;

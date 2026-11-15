@@ -30,8 +30,26 @@ it("withholds unfinished citations and navigates catalog links with the router",
   expect(screen.getByText("Paper destination")).toBeInTheDocument();
   expect(screen.getByText("Read", { exact: false })).toBeInTheDocument();
 });
-it("keeps tool details collapsed by default", () => {
+it("keeps tool details collapsed by default and expands them from a quiet row", () => {
   const { container } = render(<AssistantToolSteps steps={[{ name: "search_papers" }, { name: "get_paper_info" }, { name: "read_paper", error: true }]} />);
   expect(screen.getByText("Searched the catalog · 3 steps")).toBeInTheDocument();
-  expect(container.querySelector("details")).not.toHaveAttribute("open");
+  const toggle = screen.getByRole("button", { name: /Searched the catalog/ });
+  expect(toggle).toHaveAttribute("aria-expanded", "false");
+  expect(container.querySelector("ol")).toBeNull();
+  fireEvent.click(toggle);
+  expect(toggle).toHaveAttribute("aria-expanded", "true");
+  expect(screen.getByText("Read a paper (could not complete)")).toBeInTheDocument();
+});
+it("shows a working state at once, then the latest tool or working note", () => {
+  const { rerender } = render(<AssistantToolSteps steps={[]} running />);
+  expect(screen.getByRole("status")).toHaveTextContent("Thinking…");
+  rerender(<AssistantToolSteps steps={[{ name: "search_papers", call_id: "a", pending: true }]} running />);
+  expect(screen.getByRole("status")).toHaveTextContent("Searching papers…");
+  rerender(<AssistantToolSteps steps={[{ name: "search_papers", call_id: "a", pending: true }]} workingNote="Checking the industry posts." running />);
+  expect(screen.getByRole("status")).toHaveTextContent("Checking the industry posts…");
+  rerender(<AssistantToolSteps steps={[{ name: "search_papers", call_id: "a" }]} running writing />);
+  expect(screen.getByRole("status")).toHaveTextContent("Writing the answer…");
+  rerender(<AssistantToolSteps steps={[{ name: "search_papers", call_id: "a" }]} />);
+  expect(screen.queryByRole("status")).toBeNull();
+  expect(screen.getByText("Searched the catalog · 1 step")).toBeInTheDocument();
 });

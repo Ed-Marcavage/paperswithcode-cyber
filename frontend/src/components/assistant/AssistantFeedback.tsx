@@ -2,25 +2,35 @@ import { useId, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { assistantApi, assistantKeys, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
 import { assistantEvent } from "@/lib/catalogAnalytics";
+import { AssistantIcon } from "./icons";
+
+type Rating = "good" | "bad";
 
 export function AssistantFeedback({ message, surface = "panel" }: { message: AssistantMessage; surface?: AssistantSurface }) {
-  const [rating, setRating] = useState<"good" | "bad" | null>(message.feedback?.rating ?? null);
+  const [rating, setRating] = useState<Rating | null>(message.feedback?.rating ?? null);
   const [note, setNote] = useState(message.feedback?.note ?? "");
+  const [noteOpen, setNoteOpen] = useState(false);
   const noteId = useId();
   const client = useQueryClient();
-  const mutation = useMutation({ mutationFn: () => assistantApi.feedback(message.run_id!, rating!, note),
+  const mutation = useMutation({ mutationFn: (value: { rating: Rating; note: string }) => assistantApi.feedback(message.run_id!, value.rating, value.note),
     onSuccess: () => { assistantEvent("feedback_given", surface); void client.invalidateQueries({ queryKey: ["assistant", "conversation"] }); void client.invalidateQueries({ queryKey: assistantKeys.list }); } });
   if (!message.run_id || message.status === "running") return null;
-  return <details className="assistant-feedback ph-mask"><summary>Give feedback</summary>
-    <form onSubmit={event => { event.preventDefault(); if (rating) mutation.mutate(); }}>
-      <div role="group" aria-label="Rate this answer">
-        <button type="button" aria-pressed={rating === "good"} onClick={() => { setRating("good"); mutation.reset(); }}>Good answer</button>
-        <button type="button" aria-pressed={rating === "bad"} onClick={() => { setRating("bad"); mutation.reset(); }}>Bad answer</button>
-      </div>
-      <label htmlFor={noteId}>Optional note</label><textarea id={noteId} value={note} maxLength={500} rows={2} onChange={event => { setNote(event.target.value); mutation.reset(); }} />
-      <button type="submit" disabled={!rating || mutation.isPending}>Save feedback</button>
-      {mutation.isSuccess && <span role="status">Feedback saved.</span>}
-      {mutation.isError && <span role="alert">Feedback could not be saved. Please try again.</span>}
-    </form>
-  </details>;
+  // A thumb saves at once; the note is an optional follow-up on the same rating.
+  const rate = (value: Rating) => { setRating(value); setNoteOpen(true); mutation.reset(); mutation.mutate({ rating: value, note }); };
+  return <div className="assistant-feedback ph-mask">
+    <div className="assistant-feedback-row" role="group" aria-label="Rate this answer">
+      <button type="button" className="assistant-icon-button" aria-pressed={rating === "good"} aria-label="Good answer" title="Good answer"
+        disabled={mutation.isPending} onClick={() => rate("good")}><AssistantIcon name="thumbUp" size={15} /></button>
+      <button type="button" className="assistant-icon-button" aria-pressed={rating === "bad"} aria-label="Bad answer" title="Bad answer"
+        disabled={mutation.isPending} onClick={() => rate("bad")}><AssistantIcon name="thumbDown" size={15} /></button>
+      {mutation.isSuccess && <span role="status" className="assistant-feedback-thanks">Thanks for the feedback.</span>}
+      {mutation.isError && <span role="alert" className="assistant-feedback-error">Feedback could not be saved. Try again.</span>}
+    </div>
+    {rating && noteOpen && !(mutation.isSuccess && mutation.variables?.note) && <form className="assistant-feedback-note" onSubmit={event => { event.preventDefault(); mutation.mutate({ rating, note }); }}>
+      <label htmlFor={noteId} className="sr-only">Optional note</label>
+      <input id={noteId} value={note} maxLength={500} placeholder={rating === "good" ? "What was useful? (optional)" : "What was missing or wrong? (optional)"}
+        onChange={event => { setNote(event.target.value); mutation.reset(); }} />
+      <button type="submit" disabled={mutation.isPending || !note.trim()}>Send note</button>
+    </form>}
+  </div>;
 }
