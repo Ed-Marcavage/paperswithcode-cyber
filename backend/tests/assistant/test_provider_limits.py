@@ -56,14 +56,16 @@ def test_unavailable_reset_falls_back_to_cooldown(body):
     assert asyncio.run(go()) == now + timedelta(minutes=30)
 
 
-def test_midturn_limit_saves_partial_and_disables_without_more_calls(client, store, monkeypatch):
+def test_midturn_limit_keeps_notes_only_in_trace_and_disables_without_more_calls(client, store, monkeypatch):
     services = fake_services(monkeypatch, [[text_chunk("Partial"), tool_chunk()],
         httpx.Response(429, json={"error": {"message": QUOTA}})])
     response = client.post("/api/v1/assistant/turn", json={"question": "Find something"})
     events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
     assert events[-1]["code"] == "usage_limit" and events[-1]["message"] == USAGE_LIMIT_MESSAGE
     run = store.show_run(events[0]["run_id"])
-    assert run["status"] == "provider_limit" and run["answer"] == "Partial"
+    assert run["status"] == "provider_limit" and run["answer"] == ""
+    assert run["steps"][0]["text"] == "Partial"
+    assert events[1] == {"type": "working_note", "text": "Partial"}
     status = client.get("/api/v1/assistant/status").json()
     assert not status["available"] and status["retry_at"]
     assert status["reason"] == events[-1]["message"]
@@ -105,6 +107,7 @@ def test_busy_retry_is_brief_recorded_and_does_not_disable(client, store, monkey
 def test_streamed_usage_limit_is_also_classified(client, store, monkeypatch):
     fake_services(monkeypatch, [[text_chunk("Partial"), {"error": {"message": QUOTA}}]])
     response = client.post("/api/v1/assistant/turn", json={"question": "Hi"})
+    assert '"type":"text_delta"' in response.text.replace(" ", "")
     assert "usage_limit" in response.text
     assert next(store.runs(1))["answer"] == "Partial"
     assert not store.provider_status()["available"]

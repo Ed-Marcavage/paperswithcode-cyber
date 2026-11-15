@@ -59,6 +59,9 @@ def test_full_trace_from_http_turn(client, store, monkeypatch, caplog, fail):
 
 def test_cancelled_trace_records_partial_model_step(store, monkeypatch):
     fake_services(monkeypatch, [[text_chunk("Partial answer"), text_chunk("Should not appear")]])
+    async def no_tools(self):
+        return []
+    monkeypatch.setattr(CatalogMcp, "tools", no_tools)
     saved = store.begin("owner", None, "Question")
     async def go():
         events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(), saved, store)
@@ -133,3 +136,23 @@ def test_retention_cascades_to_runs_and_steps(store):
     with store.sessions() as db:
         assert db.scalar(select(AssistantRun)) is None
         assert db.scalar(select(AssistantRunStep)) is None
+
+
+def test_working_notes_stay_in_trace_not_persisted_answer_or_followup(client, store, monkeypatch):
+    note = "Let me check the posts."
+    services = fake_services(monkeypatch, [
+        [text_chunk(note), tool_chunk()], [text_chunk("Final answer")], [text_chunk("Follow-up")],
+    ])
+    response = client.post("/api/v1/assistant/turn", json={"question": "Find papers"})
+    events = [json.loads(line[6:]) for line in response.text.splitlines() if line.startswith("data: ")]
+    meta = events[0]
+    run = store.show_run(meta["run_id"])
+    assert run["answer"] == "Final answer"
+    assert run["steps"][0]["text"] == note
+    assert events[1] == {"type": "working_note", "text": note}
+    conversation = client.get(f"/api/v1/assistant/conversations/{meta['conversation_id']}").json()
+    assert conversation["messages"][-1]["content"] == "Final answer"
+    client.post("/api/v1/assistant/turn", json={"question": "And next?", "conversation_id": meta["conversation_id"]})
+    history = services.model_requests[-1]["messages"]
+    assert note not in json.dumps(history)
+    assert any(m["role"] == "assistant" and m["content"] == "Final answer" for m in history)

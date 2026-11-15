@@ -115,8 +115,8 @@ def test_tool_limit_including_multi_call_reply():
 def test_output_cap_and_finalizer():
     services = FakeServices([[text_chunk("x" * 100)], [text_chunk("y" * 100)]])
     turn, _ = asyncio.run(services.run(TurnLimits(output_chars=40, final_chars=10)))
-    assert len(turn.text) == 40
-    assert turn.text == "x" * 30 + "y" * 10
+    assert turn.text == "y" * 10
+    assert sum(len(s["text"]) for s in turn.steps if s["kind"] == "model") == 40
     assert turn.status == "limit_reached"
     assert "tools" not in services.model_requests[-1]
 
@@ -167,10 +167,12 @@ def test_time_limit_stops_research_and_finalizes_with_tools_off():
     assert len(model.requests) == 1 and "tools" not in model.requests[0]
 
 
-def test_provider_error_is_plain_and_partial_text_is_kept():
+def test_provider_error_is_plain_and_working_notes_are_not_answers():
     services = FakeServices([[text_chunk("Started"), tool_chunk()], 500])
     turn, events = asyncio.run(services.run())
-    assert turn.text == "Started"
+    assert turn.text == ""
+    assert events[0] == {"type": "working_note", "text": "Started"}
+    assert turn.steps[0]["text"] == "Started"
     assert turn.status == "failed"
     assert events[-1]["type"] == "error"
     assert "private" not in json.dumps(events)
@@ -181,3 +183,34 @@ def test_bad_arguments_and_disallowed_tools_are_never_sent_to_mcp():
     turn, _ = asyncio.run(services.run())
     assert services.tool_requests == []
     assert len([step for step in turn.steps if step["kind"] == "tool" and step["error"]]) == 2
+
+
+def test_working_notes_are_separate_from_answer_and_model_history():
+    note = "Let me also check the engineering posts."
+    services = FakeServices([
+        [text_chunk("Let me also check "), text_chunk("the engineering posts."), tool_chunk()],
+        [text_chunk("The final answer."), chunk(finish="stop")],
+    ])
+    turn, events = asyncio.run(services.run())
+    assert events[0] == {"type": "working_note", "text": note}
+    assert [e["text"] for e in events if e["type"] == "text_delta"] == ["The final answer."]
+    assert turn.text == "The final answer."
+    assert turn.steps[0]["text"] == note
+    assert services.model_requests[1]["messages"][2]["content"] is None
+    assert note not in json.dumps(services.model_requests[1])
+
+
+def test_working_notes_use_output_budget_but_not_finalizer_history():
+    services = FakeServices([[text_chunk("working"), tool_chunk()], [text_chunk("answer")]])
+    turn, events = asyncio.run(services.run(TurnLimits(tool_calls=1)))
+    assert turn.text == "answer" and turn.status == "limit_reached"
+    assert events[0] == {"type": "working_note", "text": "working"}
+    assert "working" not in json.dumps(services.model_requests[-1])
+    assert "tools" not in services.model_requests[-1]
+
+
+def test_prompt_links_catalog_titles_before_original_sources():
+    from backend.services.assistant_loop import PROMPT_VERSION
+    assert PROMPT_VERSION == "cyber-assistant-v2"
+    assert "catalog_url" in SYSTEM_PROMPT
+    assert "second, shorter" in SYSTEM_PROMPT
