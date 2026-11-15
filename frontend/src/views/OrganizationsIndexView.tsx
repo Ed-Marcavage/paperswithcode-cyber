@@ -11,6 +11,11 @@ import { catalogQueryKeys, TEN_MINUTES } from "@/lib/api/queryKeys";
 
 type SortMode = "trending" | "papers" | "stars" | "name";
 
+/** Linked papers plus agent-related industry posts (other posts and repositories not
+ * counted), as the backend's "papers" sort. */
+const papersAndAgentPosts = (organization: Organization): number =>
+  (organization.paper_count ?? 0) + (organization.agent_post_count ?? 0);
+
 const parseSort = (value: string | null): SortMode =>
   value === "papers" || value === "stars" || value === "name" ? value : "trending";
 
@@ -70,7 +75,7 @@ const OrganizationsIndexView: React.FC = () => {
     if (sort === "papers") {
       return [...filtered].sort(
         (a, b) =>
-          (b.paper_count ?? 0) - (a.paper_count ?? 0) ||
+          papersAndAgentPosts(b) - papersAndAgentPosts(a) ||
           a.name.localeCompare(b.name) ||
           a.slug.localeCompare(b.slug),
       );
@@ -107,7 +112,7 @@ const OrganizationsIndexView: React.FC = () => {
             {sort === "trending"
               ? "Ranked by 30-day momentum"
               : sort === "papers"
-                ? "Sorted by linked papers"
+                ? discovery ? "Sorted by papers plus agent-related posts" : "Sorted by linked papers"
                 : sort === "stars" ? "Stars across cataloged repositories" : "Sorted A–Z"}
           </span>
         </div>
@@ -125,7 +130,7 @@ const OrganizationsIndexView: React.FC = () => {
             {(
               [
                 ["trending", "Trending"],
-                ["papers", "Most papers"],
+                ["papers", discovery ? "Most agent-related work" : "Most papers"],
                 ...(discovery ? [["stars", "Most stars"]] as const : []),
                 ["name", "A–Z"],
               ] as const
@@ -184,18 +189,27 @@ const OrganizationsIndexView: React.FC = () => {
             {organizations.map((organization) => {
               const count = organization.paper_count ?? 0;
               const showStars = discovery && sort === "stars";
+              // The "papers" sort ranks by papers plus agent-related posts, so the card leads
+              // with that sum and says how many of the posts are agent-related.
+              const showRelevant = discovery && sort === "papers";
+              const postCount = organization.post_count ?? 0;
+              const agentPosts = organization.agent_post_count ?? 0;
               const workCounts = [
                 [count, "paper", "papers"],
-                [organization.post_count ?? 0, "post", "posts"],
+                [postCount, "post", "posts"],
                 [organization.repository_count ?? 0, "repository", "repositories"],
               ] as const;
-              const [primaryCount, singular, plural] = discovery && count === 0
+              const [primaryCount, singular, plural] = showRelevant
+                ? [papersAndAgentPosts(organization), "agent-related work", "agent-related works"] as const
+                : discovery && count === 0
                 ? workCounts.reduce((largest, work) => work[0] > largest[0] ? work : largest)
                 : workCounts[0];
               const kinds = workCounts
                 .filter(([n, kind]) => (n > 0 || kind === "paper") &&
-                  (showStars || singular === "paper" || kind !== singular))
-                .map(([n, singular, plural]) => `${n} ${n === 1 ? singular : plural}`).join(" · ");
+                  (showStars || showRelevant || singular === "paper" || kind !== singular))
+                .map(([n, singular, plural]) => `${n} ${n === 1 ? singular : plural}` +
+                  (showRelevant && singular === "post" ? ` (${agentPosts} agent-related)` : ""))
+                .join(" · ");
               const githubLogin = organization.github_url?.split("/").filter(Boolean).pop();
               const years =
                 organization.first_paper_year && organization.latest_paper_year

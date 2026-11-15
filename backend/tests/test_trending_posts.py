@@ -1,4 +1,4 @@
-"""Industry posts on Trending: block selection, Posts ranking and routes."""
+"""Industry posts on Trending: the Posts view (pinned posts first, then ranked) and its route."""
 from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
@@ -8,7 +8,9 @@ from backend.database.connection import get_database_session
 from backend.main import create_app
 from backend.services import trending_posts
 from backend.services.publishers import publisher_name
-from backend.services.trending_posts import block_heading, decayed_score, post_score, rank_feed, select_block
+from backend.services.trending_posts import (
+    MIN_AGENT_RELEVANCE, agent_related, decayed_score, order_feed, pin, post_score, rank_feed,
+)
 
 ANCHOR = date(2026, 11, 12)
 
@@ -21,7 +23,8 @@ def row(paper_id, days_old, tier="featured", depth=2, originality=2, relevance=3
         post["curated"] = True
     if pin:
         post["curated_pin"] = pin
-    return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post}
+    return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post,
+            "source_url": f"https://example.com/{paper_id}"}
 
 
 def ids(rows):
@@ -31,49 +34,6 @@ def ids(rows):
 def test_score_adds_one_for_harness_engineering():
     assert post_score(row(1, 0, depth=3, originality=2)["post"]) == 5
     assert post_score(row(1, 0, depth=3, originality=2, harness=True)["post"]) == 6
-
-
-def test_block_puts_curated_first_newest_first_then_scores():
-    rows = [
-        row(1, 1, depth=4, originality=4),
-        row(2, 5, curated=True),
-        row(3, 2, curated=True, tier="catalog", relevance=0),
-        row(4, 3, depth=4, originality=3, harness=True),
-        row(5, 0, depth=2, originality=2),
-        row(6, 0, relevance=2, depth=4, originality=4),  # agent relevance too low
-        row(7, 0, tier="catalog", depth=4, originality=4),  # not featured
-        row(8, 4, depth=2, originality=2),
-        row(9, 6, depth=1, originality=1),
-    ]
-    chosen, window = select_block(rows, ANCHOR)
-    assert window == 14
-    assert ids(chosen) == ["3", "2", "1", "4", "5", "8"]
-
-
-def test_block_widens_to_30_days_when_14_give_too_few():
-    rows = [row(1, 0), row(2, 13), row(3, 14), row(4, 20), row(5, 29), row(6, 30), row(7, 31)]
-    chosen, window = select_block(rows, ANCHOR)
-    assert window == 30
-    assert ids(chosen) == ["1", "2", "3", "4", "5"]
-
-
-def test_pinned_posts_come_first_in_pin_order_whatever_their_date():
-    rows = [row(1, 0, depth=4, originality=4), row(2, 90, pin=2), row(3, 3, pin=1), row(4, 1, curated=True)]
-    chosen, _ = select_block(rows, ANCHOR, limit=3)
-    assert ids(chosen) == ["3", "2", "4"]
-
-
-def test_pins_alone_can_fill_the_block():
-    rows = [row(i, 40 + i, pin=7 - i) for i in range(1, 7)] + [row(9, 0, curated=True)]
-    chosen, _ = select_block(rows, ANCHOR)
-    assert ids(chosen) == ["6", "5", "4", "3", "2", "1"]
-
-
-def test_heading_makes_a_date_claim_only_without_pins():
-    assert block_heading(6, 6, False) == "Editor's picks from industry"
-    assert block_heading(2, 6, False) == "From industry"
-    assert block_heading(0, 6, True) == "From industry this week"
-    assert block_heading(0, 6, False) == "Recent from industry"
 
 
 def test_publisher_name_prefers_curated_then_map_then_host():
@@ -92,27 +52,101 @@ def test_posts_view_halves_score_every_seven_days():
     assert ids(rank_feed(rows, ANCHOR)) == ["2", "3", "1"]
 
 
+class FakeSession:
+    """Answers anchor_date's scalar and the Posts view's row query, applying its SQL filters
+    (featured or pinned, inside the date window)."""
+
+    def __init__(self, rows):
+        self.rows = rows
+
+    def scalar(self, statement):
+        return ANCHOR
+
+    def execute(self, statement, params=None):
+        start, end = (params or {}).get("start"), (params or {}).get("end")
+        rows = [r for r in self.rows
+                if (r["post"]["tier"] == "featured" or "curated_pin" in r["post"])
+                and (start is None or r["date_published"] >= start)
+                and (end is None or r["date_published"] <= end)]
+        return type("Result", (), {"mappings": lambda _: iter(rows)})()
+
+
+def test_threshold_is_three():
+    assert MIN_AGENT_RELEVANCE == 3
+    assert [agent_related({"agent_relevance": n}) for n in range(5)] == [False, False, False, True, True]
+    assert not agent_related({})
+
+
+def test_posts_view_lists_only_agent_related_posts():
+    rows = [row(n, n, relevance=n % 5, depth=4) for n in range(10)]
+    page, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=3)
+    assert total == 4  # relevance 3 or 4: papers 3, 4, 8, 9
+    assert ids(page) == ["3", "4", "8"]
+    assert page[0]["publisher"] == "example.com"
+    assert page[0]["date_published"] == (ANCHOR - timedelta(days=3)).isoformat()
+    assert trending_posts.posts_feed_ids(FakeSession(rows), page=2, page_size=3) == ([9], 4)
+
+
+def test_pin_reads_positive_pin_numbers_only():
+    assert pin({"curated_pin": 2}) == 2
+    assert pin({"curated": True}) is None
+    assert pin({"curated_pin": 0}) is None
+    assert pin({"curated_pin": "1"}) is None
+
+
+def test_pinned_posts_lead_in_pin_order_whatever_their_date_tier_or_relevance():
+    rows = [
+        row(1, 0, depth=4, originality=4),
+        row(2, 90, pin=2),  # old
+        row(3, 3, pin=1, relevance=0, tier="catalog"),  # neither featured nor agent-related
+        row(4, 1, curated=True, depth=1, originality=1),  # curated, not pinned: ranked like any post
+        row(5, 2, depth=3, originality=3),
+        row(6, 0, relevance=2, depth=4, originality=4),  # not agent-related, not pinned
+        row(7, 0, tier="catalog"),  # not featured, not pinned
+    ]
+    ordered = order_feed(rows, ANCHOR, page_size=30)
+    assert ids(ordered) == ["3", "2", "1", "5", "4"]
+
+
+def test_pinned_posts_are_not_repeated_in_the_ranked_rows():
+    rows = [row(1, 0, depth=4, originality=4, pin=2), row(2, 0, depth=1, originality=1, pin=1), row(3, 1)]
+    ordered = order_feed(rows, ANCHOR, page_size=30)
+    assert ids(ordered) == ["2", "1", "3"]
+    assert len(ids(ordered)) == len(set(ids(ordered)))
+
+
+def test_pinned_posts_fill_the_first_page_only():
+    rows = [row(n, n, depth=4, originality=4) for n in range(1, 8)] + [row(10 + n, 50, pin=n) for n in range(1, 4)]
+    first, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=5)
+    second, _ = trending_posts.posts_feed(FakeSession(rows), page=2, page_size=5)
+    assert total == 10
+    assert ids(first) == ["11", "12", "13", "1", "2"]
+    assert ids(second) == ["3", "4", "5", "6", "7"]
+    assert not any(pin(r["post"]) for r in second)
+
+
+def test_pins_beyond_one_page_fall_back_to_the_ranking():
+    rows = [row(n, 0, pin=n) for n in range(1, 4)] + [row(4, 0, pin=4, relevance=0)]
+    ordered = order_feed(rows, ANCHOR, page_size=2)
+    # Pins 3 and 4 do not fit on the first page: 3 is ranked like any post, 4 is not agent-related.
+    assert ids(ordered) == ["1", "2", "3"]
+
+
+def test_a_date_window_keeps_only_pinned_posts_inside_it_and_they_still_lead():
+    rows = [row(1, 2, pin=1), row(2, 40, pin=2), row(3, 1, depth=4, originality=4), row(4, 20)]
+    week, total = trending_posts.posts_feed(
+        FakeSession(rows), 1, 30, start_date=ANCHOR - timedelta(days=7), end_date=ANCHOR)
+    assert (ids(week), total) == (["1", "3"], 2)
+    older, _ = trending_posts.posts_feed(
+        FakeSession(rows), 1, 30, start_date=ANCHOR - timedelta(days=60), end_date=ANCHOR - timedelta(days=10))
+    assert ids(older) == ["2", "4"]
+
+
 def make_client(monkeypatch):
     monkeypatch.setattr(get_settings(), "discovery_catalog", True)
     app = create_app()
     app.dependency_overrides[get_database_session] = lambda: object()
     return TestClient(app)
-
-
-def test_highlights_route(monkeypatch):
-    seen = []
-
-    def industry_block(db, limit):
-        seen.append(limit)
-        return {"anchor_date": "2026-11-12", "window_days": 14, "this_week": True, "results": []}
-
-    monkeypatch.setattr(trending_posts, "industry_block", industry_block)
-    client = make_client(monkeypatch)
-    response = client.get("/api/v1/catalog/trending-posts/highlights")
-    assert response.status_code == 200
-    assert response.json()["window_days"] == 14
-    assert seen == [6]
-    assert client.get("/api/v1/catalog/trending-posts/highlights?limit=50").status_code == 422
 
 
 def test_posts_feed_route_passes_paging_and_dates(monkeypatch):
@@ -128,3 +162,7 @@ def test_posts_feed_route_passes_paging_and_dates(monkeypatch):
     assert response.status_code == 200
     assert response.json()["results"] == []
     assert seen == [(2, 10, date(2026, 11, 1), None)]
+
+
+def test_the_separate_highlights_route_is_gone(monkeypatch):
+    assert make_client(monkeypatch).get("/api/v1/catalog/trending-posts/highlights").status_code == 404

@@ -18,13 +18,35 @@ from backend.utils.urls import get_paper_route_identifier
 PAGE_SIZE = 25
 SITEMAP_SIZE = 1000
 AXES = ("topic", "target", "contribution", "kind", "year")
-HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses | Papers With Code Cyber"
-HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
+# Keep aligned with frontend/src/lib/cyberCopy.ts (cyberHomeTitle, cyberHomeDescription).
+# "/" lists industry posts and papers, so both are named; the papers wording is unchanged.
+HOME_TITLE = "AI Pentesting Tools & Security Agent Harnesses: Papers & Posts | Papers With Code Cyber"
+HOME_DESCRIPTION = "Explore AI pentesting tools, security agent harnesses, industry posts, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering."
 CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
-# Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote).
-INDUSTRY_NOTE = "The block at the top shows hand-picked industry engineering posts."
-FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+# Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote,
+# cyberTrendingPostsDescription, cyberTrendingPapersDescription).
+INDUSTRY_NOTE = "The posts list starts with the editor's picks, then ranks other posts about AI agents."
+# React's Trending switch opens on posts (?kind=paper shows papers); the server page
+# lists both feeds, posts first, so crawlers keep the paper links. Pinned posts lead
+# the posts list, labelled like React's "Editor's pick" badge.
+POSTS_HEADING = "Trending posts about AI agents"
+EDITORS_PICK = "Editor's pick"
+POSTS_FEED_DESCRIPTION = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
+PAPERS_FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
+
+
+def _post_link(row: dict) -> DiscoveryPaperLink:
+    """A row of Trending's posts feed as a page link; pinned posts are marked as editor's picks."""
+    publisher = row.get("publisher") or ""
+    label = " · ".join(value for value in (
+        EDITORS_PICK if trending_posts.pin(row["post"]) is not None else "", publisher) if value)
+    return DiscoveryPaperLink(
+        quote(row["reference"], safe=""),
+        row["post"].get("curated_title") or row["title"],
+        date.fromisoformat(row["date_published"]),
+        label,
+    )
 
 
 def homepage(db: Session, params) -> DiscoveryPage:
@@ -33,19 +55,12 @@ def homepage(db: Session, params) -> DiscoveryPage:
         for key in ("start_date", "end_date")
         if params.get(key)
     }
+    # ?kind only picks React's tab: every kind gets the same page, with both lists.
+    posts, _ = trending_posts.posts_feed(
+        db, 1, 20, dates.get("start_date"), dates.get("end_date")
+    )
     papers = PaperService(db).get_papers(
         page=1, page_size=20, order_by="trending", latest_only=True, **dates
-    )
-    # The same industry block React shows above the feed, so the links are crawlable.
-    block = trending_posts.industry_block(db)
-    highlights = tuple(
-        DiscoveryPaperLink(
-            quote(row["reference"], safe=""),
-            row["post"].get("curated_title") or row["title"],
-            date.fromisoformat(row["date_published"]),
-            row.get("publisher") or "",
-        )
-        for row in block["results"]
     )
     return DiscoveryPage(
         kind="Cybersecurity research",
@@ -53,14 +68,20 @@ def homepage(db: Session, params) -> DiscoveryPage:
         title=HOME_TITLE,
         description=HOME_DESCRIPTION,
         heading="Trending Research",
-        body_markdown=HOME_DESCRIPTION + " " + INDUSTRY_NOTE + "\n\n" + FEED_DESCRIPTION,
-        highlight_heading=block["heading"],
-        highlight_links=highlights,
+        body_markdown=HOME_DESCRIPTION
+        + " "
+        + INDUSTRY_NOTE
+        + "\n\n"
+        + POSTS_FEED_DESCRIPTION
+        + "\n\n"
+        + PAPERS_FEED_DESCRIPTION,
         breadcrumbs=(),
         entity_links=(
             DiscoveryLink("/catalog", "Browse catalog"),
             DiscoveryLink("/mcp", "Connect an agent"),
         ),
+        post_heading=POSTS_HEADING,
+        post_links=tuple(_post_link(row) for row in posts),
         paper_links=tuple(
             DiscoveryPaperLink(
                 get_paper_route_identifier(p.source, p.arxiv_id, int(p.id)),

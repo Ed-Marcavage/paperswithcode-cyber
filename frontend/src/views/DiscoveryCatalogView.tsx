@@ -8,7 +8,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { isAssistantEnabled } from "@/lib/apiUrl";
 import { AssistantCatalogLink } from "@/components/assistant/AssistantCatalogLink";
 import { axes, type Axis, browseQuery, type DiscoveryWork, filtersQuery } from "@/lib/api/discovery";
-import { POST_TYPE_LABELS, postTypeLabel, publisherHost } from "@/lib/industryPost";
+import { isEditorsPick, POST_TYPE_LABELS, postTypeLabel, publisherHost } from "@/lib/industryPost";
 import "./DiscoveryCatalog.css";
 
 const PAGE = 25;
@@ -154,7 +154,7 @@ function PostSummary({ work, details }: { work: DiscoveryWork; details: string[]
   return <>
     <span className="discovery-post-meta">
       {post?.tier === "featured" && <FeaturedChip />}
-      {post?.curated && <EditorsPickChip />}
+      {isEditorsPick(post) && <EditorsPickChip />}
       <small>{meta.join(" · ")}</small>
     </span>
     {post?.tldr && <p className="discovery-tldr">{post.tldr}</p>}

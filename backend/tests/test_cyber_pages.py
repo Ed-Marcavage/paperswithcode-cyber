@@ -39,16 +39,17 @@ ROWS = [
     for n in range(51)
 ]
 
-BLOCK = {
-    "heading": "Editor's picks from industry",
-    "results": [
-        {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
-         "date_published": "2026-10-27", "publisher": "Google Project Zero",
-         "post": {"curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
-        {"reference": "77", "title": "Plain post", "date_published": "2026-11-09",
-         "publisher": "Endor Labs", "post": {}},
-    ],
-}
+FEED = [
+    {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
+     "date_published": "2026-10-27", "publisher": "Google Project Zero",
+     "post": {"curated": True, "curated_pin": 1,
+              "curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
+    {"reference": "301", "title": "Agent harness for code audit", "date_published": "2026-11-10",
+     "publisher": "Endor Labs", "post": {"agent_relevance": 4}},
+    {"reference": "302", "title": "Raw title", "date_published": "2026-11-09",
+     "publisher": "Wiz", "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3}},
+]
+
 
 
 @pytest.fixture
@@ -84,7 +85,10 @@ def client(monkeypatch, tmp_path):
             "results": ROWS[offset : offset + limit],
         },
     )
-    monkeypatch.setattr(trending_posts, "industry_block", lambda db: BLOCK)
+    monkeypatch.setattr(
+        trending_posts, "posts_feed",
+        lambda db, page, page_size, start_date=None, end_date=None: (FEED, len(FEED)),
+    )
     monkeypatch.setattr(pages, "catalog_count", lambda db: len(ROWS))
     monkeypatch.setattr(pages, "sitemap_papers", lambda db, page: ROWS)
     app = create_app()
@@ -315,15 +319,93 @@ def test_existing_catalog_api_is_not_intercepted(client):
     assert len(response.json()["results"]) == 2
 
 
-def test_homepage_lists_the_industry_block_in_html_and_markdown(client):
+def test_homepage_lists_pinned_posts_first_as_editors_picks_without_a_separate_block(client):
     html = BeautifulSoup(client.get("/").text, "html.parser")
-    section = html.select_one('#root main section[aria-labelledby="highlights-heading"]')
-    assert section.h2.text == "Editor's picks from industry"
-    links = [(a["href"], a.text) for a in section.select("a")]
-    assert links == [("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"), ("/paper/77", "Plain post")]
-    assert "Google Project Zero · 2026-10-27" in section.text
-    assert "hand-picked industry engineering posts" in html.select_one("#root main header").text
+    main = html.select_one("#root main")
+    assert main.select_one('section[aria-labelledby="highlights-heading"]') is None
+    items = main.select('section[aria-labelledby="posts-heading"] li')
+    assert items[0].a["href"] == "/paper/5289"
+    assert items[0].a.text == "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"
+    assert "Editor's pick · Google Project Zero · 2026-10-27" in items[0].text
+    assert not any("Editor's pick" in item.text for item in items[1:])
+    header = main.select_one("header").text
+    assert "The posts list starts with the editor's picks, then ranks other posts about AI agents." in header
+    assert "hand-picked" not in header and "block" not in header
     markdown = client.get("/index.md").text
-    assert "## Editor's picks from industry" in markdown
-    assert f"- [Plain post]({ORIGIN}/paper/77) — Endor Labs · 2026-11-09" in markdown
-    assert markdown.index("Editor's picks") < markdown.index("## Relevant papers")
+    assert "Editor's picks from industry" not in markdown
+    assert (f"1. [Fuzzers vs\\. AI, Comparing Fuzzilli and BigSleep]({ORIGIN}/paper/5289)"
+            " — Editor's pick · Google Project Zero · 2026-10-27") in markdown
+    assert f"2. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
+
+
+def test_homepage_lists_posts_then_papers_for_every_kind(client):
+    response = client.get("/")
+    html = BeautifulSoup(response.text, "html.parser")
+    main = html.select_one("#root main")
+    posts = main.select_one('section[aria-labelledby="posts-heading"]')
+    papers = main.select_one('section[aria-labelledby="papers-heading"]')
+    assert posts.h2.text == "Trending posts about AI agents"
+    assert [(a["href"], a.text) for a in posts.select("a")] == [
+        ("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"),
+        ("/paper/301", "Agent harness for code audit"), ("/paper/302", "Evaluating security agents")]
+    assert "Endor Labs · 2026-11-10" in posts.text
+    assert papers.h2.text == "Relevant papers"
+    assert [(a["href"], a.text) for a in papers.select("a")] == [
+        ("/paper/2610.34435", "Security agents & harnesses")]
+    sections = [section["aria-labelledby"] for section in main.select("section")]
+    assert sections == ["posts-heading", "papers-heading"]
+    header = main.select_one("header").text
+    assert "featured posts about AI agents" in header and "GitHub star growth" in header
+    assert html.title.text == pages.HOME_TITLE
+    assert "Papers & Posts" in pages.HOME_TITLE
+    assert html.select_one('meta[name="description"]')["content"] == pages.HOME_DESCRIPTION
+    assert "industry posts, papers, code and benchmarks" in pages.HOME_DESCRIPTION
+    assert html.select_one('link[rel="canonical"]')["href"] == ORIGIN + "/"
+    assert html.select_one('meta[name="robots"]')["content"] == "index,follow"
+    assert response.headers["x-robots-tag"] == "index,follow"
+
+    # ?kind only selects React's tab; the server page and its robots rule are the same.
+    for kind in ("paper", "post"):
+        variant = client.get(f"/?kind={kind}")
+        assert variant.text == response.text
+        assert variant.headers["x-robots-tag"] == "index,follow"
+        assert client.get(f"/index.md?kind={kind}").text == client.get("/index.md").text
+
+    markdown = client.get("/index.md").text
+    assert f"2. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
+    assert f"1. [Security agents & harnesses]({ORIGIN}/paper/2610.34435)" in markdown
+    assert markdown.index("## Trending posts about AI agents") < markdown.index("## Relevant papers")
+    assert "featured posts about AI agents" in markdown and "GitHub star growth" in markdown
+
+
+def test_homepage_keeps_the_trending_papers_query_and_date_window_robots(client, monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        PaperService, "get_papers",
+        lambda self, **kw: calls.append(("papers", kw)) or SimpleNamespace(results=[PAPER]),
+    )
+    monkeypatch.setattr(
+        trending_posts, "posts_feed",
+        lambda db, page, page_size, start_date=None, end_date=None:
+            calls.append(("posts", (page, page_size, start_date, end_date))) or (FEED, len(FEED)),
+    )
+    client.get("/?kind=paper")
+    # The same paper query "/" made before it listed posts.
+    assert calls == [("posts", (1, 20, None, None)),
+                     ("papers", {"page": 1, "page_size": 20, "order_by": "trending", "latest_only": True})]
+    calls.clear()
+    window = client.get("/?start_date=2026-11-01&end_date=2026-11-07")
+    window_dates = (date(2026, 11, 1), date(2026, 11, 7))
+    assert calls == [("posts", (1, 20, *window_dates)),
+                     ("papers", {"page": 1, "page_size": 20, "order_by": "trending", "latest_only": True,
+                                 "start_date": window_dates[0], "end_date": window_dates[1]})]
+    assert window.headers["x-robots-tag"] == "noindex,follow"
+    html = BeautifulSoup(window.text, "html.parser")
+    assert html.select_one('link[rel="canonical"]')["href"] == ORIGIN + "/"
+    assert client.get("/?kind=paper&start_date=2026-11-01").headers["x-robots-tag"] == "noindex,follow"
+
+
+def test_other_pages_keep_one_relevant_papers_list(client):
+    html = BeautifulSoup(client.get("/catalog").text, "html.parser")
+    assert html.select_one('#root main section[aria-labelledby="posts-heading"]') is None
+    assert "## Trending posts" not in client.get("/catalog.md").text

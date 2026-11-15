@@ -101,44 +101,26 @@ def render_discovery_document(page: DiscoveryPage) -> str:
     trends = "".join(
         f"<li>{markdown_inline_html(item)}</li>" for item in page.trends_markdown
     )
-    paper_links = "".join(
-        "<li><article><h3>"
-        f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
-        f"{escape(paper.title)}</a></h3><p>"
-        f"{escape(paper.context_label)}"
-        + (f" · {paper.published.isoformat()}" if paper.published else "")
-        + "</p></article></li>"
-        for paper in page.paper_links
-    )
-    empty = "<p>No eligible public papers are currently linked to this page.</p>"
-    highlights = "".join(
-        "<li><article><h3>"
-        f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
-        f"{escape(paper.title)}</a></h3><p>"
-        + " · ".join(
-            value
-            for value in (
-                escape(paper.context_label),
-                paper.published.isoformat() if paper.published else "",
-            )
-            if value
+    def ranked_items(links: tuple[DiscoveryPaperLink, ...]) -> str:
+        return "".join(
+            "<li><article><h3>"
+            f'<a href="/paper/{escape(paper.route_identifier, quote=True)}">'
+            f"{escape(paper.title)}</a></h3><p>"
+            f"{escape(paper.context_label)}"
+            + (f" · {paper.published.isoformat()}" if paper.published else "")
+            + "</p></article></li>"
+            for paper in links
         )
-        + "</p></article></li>"
-        for paper in page.highlight_links
-    )
+
+    paper_links = ranked_items(page.paper_links)
+    post_links = ranked_items(page.post_links)
+    empty = "<p>No eligible public papers are currently linked to this page.</p>"
     return (
         '<main hidden data-pwc-initial-document="discovery">'
         + (f'<nav aria-label="Breadcrumb">{breadcrumbs}</nav>' if breadcrumbs else "")
         + f"<header><p>{escape(page.kind)}</p><h1>{escape(page.heading)}</h1>"
         + markdown_html(page.body_markdown or page.description)
         + "</header>"
-        + (
-            '<section aria-labelledby="highlights-heading">'
-            f'<h2 id="highlights-heading">{escape(page.highlight_heading or "")}</h2>'
-            f"<ul>{highlights}</ul></section>"
-            if highlights
-            else ""
-        )
         + (_top_models_section(page) if page.top_models else "")
         + (
             '<section aria-labelledby="trends-heading">'
@@ -162,6 +144,13 @@ def render_discovery_document(page: DiscoveryPage) -> str:
         + (
             f'<nav aria-label="Related research topics"><ul>{entity_links}</ul></nav>'
             if entity_links
+            else ""
+        )
+        + (
+            '<section aria-labelledby="posts-heading">'
+            f'<h2 id="posts-heading">{escape(page.post_heading or "")}</h2>'
+            f"<ol>{post_links}</ol></section>"
+            if post_links
             else ""
         )
         + (

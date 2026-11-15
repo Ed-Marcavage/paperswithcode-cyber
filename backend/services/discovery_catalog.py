@@ -53,15 +53,30 @@ def _facet_counts(db: Session, axes: list[str], params: dict, post_where: str) -
     return counts
 
 
-def browse(db: Session, filters: dict, limit: int, offset: int, include_facet_counts: bool = False,
-           tier: str = "", post_type: str = "", featured_first: bool = False) -> dict:
-    """Facet filters, plus optional industry-post filters (tier, post type) and ordering."""
-    params = {"facets": json.dumps({k: [v] for k, v in filters.items() if v}),
-              "limit": limit, "offset": offset, "tier": tier, "post_type": post_type}
-    post_where = "".join([
+def _post_where(tier: str, post_type: str, min_agent_relevance: int | None) -> str:
+    """SQL conditions for the industry-post filters.
+
+    ``min_agent_relevance`` drops posts reviewed below it (a post without a
+    review score counts as 0). Papers and other non-post works have no
+    post_details and stay; combine with ``kind=post`` to list posts only."""
+    return "".join([
         " AND w.post_details ->> 'tier' = :tier" if tier else "",
         " AND w.post_details ->> 'post_type' = :post_type" if post_type else "",
+        " AND (NOT w.facets -> 'kind' ? 'post'"
+        " OR coalesce((w.post_details ->> 'agent_relevance')::int, 0) >= :min_agent_relevance)"
+        if min_agent_relevance is not None else "",
     ])
+
+
+def browse(db: Session, filters: dict, limit: int, offset: int, include_facet_counts: bool = False,
+           tier: str = "", post_type: str = "", featured_first: bool = False,
+           min_agent_relevance: int | None = None) -> dict:
+    """Facet filters, plus optional industry-post filters (tier, post type, minimum agent
+    relevance) and ordering."""
+    params = {"facets": json.dumps({k: [v] for k, v in filters.items() if v}),
+              "limit": limit, "offset": offset, "tier": tier, "post_type": post_type,
+              "min_agent_relevance": min_agent_relevance}
+    post_where = _post_where(tier, post_type, min_agent_relevance)
     where = " WHERE w.facets @> CAST(:facets AS jsonb)" + post_where
     order = "(w.post_details ->> 'tier' = 'featured') DESC NULLS LAST, " if featured_first else ""
     total = db.scalar(text("SELECT count(*) FROM discovery_works w" + where), params)

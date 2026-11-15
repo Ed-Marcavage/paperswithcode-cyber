@@ -8,6 +8,12 @@ import type { Organizations } from "@/lib/api/catalog.types";
 import { catalogApi } from "@/lib/api/catalog";
 import OrganizationsIndexView from "@/views/OrganizationsIndexView";
 
+const flags = vi.hoisted(() => ({ discovery: false }));
+vi.mock("@/lib/apiUrl", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@/lib/apiUrl")>()),
+  isDiscoveryCatalog: () => flags.discovery,
+}));
+
 const payload: Organizations = {
   count: 3,
   results: [
@@ -85,7 +91,10 @@ function renderView(initialEntry = "/organizations") {
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  flags.discovery = false;
+});
 
 describe("OrganizationsIndexView", () => {
   it("renders the shared page header and compact cards with canonical full-tile links", async () => {
@@ -124,6 +133,48 @@ describe("OrganizationsIndexView", () => {
       ),
     );
     expect(screen.queryByText("#2")).not.toBeInTheDocument();
+  });
+
+  const org = (id: string, name: string, paper_count: number, post_count: number, agent_post_count: number,
+    repository_count = 0) => ({
+    ...payload.results[2], id, name, slug: name.toLowerCase(), hf_slug: null,
+    paper_count, post_count, agent_post_count, repository_count,
+  });
+
+  it("sorts Most papers by papers plus agent-related posts outside the catalog", async () => {
+    vi.spyOn(catalogApi, "organizationIndex").mockResolvedValue({
+      count: 3,
+      results: [org("1", "Twopapers", 2, 0, 0), org("2", "Manyrepos", 1, 0, 0, 50), org("3", "Agentposts", 0, 4, 3)],
+    });
+    renderView("/organizations?sort=papers");
+    await screen.findByRole("heading", { name: "Agentposts" });
+    expect(screen.getByText("Sorted by linked papers")).toBeInTheDocument();
+    const names = screen.getAllByRole("heading", { level: 3 }).map((heading) => heading.textContent);
+    expect(names).toEqual(["Agentposts", "Twopapers", "Manyrepos"]);
+  });
+
+  it("shows the agent-related count on catalog cards for Most agent-related work", async () => {
+    flags.discovery = true;
+    const spy = vi.spyOn(catalogApi, "organizationIndex").mockResolvedValue({
+      count: 2,
+      // Backend order: 2 papers + 5 agent-related posts outranks 145 posts with 3 agent-related.
+      results: [org("1", "Agentlab", 2, 9, 5, 1), org("2", "Volume", 0, 145, 3)],
+    });
+    const view = renderView("/organizations?sort=papers");
+    await screen.findByRole("heading", { name: "Agentlab" });
+    expect(spy).toHaveBeenCalledWith("papers");
+    expect(screen.getByRole("button", { name: "Most agent-related work" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByText("Sorted by papers plus agent-related posts")).toBeInTheDocument();
+    const metrics = [...view.container.querySelectorAll(".organization-card-metrics")].map((node) => node.textContent);
+    expect(metrics).toEqual([
+      "7agent-related works2 papers · 9 posts (5 agent-related) · 1 repository",
+      "3agent-related works0 papers · 145 posts (3 agent-related)",
+    ]);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Trending" }));
+    await screen.findByText("Ranked by 30-day momentum");
+    expect(view.container.querySelector(".organization-card-metrics")?.textContent).toBe(
+      "2papers2 papers · 9 posts · 1 repository");
   });
 
   it("uses a styled fallback when an image fails", async () => {

@@ -3,6 +3,7 @@
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from backend.models.organizations import Organization
+from backend.services.trending_posts import MIN_AGENT_RELEVANCE
 
 
 def with_catalog_metrics(
@@ -14,12 +15,17 @@ def with_catalog_metrics(
     # EXISTS limits ownership to cataloged repos without multiplying their stars
     # when several papers link to the same repo. Only credited (is_official) links
     # count, so a post citing another company's repository adds nothing.
+    # agent_post_count is the posts Trending would call agent-related (review agent
+    # relevance of at least MIN_AGENT_RELEVANCE, any tier; no score counts as 0).
     rows = db.execute(
         text("""
         WITH kinds AS (
             SELECT po.organization_id,
                    count(*) FILTER (WHERE w.facets->'kind' ? 'paper') AS papers,
                    count(*) FILTER (WHERE w.facets->'kind' ? 'post') AS posts,
+                   count(*) FILTER (WHERE w.facets->'kind' ? 'post' AND coalesce(
+                       (w.post_details->>'agent_relevance')::numeric, 0) >= :min_agent_relevance
+                   ) AS agent_posts,
                    count(*) FILTER (WHERE w.facets->'kind' ? 'repository') AS tools
             FROM paper_organizations po JOIN discovery_works w ON w.paper_id=po.paper_id
             GROUP BY po.organization_id
@@ -34,12 +40,13 @@ def with_catalog_metrics(
             GROUP BY o.id
         )
         SELECT o.id, coalesce(k.papers,0) AS paper_count, coalesce(k.posts,0) AS post_count,
+               coalesce(k.agent_posts,0) AS agent_post_count,
                coalesce(k.tools,0) AS repository_count, coalesce(s.repos,0) AS owned_repository_count,
                s.stars AS catalog_stars
         FROM organizations o LEFT JOIN kinds k ON k.organization_id=o.id
         LEFT JOIN owned s ON s.id=o.id WHERE o.id = ANY(:ids)
     """),
-        {"ids": [int(org.id) for org in organizations]},
+        {"ids": [int(org.id) for org in organizations], "min_agent_relevance": MIN_AGENT_RELEVANCE},
     ).mappings()
     metrics = {
         str(row["id"]): {k: v for k, v in row.items() if k != "id"} for row in rows

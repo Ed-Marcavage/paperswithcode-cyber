@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { Link, MemoryRouter } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
+import { cyberHomeDescription, cyberHomeTitle } from "@/lib/cyberCopy";
 import { CyberMetadata } from "./CyberMetadata";
 
 const state = vi.hoisted(() => ({ data: undefined as object | undefined, isPending: false }));
@@ -30,4 +31,20 @@ it("preserves selected facets and removes stale paper structured data on navigat
   fireEvent.click(screen.getByText("Developers"));
   expect(canonical()).toBeUndefined();
   expect(document.querySelector('link[type="text/markdown"]')).toBeNull();
+});
+
+it("indexes the home page for every Trending tab and names posts and papers", () => {
+  render(<MemoryRouter initialEntries={["/?kind=paper"]}><CyberMetadata /><Link to="/?kind=post">Posts</Link><Link to="/?start_date=2026-11-01">Window</Link></MemoryRouter>);
+  const robots = () => document.querySelector('meta[name="robots"]')?.getAttribute("content");
+  expect(document.title).toBe(cyberHomeTitle);
+  expect(document.title).toContain("Papers & Posts");
+  expect(document.querySelector('meta[name="description"]')).toHaveAttribute("content", cyberHomeDescription);
+  expect(canonical()).toBe("https://paperswithcode-cyber.com/");
+  expect(robots()).toBe("index,follow");
+  fireEvent.click(screen.getByText("Posts"));
+  expect(canonical()).toBe("https://paperswithcode-cyber.com/");
+  expect(robots()).toBe("index,follow");
+  fireEvent.click(screen.getByText("Window"));
+  expect(canonical()).toBe("https://paperswithcode-cyber.com/");
+  expect(robots()).toBe("noindex,follow");
 });

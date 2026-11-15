@@ -39,6 +39,11 @@ class Organization(BaseModel):
         0, description="Number of papers linked to this organization"
     )
     post_count: Optional[int] = None
+    agent_post_count: Optional[int] = Field(
+        None,
+        description="Industry posts whose review agent relevance is at least Trending's "
+        "MIN_AGENT_RELEVANCE (any tier); catalog mode only",
+    )
     repository_count: Optional[int] = None
     owned_repository_count: Optional[int] = None
     catalog_stars: Optional[int] = None

@@ -27,18 +27,16 @@ def papers(topic: str = "", target: str = "", contribution: str = "", kind: str 
            tier: Literal["", "featured", "catalog"] = Query("", description="Industry post tier"),
            post_type: str = Query("", max_length=64, description="Industry post type slug"),
            order: Literal["", "featured"] = Query("", description="`featured` lists featured posts first"),
+           min_agent_relevance: int | None = Query(
+               None, ge=0, le=4,
+               description="Leave out industry posts whose review agent relevance (0-4) is below this. "
+                           "Papers are not filtered; add `kind=post` for posts only. Trending uses "
+                           f"{trending_posts.MIN_AGENT_RELEVANCE}."),
            db: Session = Depends(get_database_session)):
     facets = dict(topic=topic, target=target, contribution=contribution, kind=kind, year=year)
     return discovery_catalog.browse(db, facets, limit, offset, include_facet_counts,
-                                    tier=tier, post_type=post_type, featured_first=order == "featured")
-
-
-@router.get("/trending-posts/highlights", summary="Industry posts for the top of Trending")
-def trending_post_highlights(limit: int = Query(trending_posts.BLOCK_LIMIT, ge=1, le=12),
-                             db: Session = Depends(get_database_session)):
-    """Curated posts first, then featured posts with agent relevance of at least 3, from the
-    last 14 days before the newest post (30 days when 14 give too few)."""
-    return trending_posts.industry_block(db, limit)
+                                    tier=tier, post_type=post_type, featured_first=order == "featured",
+                                    min_agent_relevance=min_agent_relevance)
 
 
 @router.get("/trending-posts", response_model=Papers, summary="Featured industry posts ranked for Trending")
@@ -46,7 +44,9 @@ def trending_posts_feed(page: int = Query(1, ge=1), page_size: int = Query(30, g
                         include_resources: bool = False,
                         date_range: PaperDateRange = Depends(get_paper_date_range),
                         db: Session = Depends(get_database_session)):
-    """Featured posts ranked by review score, halved for every 7 days since publication."""
+    """The owner's pinned posts first, in pin order (first page only; a date window keeps only
+    the pinned posts inside it), then featured posts whose agent relevance meets Trending's
+    threshold, ranked by review score halved for every 7 days since publication."""
     ids, total = trending_posts.posts_feed_ids(db, page, page_size, date_range.start_date, date_range.end_date)
     by_id = {paper.id: paper for paper in db.query(DBPaper).filter(DBPaper.id.in_(ids))} if ids else {}
     service = PaperService(db)
