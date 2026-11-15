@@ -339,6 +339,8 @@
   transition: text-decoration-color 0.15s;
 }
 .assistant-markdown a:hover { text-decoration-color: currentColor; }
+/* Links off the site open in a new tab; a small arrow says so. */
+.assistant-markdown .assistant-external-link .assistant-icon { display: inline-block; margin-left: 0.2em; vertical-align: -0.05em; opacity: 0.75; }
 .assistant-markdown :is(h1, h2, h3) { margin: 1.3em 0 0.45em; font-family: var(--serif); font-weight: 600; line-height: 1.3; letter-spacing: -0.01em; color: var(--ink); }
 .assistant-markdown h1 { font-size: 1.4em; }
 .assistant-markdown h2 { font-size: 1.28em; }

@@ -7,6 +7,7 @@ const paths = {
   plus: <path d="M8 3v10M3 8h10" />,
   close: <path d="M4 4l8 8M12 4l-8 8" />,
   chats: <path d="M2.5 4h11M2.5 8h11M2.5 12h7" />,
+  external: <path d="M9.5 2.5h4v4M13.5 2.5L8 8M11.5 9.5v4h-9v-9h4" />,
   expand: <path d="M9.5 2.5h4v4M13.5 2.5L9 7M6.5 13.5h-4v-4M2.5 13.5L7 9" />,
   pencil: <path d="M10.5 3l2.5 2.5L6 12.5H3.5V10L10.5 3z" />,
   trash: <path d="M3 4.5h10M6.5 4.5V3h3v1.5M4.5 4.5l.6 8.5h5.8l.6-8.5" />,

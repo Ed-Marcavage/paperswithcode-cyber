@@ -14,7 +14,7 @@ it("renders only safe evidence or site links, with no HTML or images", () => {
   expect(container.querySelectorAll("img")).toHaveLength(0);
   expect(screen.getByText("Safe").tagName).toBe("STRONG");
   expect(screen.getAllByRole("link")).toHaveLength(2);
-  expect(screen.getByRole("link", { name: "proof" })).toHaveAttribute("href", "https://example.com/evidence");
+  expect(screen.getByRole("link", { name: "proof (opens in a new tab)" })).toHaveAttribute("href", "https://example.com/evidence");
   for (const href of ["//evil.test", "/\\evil.test", "javascript:alert(1)", "data:text/html,x", "https://u:p@example.com"]) {
     expect(allowedLink(href, new Set([href]))).toBeNull();
   }
@@ -59,4 +59,41 @@ it("does not turn a bare word or relative path into a link", () => {
     expect(allowedLink(href, new Set())).toBeNull();
   }
   expect(allowedLink("/paper/123", new Set())).toEqual({ href: "/paper/123", local: true });
+});
+
+it("opens evidence links off the site in a new tab with an indicator, and site links through the router", () => {
+  const external = "https://shopify.engineering/cyber-chaos-monkey";
+  render(<MemoryRouter initialEntries={["/catalog"]}>
+    <AssistantMarkdown streaming={false} evidence={new Set([external])}
+      text={`See [Cyber Chaos Monkey](${external}) and [the catalog](/catalog?kind=post) or [Wiz](https://paperswithcode-cyber.com/paper/1012).`} />
+    <Routes><Route path="/paper/1012" element={<p>Wiz page</p>} /><Route path="*" element={null} /></Routes>
+  </MemoryRouter>);
+  const out = screen.getByRole("link", { name: /Cyber Chaos Monkey/ });
+  expect(out).toHaveAttribute("href", external);
+  expect(out).toHaveAttribute("target", "_blank");
+  expect(out).toHaveAttribute("rel", "noopener noreferrer");
+  expect(out).toHaveAccessibleName("Cyber Chaos Monkey (opens in a new tab)");
+  expect(out.querySelector("svg.assistant-icon")).not.toBeNull();
+  for (const name of ["the catalog", "Wiz"]) {
+    const link = screen.getByRole("link", { name });
+    expect(link).not.toHaveAttribute("target");
+    expect(link.querySelector("svg")).toBeNull();
+  }
+  expect(screen.getByRole("link", { name: "Wiz" })).toHaveAttribute("href", "/paper/1012");
+  expect(screen.getByRole("link", { name: "the catalog" })).toHaveAttribute("href", "/catalog?kind=post");
+});
+
+it("never turns a site link into one that leaves the site after normalisation", () => {
+  for (const href of ["/.//evil.test/x", "/..//evil.test", "/%2F/evil.test", "/%2f%2fevil.test", "/\\evil.test", "//evil.test",
+    "/%5Cevil.test", "https://paperswithcode-cyber.com/.//evil.test/collect?x=1", `${window.location.origin}/..//evil.test`]) {
+    expect(allowedLink(href, new Set([href]))).toBeNull();
+  }
+  expect(allowedLink("/paper/123", new Set())).toEqual({ href: "/paper/123", local: true });
+  expect(allowedLink("/catalog?kind=post#top", new Set())).toEqual({ href: "/catalog?kind=post#top", local: true });
+  expect(allowedLink("/orgs/./alpha", new Set())).toEqual({ href: "/orgs/alpha", local: true });
+  expect(allowedLink("https://paperswithcode-cyber.com/paper/1", new Set())).toEqual({ href: "/paper/1", local: true });
+  expect(allowedLink(`${window.location.origin}/paper/2`, new Set())).toEqual({ href: "/paper/2", local: true });
+  // Off-site links still need their exact address in a tool result.
+  expect(allowedLink("https://evil.test/x", new Set())).toBeNull();
+  expect(allowedLink("https://example.com/evidence", new Set(["https://example.com/evidence"]))).toEqual({ href: "https://example.com/evidence", local: false });
 });

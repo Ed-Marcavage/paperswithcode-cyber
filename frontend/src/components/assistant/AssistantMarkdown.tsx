@@ -3,6 +3,7 @@ import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
 import { allowedLink, chatUrlTransform, withholdPartialCitation } from "./markdown";
 import { assistantEvent } from "@/lib/catalogAnalytics";
+import { AssistantIcon } from "./icons";
 import type { AssistantSurface } from "@/lib/api/assistant";
 
 export function AssistantMarkdown({ text, streaming, evidence, surface = "panel" }: { text: string; streaming: boolean; evidence: Set<string>; surface?: AssistantSurface }) {
@@ -15,7 +16,11 @@ export function AssistantMarkdown({ text, streaming, evidence, surface = "panel"
         const link = allowedLink(href ?? "", evidence);
         if (!link) return <span>{children}</span>;
         const clicked = () => assistantEvent("link_clicked", surface);
-        return link.local ? <Link to={link.href} onClick={clicked}>{children}</Link> : <a href={link.href} rel="noreferrer" onClick={clicked}>{children}</a>;
+        // Site pages open through the router, so the panel stays open; anything else opens in a new tab.
+        if (link.local) return <Link to={link.href} onClick={clicked}>{children}</Link>;
+        return <a href={link.href} target="_blank" rel="noopener noreferrer" className="assistant-external-link" onClick={clicked}>
+          {children}<AssistantIcon name="external" size={11} /><span className="sr-only"> (opens in a new tab)</span>
+        </a>;
       },
     }}>{streaming ? withholdPartialCitation(text) : text}</ReactMarkdown></div>;
 }
