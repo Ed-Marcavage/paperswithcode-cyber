@@ -41,9 +41,10 @@ COMPAT_LOGO_CACHE_HEADERS = {
 
 OrganizationSort = Literal["trending", "papers", "stars", "name"]
 
-def papers_and_posts(org: Organization) -> int:
-    """Linked papers plus industry posts (repositories not counted); the "papers" sort's key."""
-    return (org.paper_count or 0) + (org.post_count or 0)
+def papers_and_agent_posts(org: Organization) -> int:
+    """Linked papers plus agent-related industry posts (agent_post_count; other posts and
+    repositories not counted); the "papers" sort's key and the trending sort's tie-break."""
+    return (org.paper_count or 0) + (org.agent_post_count or 0)
 
 
 def sort_organizations(result: Organizations, sort: OrganizationSort | None) -> Organizations:
@@ -53,9 +54,9 @@ def sort_organizations(result: Organizations, sort: OrganizationSort | None) -> 
         if sort == "stars":
             return (org.catalog_stars is None, -(org.catalog_stars or 0), org.name.casefold(), org.slug)
         if sort == "papers":
-            return (-papers_and_posts(org), org.name.casefold(), org.slug)
+            return (-papers_and_agent_posts(org), org.name.casefold(), org.slug)
         if sort == "trending":
-            return (-(org.organization_trending_score or 0), -papers_and_posts(org), org.name.casefold(), org.slug)
+            return (-(org.organization_trending_score or 0), -papers_and_agent_posts(org), org.name.casefold(), org.slug)
         return (org.name.casefold(), org.slug)
     return result.model_copy(update={"results": sorted(result.results, key=key)})
 

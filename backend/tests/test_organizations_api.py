@@ -567,19 +567,46 @@ def test_organization_search_matches_name_and_ranks_prefix_first(org_client):
     assert response.json()["results"][0]["paper_count"] == 4
 
 
-def test_papers_sort_ranks_papers_plus_posts_and_trending_ties_use_the_sum():
+def test_papers_sort_ranks_papers_plus_agent_related_posts_and_trending_ties_use_the_sum():
     from backend.models.organizations import Organization, Organizations
     from backend.routers.organizations import sort_organizations
 
-    def org(slug, papers, posts, repos=0, score=0.0):
+    def org(slug, papers, posts, agent_posts, repos=0, score=0.0):
         return Organization(id=slug, name=slug, slug=slug, paper_count=papers, post_count=posts,
-                            repository_count=repos, organization_trending_score=score)
+                            agent_post_count=agent_posts, repository_count=repos,
+                            organization_trending_score=score)
 
-    result = Organizations(count=4, results=[
-        org("two-papers", 2, 0), org("many-repos", 1, 0, repos=50), org("posts-only", 0, 24),
-        org("mixed", 3, 3),
+    result = Organizations(count=5, results=[
+        org("two-papers", 2, 0, 0), org("many-repos", 1, 0, 0, repos=50),
+        org("volume", 0, 145, 3), org("agent-posts", 0, 9, 5), org("mixed", 3, 3, 1),
     ])
     assert [o.slug for o in sort_organizations(result, "papers").results] == [
-        "posts-only", "mixed", "two-papers", "many-repos"]
-    tied = Organizations(count=2, results=[org("two-papers", 2, 0, score=1.0), org("posts-only", 0, 24, score=1.0)])
-    assert [o.slug for o in sort_organizations(tied, "trending").results] == ["posts-only", "two-papers"]
+        "agent-posts", "mixed", "volume", "two-papers", "many-repos"]
+    tied = Organizations(count=2, results=[org("volume", 0, 145, 1, score=1.0),
+                                           org("two-papers", 2, 0, 0, score=1.0)])
+    assert [o.slug for o in sort_organizations(tied, "trending").results] == ["two-papers", "volume"]
+
+
+def test_catalog_metrics_count_agent_related_posts_at_the_trending_threshold():
+    from backend.models.organizations import Organization
+    from backend.services import discovery_organizations, trending_posts
+
+    class Rows:
+        def __init__(self, rows):
+            self.rows = rows
+
+        def mappings(self):
+            return self.rows
+
+    class FakeSession:
+        def execute(self, statement, params):
+            self.sql, self.params = str(statement), params
+            return Rows([{"id": 7, "paper_count": 2, "post_count": 145, "agent_post_count": 3,
+                          "repository_count": 1, "owned_repository_count": 0, "catalog_stars": None}])
+
+    db = FakeSession()
+    [result] = discovery_organizations.with_catalog_metrics(
+        db, [Organization(id="7", name="Rapid", slug="rapid", paper_count=0)])
+    assert db.params["min_agent_relevance"] == trending_posts.MIN_AGENT_RELEVANCE == 3
+    assert "(w.post_details->>'agent_relevance')::numeric, 0) >= :min_agent_relevance" in db.sql
+    assert (result.paper_count, result.post_count, result.agent_post_count) == (2, 145, 3)

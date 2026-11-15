@@ -132,6 +132,8 @@ export interface Organization {
   is_featured: boolean;
   display_order?: number | null;
   post_count?: number | null;
+  /** Posts with review agent relevance of at least Trending's minimum (catalog mode only). */
+  agent_post_count?: number | null;
   repository_count?: number | null;
   owned_repository_count?: number | null;
   catalog_stars?: number | null;
