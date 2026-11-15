@@ -184,16 +184,10 @@ describe("PaperCard industry posts", () => {
     expect(screen.queryByText("Long abstract")).not.toBeInTheDocument();
   });
 
-  it("marks pinned posts as Editor's pick next to Featured", () => {
-    renderWith({ ...paper, catalogKind: "post", catalogPost: { ...post, curated: true, curated_pin: 1, curated_company: "Wiz" } });
-    expect(screen.getByRole("link", { name: "Featured" })).toBeInTheDocument();
-    expect(screen.getByText("Editor's pick")).toBeInTheDocument();
-  });
-
-  it("gives curated posts without a pin no Editor's pick badge", () => {
+  it("marks curated posts as Editor's pick next to Featured", () => {
     renderWith({ ...paper, catalogKind: "post", catalogPost: { ...post, curated: true, curated_company: "Wiz" } });
     expect(screen.getByRole("link", { name: "Featured" })).toBeInTheDocument();
-    expect(screen.queryByText("Editor's pick")).not.toBeInTheDocument();
+    expect(screen.getByText("Editor's pick")).toBeInTheDocument();
   });
 
   it("leaves papers unchanged", () => {

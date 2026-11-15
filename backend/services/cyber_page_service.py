@@ -26,26 +26,21 @@ CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
 # Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote,
 # cyberTrendingPostsDescription, cyberTrendingPapersDescription).
-INDUSTRY_NOTE = "The posts list starts with the editor's picks, then ranks other posts about AI agents."
+INDUSTRY_NOTE = "The block at the top shows hand-picked industry engineering posts."
 # React's Trending switch opens on posts (?kind=paper shows papers); the server page
-# lists both feeds, posts first, so crawlers keep the paper links. Pinned posts lead
-# the posts list, labelled like React's "Editor's pick" badge.
+# lists both feeds, posts first, so crawlers keep the paper links.
 POSTS_HEADING = "Trending posts about AI agents"
-EDITORS_PICK = "Editor's pick"
 POSTS_FEED_DESCRIPTION = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
 PAPERS_FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
 
 def _post_link(row: dict) -> DiscoveryPaperLink:
-    """A row of Trending's posts feed as a page link; pinned posts are marked as editor's picks."""
-    publisher = row.get("publisher") or ""
-    label = " · ".join(value for value in (
-        EDITORS_PICK if trending_posts.pin(row["post"]) is not None else "", publisher) if value)
+    """A Trending industry post (block or feed row) as a page link."""
     return DiscoveryPaperLink(
         quote(row["reference"], safe=""),
         row["post"].get("curated_title") or row["title"],
         date.fromisoformat(row["date_published"]),
-        label,
+        row.get("publisher") or "",
     )
 
 
@@ -62,6 +57,9 @@ def homepage(db: Session, params) -> DiscoveryPage:
     papers = PaperService(db).get_papers(
         page=1, page_size=20, order_by="trending", latest_only=True, **dates
     )
+    # The same industry block React shows above the feed, so the links are crawlable.
+    block = trending_posts.industry_block(db)
+    highlights = tuple(_post_link(row) for row in block["results"])
     return DiscoveryPage(
         kind="Cybersecurity research",
         canonical_path="/",
@@ -75,6 +73,8 @@ def homepage(db: Session, params) -> DiscoveryPage:
         + POSTS_FEED_DESCRIPTION
         + "\n\n"
         + PAPERS_FEED_DESCRIPTION,
+        highlight_heading=block["heading"],
+        highlight_links=highlights,
         breadcrumbs=(),
         entity_links=(
             DiscoveryLink("/catalog", "Browse catalog"),

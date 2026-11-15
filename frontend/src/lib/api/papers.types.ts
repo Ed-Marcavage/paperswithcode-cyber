@@ -347,10 +347,8 @@ export interface CatalogPost {
   reports_benchmark_results: boolean;
   agent_harness_engineering: boolean;
   entities: { type: string; name: string; role: string }[];
-  /** Hand-picked by the catalog editor. */
+  /** Hand-picked by the catalog editor ("Editor's pick"). */
   curated?: boolean;
-  /** The editor's pin number: pinned posts lead Trending's posts feed in this order ("Editor's pick"). */
-  curated_pin?: number | null;
   /** Company name and short title the editor gives a curated post. */
   curated_company?: string | null;
   curated_title?: string | null;

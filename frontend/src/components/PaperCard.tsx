@@ -14,7 +14,7 @@ import { papersApi } from "@/lib/api/papers";
 import { paperQueryKeys } from "@/lib/paperQueryKeys";
 import { safeExternalHref } from "@/lib/safeExternalHref";
 import { formatStarCount } from "@/lib/frameworks";
-import { isEditorsPick, postTypeLabel } from "@/lib/industryPost";
+import { postTypeLabel } from "@/lib/industryPost";
 import type { PaperCardProps } from "@/lib/transform";
 import { TEN_MINUTES } from "@/lib/api/queryKeys";
 
@@ -145,7 +145,7 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   const visibleMethods = visibleFeedMethods(paper);
   const post = paper.catalogPost;
   const featured = post?.tier === "featured";
-  const curated = isEditorsPick(post);
+  const curated = !!post?.curated;
   return (
     <article className="paper-card">
       {(!isDiscoveryCatalog() || paper.thumbnailUrl) && <Link

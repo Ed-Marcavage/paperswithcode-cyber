@@ -39,11 +39,18 @@ ROWS = [
     for n in range(51)
 ]
 
+BLOCK = {
+    "heading": "Editor's picks from industry",
+    "results": [
+        {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
+         "date_published": "2026-10-27", "publisher": "Google Project Zero",
+         "post": {"curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
+        {"reference": "77", "title": "Plain post", "date_published": "2026-11-09",
+         "publisher": "Endor Labs", "post": {}},
+    ],
+}
+
 FEED = [
-    {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
-     "date_published": "2026-10-27", "publisher": "Google Project Zero",
-     "post": {"curated": True, "curated_pin": 1,
-              "curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
     {"reference": "301", "title": "Agent harness for code audit", "date_published": "2026-11-10",
      "publisher": "Endor Labs", "post": {"agent_relevance": 4}},
     {"reference": "302", "title": "Raw title", "date_published": "2026-11-09",
@@ -85,6 +92,7 @@ def client(monkeypatch, tmp_path):
             "results": ROWS[offset : offset + limit],
         },
     )
+    monkeypatch.setattr(trending_posts, "industry_block", lambda db: BLOCK)
     monkeypatch.setattr(
         trending_posts, "posts_feed",
         lambda db, page, page_size, start_date=None, end_date=None: (FEED, len(FEED)),
@@ -319,23 +327,18 @@ def test_existing_catalog_api_is_not_intercepted(client):
     assert len(response.json()["results"]) == 2
 
 
-def test_homepage_lists_pinned_posts_first_as_editors_picks_without_a_separate_block(client):
+def test_homepage_lists_the_industry_block_in_html_and_markdown(client):
     html = BeautifulSoup(client.get("/").text, "html.parser")
-    main = html.select_one("#root main")
-    assert main.select_one('section[aria-labelledby="highlights-heading"]') is None
-    items = main.select('section[aria-labelledby="posts-heading"] li')
-    assert items[0].a["href"] == "/paper/5289"
-    assert items[0].a.text == "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"
-    assert "Editor's pick · Google Project Zero · 2026-10-27" in items[0].text
-    assert not any("Editor's pick" in item.text for item in items[1:])
-    header = main.select_one("header").text
-    assert "The posts list starts with the editor's picks, then ranks other posts about AI agents." in header
-    assert "hand-picked" not in header and "block" not in header
+    section = html.select_one('#root main section[aria-labelledby="highlights-heading"]')
+    assert section.h2.text == "Editor's picks from industry"
+    links = [(a["href"], a.text) for a in section.select("a")]
+    assert links == [("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"), ("/paper/77", "Plain post")]
+    assert "Google Project Zero · 2026-10-27" in section.text
+    assert "hand-picked industry engineering posts" in html.select_one("#root main header").text
     markdown = client.get("/index.md").text
-    assert "Editor's picks from industry" not in markdown
-    assert (f"1. [Fuzzers vs\\. AI, Comparing Fuzzilli and BigSleep]({ORIGIN}/paper/5289)"
-            " — Editor's pick · Google Project Zero · 2026-10-27") in markdown
-    assert f"2. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
+    assert "## Editor's picks from industry" in markdown
+    assert f"- [Plain post]({ORIGIN}/paper/77) — Endor Labs · 2026-11-09" in markdown
+    assert markdown.index("Editor's picks") < markdown.index("## Relevant papers")
 
 
 def test_homepage_lists_posts_then_papers_for_every_kind(client):
@@ -346,14 +349,13 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
     papers = main.select_one('section[aria-labelledby="papers-heading"]')
     assert posts.h2.text == "Trending posts about AI agents"
     assert [(a["href"], a.text) for a in posts.select("a")] == [
-        ("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"),
         ("/paper/301", "Agent harness for code audit"), ("/paper/302", "Evaluating security agents")]
     assert "Endor Labs · 2026-11-10" in posts.text
     assert papers.h2.text == "Relevant papers"
     assert [(a["href"], a.text) for a in papers.select("a")] == [
         ("/paper/2610.34435", "Security agents & harnesses")]
     sections = [section["aria-labelledby"] for section in main.select("section")]
-    assert sections == ["posts-heading", "papers-heading"]
+    assert sections == ["highlights-heading", "posts-heading", "papers-heading"]
     header = main.select_one("header").text
     assert "featured posts about AI agents" in header and "GitHub star growth" in header
     assert html.title.text == pages.HOME_TITLE
@@ -372,9 +374,10 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
         assert client.get(f"/index.md?kind={kind}").text == client.get("/index.md").text
 
     markdown = client.get("/index.md").text
-    assert f"2. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
+    assert f"1. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
     assert f"1. [Security agents & harnesses]({ORIGIN}/paper/2610.34435)" in markdown
-    assert markdown.index("## Trending posts about AI agents") < markdown.index("## Relevant papers")
+    assert (markdown.index("## Editor's picks") < markdown.index("## Trending posts about AI agents")
+            < markdown.index("## Relevant papers"))
     assert "featured posts about AI agents" in markdown and "GitHub star growth" in markdown
 
 
