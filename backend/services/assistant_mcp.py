@@ -12,6 +12,7 @@ from typing import Any
 
 import httpx
 from backend.services.assistant_catalog_links import add_catalog_urls
+from backend.services.assistant_facets import FACET_TOOLS, describe_facets, explain_empty, invalid_facet, vocabulary
 from backend.services.assistant_tool_budget import bounded_arguments, bounded_tool, compact_result
 from backend.services.assistant_post_metadata import enrich_posts, lookup_post_metadata
 
@@ -24,6 +25,9 @@ MAX_RESPONSE_BYTES = 1024 * 1024
 MAX_RESULT_BYTES = 16 * 1024
 READ_PAPER_BYTES = 8 * 1024
 TRUNCATION = "\n[Result truncated; narrow the request.]"
+FILTER_CACHE = {}
+FILTER_LOCKS = {}
+
 META = {
     "io.modelcontextprotocol/protocolVersion": "2026-07-28",
     "io.modelcontextprotocol/clientCapabilities": {},
@@ -96,6 +100,19 @@ class CatalogMcp:
             raise AssistantMcpError("The catalog returned an invalid response.")
         return value["result"]
 
+    async def filters(self):
+        # Catalog vocabulary is public and stable for this process's catalog snapshot.
+        # Key by endpoint so separate catalogs never share slugs. Failures are not cached.
+        lock = FILTER_LOCKS.setdefault(self.endpoint, asyncio.Lock())
+        async with lock:
+            if self.endpoint not in FILTER_CACHE:
+                result = await self._request("tools/call", {"name": "catalog_filters", "arguments": {}})
+                payload, is_json = result_payload(result)
+                if result.get("isError") or not is_json or not vocabulary(payload):
+                    raise AssistantMcpError("The catalog filter choices are unavailable. Please try again.")
+                FILTER_CACHE[self.endpoint] = payload
+            return FILTER_CACHE[self.endpoint]
+
     async def tools(self) -> list[dict]:
         result = await self._request("tools/list", {})
         tools = result.get("tools")
@@ -106,13 +123,20 @@ class CatalogMcp:
             raise AssistantMcpError("The catalog tool list is incomplete.")
         if any(not isinstance(t.get("inputSchema"), dict) for t in selected):
             raise AssistantMcpError("The catalog tool schemas are invalid.")
-        return [bounded_tool(tool) for tool in selected]
+        choices = vocabulary(await self.filters())
+        return [describe_facets(bounded_tool(tool), choices) for tool in selected]
 
     async def call(self, name: str, arguments: dict) -> ToolResult:
         # Reject even before schema discovery or opening a connection.
         if name not in TOOL_NAMES:
             raise AssistantMcpError("This tool is not allowed.")
         arguments = bounded_arguments(name, arguments)
+        if name == "catalog_filters":
+            return cap_payload(await self.filters(), limit=MAX_RESULT_BYTES, is_json=True, is_error=False)
+        if name in FACET_TOOLS and any(axis in arguments and arguments[axis] != "" for axis in ("topic", "target", "contribution", "kind", "year")):
+            invalid = invalid_facet(arguments, vocabulary(await self.filters()))
+            if invalid:
+                return cap_payload(invalid, limit=MAX_RESULT_BYTES, is_json=True, is_error=True)
         upstream_arguments = {k: v for k, v in arguments.items() if k != "counts_only"}
         result = await self._request("tools/call", {"name": name, "arguments": upstream_arguments})
         payload, is_json = result_payload(result)
@@ -120,5 +144,6 @@ class CatalogMcp:
         if is_json and not is_error:
             payload = compact_result(name, add_catalog_urls(name, payload), arguments)
             payload = await enrich_posts(payload, self.lookup)
+            payload = explain_empty(name, payload, arguments)
         return cap_payload(payload, limit=READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES,
                            is_json=is_json, is_error=is_error)

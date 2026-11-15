@@ -10,9 +10,18 @@ from backend.services.assistant_mcp import (
 )
 
 
+FILTERS = {"topic": {"penetration-testing": "Penetration testing"}, "target": {"web": "Web"},
+           "contribution": {"benchmark": "Benchmark"}, "kind": {"post": "Post", "paper": "Paper"}, "year": {"2026": "2026"}}
+
+
 def run(call, handler):
+    def dispatch(request):
+        body = json.loads(request.content)
+        if body["method"] == "tools/call" and body["params"]["name"] == "catalog_filters":
+            return response(request, {"structuredContent": FILTERS})
+        return handler(request)
     async def go():
-        async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        async with httpx.AsyncClient(transport=httpx.MockTransport(dispatch)) as client:
             return await call(CatalogMcp(client, "http://catalog.test/mcp", lookup=lambda ids: {}))
     return asyncio.run(go())
 

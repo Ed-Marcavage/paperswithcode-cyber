@@ -8,6 +8,7 @@ from openai import AsyncOpenAI
 
 from backend.services.assistant_loop import SYSTEM_PROMPT, Turn, TurnLimits, run_turn
 from backend.services.assistant_mcp import CatalogMcp, TOOL_NAMES
+from backend.tests.assistant.test_mcp import FILTERS
 
 
 def chunk(delta=None, finish=None, usage=None):
@@ -45,6 +46,8 @@ class FakeServices:
         payload = json.loads(request.content)
         if payload["method"] == "tools/list":
             result = {"tools": [{"name": name, "inputSchema": {"type": "object"}} for name in TOOL_NAMES]}
+        elif payload["params"].get("name") == "catalog_filters":
+            result = {"structuredContent": FILTERS}
         else:
             self.tool_requests.append(payload["params"])
             result = {"structuredContent": {"title": "Evidence", "url": "/paper/evidence"}}

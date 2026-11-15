@@ -63,7 +63,7 @@ def test_duplicate_nested_work_ids_are_looked_up_once_and_missing_ids_are_not_gu
     assert calls == [[1]]
     assert payload["paper"]["publisher"] == payload["discovery"]["publisher"] == "Curated publisher"
     adapted("browse_catalog", {"results": [{"title": "No ID", "source_url": "https://example.test"}]}, lookup)
-    adapted("catalog_filters", {"id": "1", "title": "Not a work"}, lookup)
+    adapted("catalog_filters", {"id": "1", "title": "Not a work", "topic": {"security": "Security"}}, lookup)
     adapted("get_paper_info", {"in_catalog": False, "paper": {"id": "1", "title": "Missing"}}, lookup)
     adapted("search_papers", {"results": [{"id": "1", "title": "Error"}]}, lookup, error=True)
     assert calls == [[1]]

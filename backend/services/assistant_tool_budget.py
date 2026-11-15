@@ -2,6 +2,8 @@
 
 from copy import deepcopy
 
+from backend.services.assistant_facets import normalize_facets
+
 MAX_ITEMS = 10
 SUMMARY_CHARS = 600
 LIST_TOOLS = {"search_papers", "browse_catalog", "list_developers", "list_recent_papers",
@@ -14,7 +16,7 @@ COUNT_DESCRIPTION = (" include_facet_counts is ignored unless counts_only=true. 
 
 
 def bounded_arguments(name, arguments):
-    result = dict(arguments)
+    result = normalize_facets(name, arguments)
     for key in SIZE_ARGUMENTS & result.keys():
         value = result[key]
         if type(value) is not int:

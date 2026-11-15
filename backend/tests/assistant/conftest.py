@@ -57,3 +57,10 @@ def client(monkeypatch, store):
     app = create_app()
     app.dependency_overrides[get_assistant_store] = lambda: store
     return TestClient(app, headers={"Origin": "http://testserver"})
+
+
+@pytest.fixture(autouse=True)
+def isolated_filter_cache(monkeypatch):
+    from backend.services import assistant_mcp
+    monkeypatch.setattr(assistant_mcp, "FILTER_CACHE", {})
+    monkeypatch.setattr(assistant_mcp, "FILTER_LOCKS", {})
