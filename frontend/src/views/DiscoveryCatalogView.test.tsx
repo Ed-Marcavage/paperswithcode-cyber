@@ -1,8 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { MemoryRouter, useLocation } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 import * as request from "@/lib/api/request";
+import { assistantApi } from "@/lib/api/assistant";
+import { AssistantProvider } from "@/components/assistant/AssistantProvider";
+import { AssistantPanel } from "@/components/assistant/AssistantPanel";
 import DiscoveryCatalogView from "./DiscoveryCatalogView";
 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllEnvs(); localStorage.clear(); });
@@ -77,3 +80,26 @@ it("puts filters in an accessible sheet with removable chips, keeping the URL pa
   expect(screen.getByTestId("search")).toBeEmptyDOMElement();
 });
 
+it("offers Try chat only when the assistant is enabled and available, opening the panel in place", async () => {
+  catalogApi();
+  vi.stubEnv("VITE_ASSISTANT_ENABLED", "true");
+  const status = vi.spyOn(assistantApi, "status").mockResolvedValue({ available: true, code: null, reason: null, retry_at: null });
+  vi.spyOn(assistantApi, "list").mockResolvedValue([]);
+  const view = render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={["/catalog"]}><AssistantProvider>
+      <Routes><Route path="/catalog" element={<DiscoveryCatalogView />} /><Route path="/chat" element={<p>Chat page</p>} /></Routes>
+      <AssistantPanel /></AssistantProvider></MemoryRouter>
+  </QueryClientProvider>);
+  const links = await screen.findAllByRole("link", { name: /Try chat/ });
+  expect(links[0]).toHaveAttribute("href", "/chat");
+  fireEvent.click(links[0]);
+  expect(await screen.findByRole("dialog", { name: "Ask the catalog" })).toBeInTheDocument();
+  expect(screen.queryByText("Chat page")).toBeNull();
+  view.unmount();
+  status.mockResolvedValue({ available: false, code: "usage_limit", reason: "Resting.", retry_at: null });
+  render(<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
+    <MemoryRouter initialEntries={["/catalog"]}><AssistantProvider><DiscoveryCatalogView /></AssistantProvider></MemoryRouter>
+  </QueryClientProvider>);
+  await screen.findByText("1,763 results · Showing 1–1");
+  expect(screen.queryByRole("link", { name: /Try chat/ })).toBeNull();
+});

@@ -5,6 +5,8 @@ import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
 import * as Dialog from "@radix-ui/react-dialog";
+import { isAssistantEnabled } from "@/lib/apiUrl";
+import { AssistantCatalogLink } from "@/components/assistant/AssistantCatalogLink";
 import { axes, type Axis, browseQuery, type DiscoveryWork, filtersQuery } from "@/lib/api/discovery";
 import { POST_TYPE_LABELS, postTypeLabel, publisherHost } from "@/lib/industryPost";
 import "./DiscoveryCatalog.css";
@@ -112,6 +114,7 @@ export default function DiscoveryCatalogView() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
+      {isAssistantEnabled() && <AssistantCatalogLink />}
     </div>
     {active.length > 0 && <ul className="discovery-chips" aria-label="Active filters">{active.map(item => <li key={item.key}>
       <button type="button" aria-label={`Remove filter ${item.label}: ${item.value}`} onClick={() => change(item.key, "")}>
@@ -124,7 +127,8 @@ export default function DiscoveryCatalogView() {
       {controls}
       <div className="discovery-filters-end">
         {(hasFilters || hasPostControls) && <button type="button" className="discovery-clear" onClick={() => setParams({})}>Clear filters</button>}
-        </div>
+        {isAssistantEnabled() && <AssistantCatalogLink />}
+      </div>
     </div>
     {terms.isError || papers.isError ? <p role="alert">Could not load the catalog. <button onClick={() => { void papers.refetch(); void terms.refetch(); }}>Try again</button></p>
       : papers.isPending ? <p role="status" className="discovery-count">Loading the catalog…</p>
