@@ -472,10 +472,30 @@ links, duration, model-call count and input/output tokens (null when absent).
 It writes each row immediately and stops on a provider usage limit. It neither
 writes chat history to the database nor sends analytics.
 
-**Obtain a live-request budget before running.** Twenty questions can make up to
-160 model requests. The implementation specification's allowance of a few live
-requests does not authorize a complete evaluation. Use fake providers in tests.
-With an authorized budget and an already-running local MCP:
+The specification author has authorized the **reviewer** to evaluate up to
+three named models, 20 questions per model. The implementer must not run this
+live evaluation; implementation tests use fake providers. Each model's run can
+make up to 160 model requests within the existing per-question limits.
+
+Inside the already-running backend container, the reviewer can use its existing
+process environment (including the backend-only key) and internal MCP hostname:
+
+```sh
+python -m backend.assistant_eval \
+  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
+  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+```
+
+From the host, the equivalent reviewer command is:
+
+```sh
+sh local-dev/compose.sh exec -T backend python -m backend.assistant_eval \
+  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
+  --output /tmp/assistant-evals/glm-5.3-flash.jsonl
+```
+
+Retain the JSONL outside the container before it is replaced. To run directly on
+the host instead, use the externally published local MCP endpoint:
 
 ```sh
 uv run --env-file .local.env python -m backend.assistant_eval \

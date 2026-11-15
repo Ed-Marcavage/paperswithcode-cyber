@@ -54,3 +54,39 @@ def test_evaluation_stops_after_quota_and_writes_partial_row():
 def test_token_totals_only_when_every_call_reports_usage():
     turn = Turn(text="Answer", status="done", steps=[{"kind": "model", "input_tokens": 4, "output_tokens": 2}] * 2)
     assert result_row(1, "Question", "model", turn, 1.25)["tokens"] == {"input_tokens": 8, "output_tokens": 4}
+
+
+def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch, capsys):
+    from backend import assistant_eval
+    replies = [[tool_chunk()], [text_chunk("Answer")]] * len(QUESTIONS)
+    services = FakeServices(replies)
+    mcp_urls = []
+
+    def dispatch(request):
+        if request.url.host == "model.test":
+            assert request.headers["authorization"] == "Bearer evaluation-test-key"
+            return services.model(request)
+        assert str(request.url) == "http://mcp:7860/mcp"
+        assert "authorization" not in request.headers
+        mcp_urls.append(str(request.url))
+        return services.mcp(request)
+
+    class TestHttpClient(httpx.AsyncClient):
+        def __init__(self, **kwargs):
+            super().__init__(transport=httpx.MockTransport(dispatch), **kwargs)
+
+    monkeypatch.chdir(tmp_path)  # No environment file is present or needed.
+    monkeypatch.setenv("PWC_ASSISTANT_API_KEY", "evaluation-test-key")
+    monkeypatch.setenv("PWC_ASSISTANT_BASE_URL", "http://model.test/v1")
+    monkeypatch.setattr(assistant_eval.httpx, "AsyncClient", TestHttpClient)
+    monkeypatch.setattr(assistant_eval, "model_client", lambda settings: AsyncOpenAI(
+        api_key=settings.api_key.get_secret_value(), base_url=settings.base_url,
+        max_retries=0, http_client=TestHttpClient()))
+    output = tmp_path / "evaluation.jsonl"
+    assert assistant_eval.main(["--model", "named-container-model", "--mcp-url", "http://mcp:7860/mcp", "--output", str(output)]) == 0
+    assert len(mcp_urls) == 40  # Discovery and a tool call per question.
+    rows = [json.loads(line) for line in output.read_text().splitlines()]
+    assert len(rows) == 20
+    assert all(row["model"] == "named-container-model" and row["status"] == "done" for row in rows)
+    captured = capsys.readouterr()
+    assert "evaluation-test-key" not in output.read_text() + captured.out + captured.err
