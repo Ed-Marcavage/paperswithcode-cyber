@@ -217,9 +217,11 @@ def test_stop_and_disconnect_leave_checkpoint_intact(store, monkeypatch, where, 
         await asyncio.wait_for(started.wait(), 2)
         message = store.get_conversation('owner', saved.conversation_id)['messages'][-1]
         assert message['content'] == 'Saved answer' and message['status'] == 'done' and message['follow_ups'] == []
+        early = None
         if not disconnect:
-            with pytest.raises(VisitorLimitReached):
-                store.begin('owner', saved.conversation_id, 'Too early')
+            # The answer is saved, so the visitor may ask again while follow-ups are still being
+            # looked for; the browser then aborts this turn's request.
+            early = store.begin('owner', saved.conversation_id, 'Asked during the follow-up wait')
             task.cancel()
             with pytest.raises(asyncio.CancelledError):
                 await task
@@ -227,6 +229,11 @@ def test_stop_and_disconnect_leave_checkpoint_intact(store, monkeypatch, where, 
             await asyncio.wait_for(task, 2)
         run = store.show_run(saved.run_id)
         assert run['status'] == 'done' and run['answer'] == 'Saved answer' and run['follow_ups'] == []
+        if early is not None:
+            # The first turn finishing late does not release the newer turn's lease.
+            with pytest.raises(VisitorLimitReached):
+                store.begin('owner', saved.conversation_id, 'Still one at a time')
+            store.finish(early, assistant_loop.Turn(text='Second answer', status='done'))
         store.begin('owner', saved.conversation_id, 'Now allowed')
     asyncio.run(exercise())
 

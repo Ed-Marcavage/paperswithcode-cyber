@@ -34,8 +34,10 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
   const menu = useCommandMenu({ topics: chat.topics, draft: chat.draft, setDraft: chat.setDraft, onTopic: chooseTopic, field, surface, enabled: !disabled });
   const last = messages[messages.length - 1];
   // Only the latest finished answer offers next questions, and only while one can be asked.
-  const suggestions = !disabled && last?.role === "assistant" && last.status === "done" ? followUps(last.follow_ups) : [];
-  const lookingForMore = !disabled && last?.role === "assistant" && last.status === "done" && Boolean(last.follow_ups_pending);
+  // "limit_reached" is also a finished answer: research hit its budget and the closing step wrote it.
+  const finished = last?.role === "assistant" && (last.status === "done" || last.status === "limit_reached");
+  const suggestions = !disabled && finished ? followUps(last.follow_ups) : [];
+  const lookingForMore = !disabled && finished && Boolean(last.follow_ups_pending);
   const ask = (question: string) => { assistantEvent("follow_up_clicked", surface); void chat.send(question, surface, pathname, { keepDraft: true }); };
   const offerTopics = chat.topics.length > 0 && !paused;
   const placeholder = !chat.availability.available ? chat.availability.reason ?? "The assistant is unavailable."

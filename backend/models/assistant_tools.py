@@ -1,5 +1,6 @@
 """Arguments for assistant-only catalog reads; no public API route."""
 
+import unicodedata
 from datetime import date
 from typing import Literal
 
@@ -32,6 +33,15 @@ class FollowUpSubmission(BaseModel):
 
     question: str = Field(min_length=1, max_length=120)
     support: str = Field(min_length=1, max_length=500, description="One short sentence naming what the search showed; trace only.")
+
+    @field_validator("question")
+    @classmethod
+    def plain_text_question(cls, value: str) -> str:
+        # A suggestion is shown as a button and later sent as the visitor's question:
+        # no control, formatting or direction-override characters.
+        if any(unicodedata.category(ch) in {"Cc", "Cf", "Co", "Cs", "Zl", "Zp"} for ch in value):
+            raise ValueError("question must be plain text without control or formatting characters")
+        return value
 
 
 class SubmitFollowUpsArguments(BaseModel):

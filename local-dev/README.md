@@ -671,9 +671,9 @@ bounded read-only post-metadata lookups with the backend database settings;
 unavailable enrichment is marked in the tool result and does not fail the turn.
 
 Evaluate one named model at a time and reserve enough provider allowance before
-starting. Each full run asks 20 questions and can make up to 240 model requests
-(eight research/answer calls plus four follow-up passes per question); comparing three models can use up to 720
-requests. Live evaluation shares the provider allowance with the assistant.
+starting. Each full run asks 20 questions and can make up to 440 model requests
+(up to 18 research and answer calls plus four follow-up passes per question); comparing three models can use up to
+1,320 requests. Most questions use far fewer. Live evaluation shares the provider allowance with the assistant.
 Use fake providers for implementation tests, and stop live runs when the
 remaining allowance is needed for interactive use.
 

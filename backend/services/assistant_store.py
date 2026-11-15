@@ -169,8 +169,17 @@ class AssistantStore:
                                         position=position, detail=step))
 
     def save_answer(self, saved: SavedTurn, turn):
-        """Checkpoint the complete answer without releasing the active-turn lease."""
+        """Checkpoint the complete answer and release the active-turn lease.
+
+        The visitor may ask again as soon as the answer is written, while this
+        turn is still looking for follow-ups. Releasing here, in the same
+        transaction as the save, means that next question is admitted at once;
+        the browser aborts this turn's request, which ends the follow-up phase.
+        Release is keyed on the run id, so the later release in ``finish`` is a
+        no-op if a newer turn holds the lease by then.
+        """
         with self.sessions.begin() as db:
+            assistant_admission.release(db, saved.run_id)
             conversation = db.scalar(select(AssistantConversation).where(
                 AssistantConversation.id == saved.conversation_id,
                 AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update())
