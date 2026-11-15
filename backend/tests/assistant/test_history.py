@@ -121,3 +121,38 @@ def test_retention_command_deletes_cascading_history(store, capsys):
         assert db.get(AssistantConversation, current.conversation_id)
         assert db.get(AssistantMessage, old.message_id) is None
         assert db.scalar(select(AssistantToolCall)) is None
+
+
+def test_configured_https_origin_allows_returning_visitor_behind_http_proxy(client, store, monkeypatch):
+    from backend.config import get_settings
+    monkeypatch.setattr(get_settings(), "environment", "production")
+    monkeypatch.setattr(get_settings(), "public_site_url", "https://catalog.test")
+    visitor = "v" * 43
+    saved = store.begin(visitor, None, "Question")
+    store.finish(saved, Turn(text="Answer", status="done"))
+    headers = {"Cookie": f"{assistant.COOKIE_NAME}={visitor}", "Origin": "https://catalog.test",
+               "Host": "backend.internal:8000", "X-Forwarded-Proto": "https"}
+    path = f"/api/v1/assistant/conversations/{saved.conversation_id}"
+    # TestClient connects over HTTP with an internal Host, as the TLS proxy does.
+    assert client.patch(path, json={"title": "Renamed"}, headers=headers).status_code == 200
+    async def fake(*args):
+        yield assistant.sse({"type": "done"})
+    monkeypatch.setattr(assistant, "turn_events", fake)
+    response = client.post("/api/v1/assistant/turn", json={"question": "Follow-up", "conversation_id": saved.conversation_id}, headers=headers)
+    assert response.status_code == 200 and "Secure" in response.headers["set-cookie"]
+    assert client.patch(path, json={"title": "Bad"}, headers={**headers, "Origin": "https://evil.test"}).status_code == 403
+    # Configured public origin always wins over forwarded scheme or host.
+    assert client.patch(path, json={"title": "Again"}, headers={**headers, "X-Forwarded-Proto": "http", "X-Forwarded-Host": "evil.test"}).status_code == 200
+    assert client.delete(path, headers=headers).status_code == 204
+
+
+def test_origin_fallback_uses_existing_forwarded_scheme_trust_only(client, store, monkeypatch):
+    from backend.config import get_settings
+    monkeypatch.setattr(get_settings(), "public_site_url", "")
+    visitor = "v" * 43
+    saved = store.begin(visitor, None, "Question")
+    path = f"/api/v1/assistant/conversations/{saved.conversation_id}"
+    headers = {"Cookie": f"{assistant.COOKIE_NAME}={visitor}", "Origin": "https://testserver", "X-Forwarded-Proto": "https"}
+    assert client.patch(path, json={"title": "Renamed"}, headers=headers).status_code == 200
+    assert client.patch(path, json={"title": "Bad"}, headers={**headers, "X-Forwarded-Proto": "https, http"}).status_code == 403
+    assert client.patch(path, json={"title": "Bad"}, headers={**headers, "Origin": "https://evil.test", "X-Forwarded-Host": "evil.test"}).status_code == 403

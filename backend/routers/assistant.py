@@ -35,7 +35,13 @@ def visitor_cookie(request: Request) -> str:
     cookie = request.cookies.get(COOKIE_NAME, "")
     if cookie and request.method not in {"GET", "HEAD", "OPTIONS"}:
         origin = request.headers.get("origin")
-        expected = get_settings().public_site_url or str(request.base_url).rstrip("/")
+        expected = get_settings().public_site_url
+        if not expected:
+            # Match the existing nginx header trust in auth._origin_from_request;
+            # keep the request Host and accept only an HTTP(S) forwarded scheme.
+            proto = request.headers.get("x-forwarded-proto", "")
+            scheme = proto if proto in {"http", "https"} else request.url.scheme
+            expected = str(request.base_url.replace(scheme=scheme)).rstrip("/")
         if origin != expected or request.headers.get("sec-fetch-site") == "cross-site":
             raise HTTPException(403, "Please send this request from the catalog page.")
     return cookie if re.fullmatch(r"[A-Za-z0-9_-]{43}", cookie) else secrets.token_urlsafe(32)

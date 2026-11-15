@@ -420,6 +420,16 @@ PostHog session id. No key produces a plain 503. A provider usage limit is store
 in the database and disables every composer until the reset; status checks do
 not call a model. Temporary provider concurrency errors are retried briefly.
 
+**Production must set `PWC_PUBLIC_SITE_URL` to the public HTTPS origin**, for
+example `https://paperswithcode-cyber.com` (no path, query or fragment). This is
+the authoritative origin for cookie-authenticated assistant writes, even when
+TLS ends at nginx and the backend receives HTTP with an internal Host. An unset
+value falls back to the request Host and HTTP(S) `X-Forwarded-Proto`, matching
+the repository's existing nginx trust in `backend/routers/auth.py`; it does not
+trust `X-Forwarded-Host`. Keep the backend behind the trusted proxy, and have the
+proxy overwrite `Host` and `X-Forwarded-Proto` on every assistant API location.
+Local direct HTTP development can leave the public origin unset.
+
 Before enabling on an existing **local** database, the reviewer applies the
 three additive migrations in order (a new empty database's `init-db.sh` uses
 ORM `create_all`, which includes these tables):
@@ -488,6 +498,10 @@ turn location has a generous **2 requests/second per IP with a burst of 60**,
 returns 429 for excess traffic, disables proxy buffering and caching, and allows
 120 seconds for streaming. This is a proxy abuse limit, not a per-visitor daily
 or concurrent-turn quota. Other assistant paths use the existing API proxy.
+Production must set backend `PWC_PUBLIC_SITE_URL` to the public HTTPS origin.
+Preserve the visitor's Host and overwrite `X-Forwarded-Proto` with `$scheme` in
+that API proxy too, including conversation PATCH/DELETE and feedback POST paths.
+The configured public origin takes precedence over those request headers.
 The normal Vite review proxy streams directly; these fragments are for review,
 not an instruction to deploy or reload nginx. Validate the assembled configuration
 as an unprivileged isolated instance following `docs/development-guide.md`.
