@@ -20,7 +20,7 @@
 .developer-work-main > span, .developer-commits { color: var(--ink-soft); font: .72rem var(--mono); }
 @media (max-width: 640px) { .developer-work-row { gap: .5rem; padding: .8rem; } }
 
-.developer-filters { align-items: end; margin-top: 0; }
+.developer-filters { align-items: end; margin-top: 0; margin-bottom: 1.25rem; }
 .developer-repo-team { color: var(--accent-text); font: .75rem var(--mono); }
 .developer-work-main a { color: inherit; }
 @media (max-width: 640px) {
