@@ -4,6 +4,7 @@ import { cyberCatalogDescription } from "@/lib/cyberCopy";
 import { paperLinkHandlers, taxonomySelected } from "@/lib/catalogAnalytics";
 import { useQuery } from "@tanstack/react-query";
 import { Link, useSearchParams } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
 import { axes, type Axis, browseQuery, type DiscoveryWork, filtersQuery } from "@/lib/api/discovery";
 import { POST_TYPE_LABELS, postTypeLabel, publisherHost } from "@/lib/industryPost";
 import "./DiscoveryCatalog.css";
@@ -54,36 +55,86 @@ export default function DiscoveryCatalogView() {
     else next.delete("offset");
     return "/catalog" + (next.size ? "?" + next.toString() : "");
   }
+  const controls = <>
+    {(Object.keys(axes) as Axis[]).map(axis => <CatalogFacetSelect key={axis} axis={axis}
+      selected={params.get(axis) || ""} options={terms.data?.[axis]} counts={papers.data?.facet_counts?.[axis]}
+      disabled={terms.isPending || (hasFilters && papers.isPending)}
+      onChange={value => { taxonomySelected(axis, value, "catalog_filter"); change(axis, value); }} />)}
+    {showsPosts && (Object.keys(postControls) as PostControl[]).map(key => {
+      const control = postControls[key];
+      return <label key={key}>{control.label}
+        <select value={params.get(key) || ""} disabled={papers.isPending} onChange={e => change(key, e.target.value)}>
+          <option value="">{control.all}</option>
+          {Object.entries(control.options).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select>
+      </label>;
+    })}
+  </>;
+  const active = [
+    ...(Object.keys(axes) as Axis[]).flatMap(axis => {
+      const value = params.get(axis);
+      return value ? [{ key: axis, label: axes[axis], value: terms.data?.[axis]?.[value] ?? value }] : [];
+    }),
+    ...(showsPosts ? (Object.keys(postControls) as PostControl[]).flatMap(key => {
+      const value = params.get(key);
+      const options: Record<string, string> = postControls[key].options;
+      return value ? [{ key, label: postControls[key].label, value: options[value] ?? value }] : [];
+    }) : []),
+  ];
   return <main className="page discovery">
     <header className="feed-header"><div>
       <h1 className="feed-title">Browse <em>catalog</em></h1>
       <p className="feed-subtitle">{cyberCatalogDescription}</p>
     </div></header>
-    <div className="discovery-filters">
-      {(Object.keys(axes) as Axis[]).map(axis => <CatalogFacetSelect key={axis} axis={axis}
-        selected={params.get(axis) || ""} options={terms.data?.[axis]} counts={papers.data?.facet_counts?.[axis]}
-        disabled={terms.isPending || (hasFilters && papers.isPending)}
-        onChange={value => { taxonomySelected(axis, value, "catalog_filter"); change(axis, value); }} />)}
-      {showsPosts && (Object.keys(postControls) as PostControl[]).map(key => {
-        const control = postControls[key];
-        return <label key={key}>{control.label}
-          <select value={params.get(key) || ""} disabled={papers.isPending} onChange={e => change(key, e.target.value)}>
-            <option value="">{control.all}</option>
-            {Object.entries(control.options).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select>
-        </label>;
-      })}
-      {(hasFilters || hasPostControls) && <button type="button" onClick={() => setParams({})}>Clear filters</button>}
+    {/* Phones: one Filters button opening a sheet, with active filters as removable chips. */}
+    <div className="discovery-mobile-bar">
+      <Dialog.Root>
+        <Dialog.Trigger asChild>
+          <button type="button" className="discovery-filters-button">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M2.5 4.5h11M4.5 8h7M6.5 11.5h3" /></svg>
+            Filters{active.length > 0 && <span className="discovery-filters-badge" aria-label={`${active.length} active`}>{active.length}</span>}
+          </button>
+        </Dialog.Trigger>
+        <Dialog.Portal>
+          <Dialog.Overlay className="discovery-sheet-overlay" />
+          <Dialog.Content className="discovery-sheet" aria-describedby={undefined}>
+            <div className="discovery-sheet-head">
+              <Dialog.Title className="discovery-sheet-title">Filters</Dialog.Title>
+              <Dialog.Close className="discovery-sheet-close" aria-label="Close filters">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"><path d="M4 4l8 8M12 4l-8 8" /></svg>
+              </Dialog.Close>
+            </div>
+            <div className="discovery-sheet-body discovery-filters">{controls}</div>
+            <div className="discovery-sheet-foot">
+              <button type="button" className="discovery-sheet-clear" disabled={!active.length} onClick={() => setParams({})}>Clear all</button>
+              <Dialog.Close className="discovery-sheet-apply">{papers.data ? `Show ${papers.data.total.toLocaleString("en-US")} ${papers.data.total === 1 ? "result" : "results"}` : "Show results"}</Dialog.Close>
+            </div>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
+    </div>
+    {active.length > 0 && <ul className="discovery-chips" aria-label="Active filters">{active.map(item => <li key={item.key}>
+      <button type="button" aria-label={`Remove filter ${item.label}: ${item.value}`} onClick={() => change(item.key, "")}>
+        <span>{item.value}</span>
+        <svg viewBox="0 0 16 16" width="12" height="12" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" /></svg>
+      </button>
+    </li>)}</ul>}
+    {/* Wider screens: the inline row. */}
+    <div className="discovery-filters discovery-filters-inline">
+      {controls}
+      <div className="discovery-filters-end">
+        {(hasFilters || hasPostControls) && <button type="button" className="discovery-clear" onClick={() => setParams({})}>Clear filters</button>}
+        </div>
     </div>
     {terms.isError || papers.isError ? <p role="alert">Could not load the catalog. <button onClick={() => { void papers.refetch(); void terms.refetch(); }}>Try again</button></p>
-      : papers.isPending ? <p role="status">Loading papers…</p>
-      : <><p role="status" className="discovery-count">{papers.data.total} {papers.data.total === 1 ? "paper" : "papers"}{papers.data.results.length > 0 && ` · Showing ${offset + 1}–${offset + papers.data.results.length}`}</p>
+      : papers.isPending ? <p role="status" className="discovery-count">Loading the catalog…</p>
+      : <><p role="status" className="discovery-count">{papers.data.total.toLocaleString("en-US")} {papers.data.total === 1 ? "result" : "results"}{papers.data.results.length > 0 && ` · Showing ${offset + 1}–${offset + papers.data.results.length}`}</p>
         <ul className="discovery-list">{papers.data.results.map(p => <li key={p.paper_id}>
           <Link to={"/paper/" + encodeURIComponent(p.reference)} {...paperLinkHandlers(p.paper_id, p.title, "title", "catalog", p.facets)}>{p.title}</Link>
           {p.facets.kind?.[0] === "post" ? <PostSummary work={p} details={[...(p.facets.year || []), ...(p.facets.contribution || []).map(slug => terms.data?.contribution?.[slug] || slug)]} />
             : <small>{[...(p.facets.year || []), ...(p.facets.contribution || []).map(slug => terms.data?.contribution?.[slug] || slug)].join(" · ")}</small>}
         </li>)}</ul>
-        {papers.data.results.length === 0 && <p>No papers match this selection.</p>}
+        {papers.data.results.length === 0 && <p className="discovery-empty">Nothing in the catalog matches these filters.</p>}
         <nav className="discovery-pager" aria-label="Catalog pages">
           {offset > 0 && <Link rel="prev" to={pageHref(Math.max(0, offset - PAGE))}>Previous</Link>}
           {offset + PAGE < papers.data.total && <Link rel="next" to={pageHref(offset + PAGE)}>Next</Link>}
