@@ -1,10 +1,15 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class Developer(BaseModel):
     github_id: int
     login: str
     repository_count: int
+    agent_work_count: int = Field(
+        0, description="Distinct research papers and agent-related posts (review agent relevance at least "
+        "Trending's MIN_AGENT_RELEVANCE) that credit one of the matching repositories: a post's original "
+        "repository or a paper's official implementation",
+    )
     featured_repo: str
     owned_stars: int | None = None
 

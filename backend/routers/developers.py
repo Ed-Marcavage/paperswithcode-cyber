@@ -15,7 +15,9 @@ def directory(
     q: str = Query("", max_length=100),
     topic: str = "", target: str = "", contribution: str = "",
     repository: str = Query("", max_length=250, description="Exact GitHub owner/name"),
-    sort: Literal["repos", "stars"] = Query("repos", description="Rank by matching repo count or stars on matching owned repos"),
+    sort: Literal["agent", "repos", "stars"] = Query(
+        "agent", description="agent: most agent-related work (agent_work_count, then commits to the repos those "
+        "works credit, then repo count, stars, login); repos: matching repo count; stars: stars on matching owned repos"),
     include_facet_counts: bool = Query(False, description="Distinct developers per option with all other filters retained"),
     limit: int = Query(24, ge=1, le=100), offset: int = Query(0, ge=0),
     db: Session = Depends(get_database_session),

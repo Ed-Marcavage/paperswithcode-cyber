@@ -6,7 +6,8 @@ import { CatalogFacetSelect } from "@/components/CatalogFacetSelect";
 import { filtersQuery } from "@/lib/api/discovery";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import "./DiscoveryCatalog.css";
-import { developerAxes, developerParams, developerPageSize, getDeveloper, getDevelopers } from "@/lib/api/developers";
+import { developerAxes, developerParams, developerPageSize, developerSort, getDeveloper, getDevelopers } from "@/lib/api/developers";
+import type { DeveloperSort } from "@/lib/api/developers";
 import { TEN_MINUTES } from "@/lib/api/queryKeys";
 import { repositoryReferencesHref } from "@/lib/industryPost";
 import "./Organizations.css";
@@ -24,6 +25,14 @@ function Avatar({ id, login }: { id: number; login: string }) {
   );
 }
 
+const sorts: [DeveloperSort, string, string][] = [
+  ["agent", "Most agent-related work", "Sorted by papers plus agent-related posts"],
+  ["repos", "Most tracked repos", "Most tracked repos"],
+  ["stars", "Most stars", "Stars on matching owned repos"],
+];
+
+const plural = (n: number, one: string, many: string) => `${n.toLocaleString()} ${n === 1 ? one : many}`;
+
 function Feedback({ loading, retry }: { loading: boolean; retry: () => void }) {
   return <div className="organizations-empty" role="status">{loading ? "Loading developers…" : (
     <>Couldn’t load developers. <button type="button" onClick={retry}>Try again</button></>
@@ -37,7 +46,7 @@ export function DevelopersIndex() {
   const page = Math.max(1, Math.min(100000, Number.parseInt(params.get("page") ?? "", 10) || 1));
   const terms = useQuery(filtersQuery);
   const request = developerParams(params, page);
-  const sortByStars = params.get("sort") === "stars";
+  const sort = developerSort(params.get("sort"));
   const repository = params.get("repository");
   const filtered = developerAxes.some(axis => params.get(axis)) || !!repository;
   const query = useQuery({
@@ -61,7 +70,7 @@ export function DevelopersIndex() {
       <section aria-labelledby="developers-heading">
         <div className="organizations-section-heading">
           <h2 id="developers-heading">{query.data ? `${count.toLocaleString()} ${count === 1 ? "developer" : "developers"}` : "Developers"}</h2>
-          <span>{sortByStars ? "Stars on matching owned repos" : "Most tracked repos"}</span>
+          <span>{sorts.find(([value]) => value === sort)?.[2]}</span>
         </div>
         <div className="organizations-controls">
           <label><span className="sr-only">Search GitHub usernames</span>
@@ -69,8 +78,10 @@ export function DevelopersIndex() {
               onChange={event => change("q", event.target.value, true)} />
           </label>
           <div className="organizations-sort" aria-label="Sort developers">
-            <button type="button" aria-pressed={!sortByStars} className={!sortByStars ? "active" : ""} onClick={() => change("sort", "")}>Most tracked repos</button>
-            <button type="button" aria-pressed={sortByStars} className={sortByStars ? "active" : ""} onClick={() => change("sort", "stars")}>Most stars</button>
+            {sorts.map(([value, label]) => (
+              <button key={value} type="button" aria-pressed={sort === value} className={sort === value ? "active" : ""}
+                onClick={() => change("sort", value === "agent" ? "" : value)}>{label}</button>
+            ))}
           </div>
         </div>
         <div className="discovery-filters developer-filters">
@@ -78,7 +89,7 @@ export function DevelopersIndex() {
             options={terms.data?.[axis]} counts={query.data?.facet_counts?.[axis]} disabled={!terms.data || !query.data}
             onChange={value => change(axis, value)} />)}
           {repository && <button type="button" onClick={() => change("repository", "")}>Remove {repository} ×</button>}
-          {(filtered || q) && <button type="button" onClick={() => setParams(sortByStars ? {sort: "stars"} : {})}>Clear filters</button>}
+          {(filtered || q) && <button type="button" onClick={() => setParams(sort === "agent" ? {} : {sort})}>Clear filters</button>}
         </div>
         {terms.isError && <p role="alert">Couldn’t load filter options. <button onClick={() => terms.refetch()}>Try again</button></p>}
 
@@ -94,8 +105,17 @@ export function DevelopersIndex() {
                     <div><h3>{dev.login}</h3></div>
                   </div>
                   <div className="organization-card-metrics">
-                    <strong>{sortByStars ? (dev.owned_stars?.toLocaleString() ?? "—") : dev.repository_count}</strong>
-                    <span>{sortByStars ? "owned repo stars" : filtered ? "matching repos" : dev.repository_count === 1 ? "tracked repo" : "tracked repos"}</span>
+                    {sort === "agent" ? <>
+                      {/* The default sort ranks by this count, as the Organizations card leads with its ranked sum. */}
+                      <strong>{dev.agent_work_count.toLocaleString()}</strong>
+                      <span>{filtered && "matching "}{dev.agent_work_count === 1 ? "agent-related work" : "agent-related works"}</span>
+                      <span className="organization-kind-summary">{filtered
+                        ? plural(dev.repository_count, "matching repo", "matching repos")
+                        : plural(dev.repository_count, "tracked repo", "tracked repos")}</span>
+                    </> : <>
+                      <strong>{sort === "stars" ? (dev.owned_stars?.toLocaleString() ?? "—") : dev.repository_count}</strong>
+                      <span>{sort === "stars" ? "owned repo stars" : filtered ? "matching repos" : dev.repository_count === 1 ? "tracked repo" : "tracked repos"}</span>
+                    </>}
                   </div>
                   <div className="organization-highlight"><span>{filtered ? "Matching work" : "Featured work"}</span><strong>{dev.featured_repo}</strong></div>
                 </Link>
