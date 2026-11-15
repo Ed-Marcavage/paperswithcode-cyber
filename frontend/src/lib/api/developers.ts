@@ -7,6 +7,8 @@ interface Developer {
 
 interface DeveloperCard extends Developer {
   repository_count: number;
+  /** Distinct papers and agent-related posts crediting a matching repo; the default sort's key. */
+  agent_work_count: number;
   featured_repo: string;
   owned_stars: number | null;
 }
@@ -22,6 +24,13 @@ interface DeveloperProfile extends Developer {
 
 export const developerPageSize = 24;
 
+/** "agent" (Most agent-related work) is the API default and is left out of the URL. */
+export type DeveloperSort = "agent" | "repos" | "stars";
+
+export function developerSort(value: string | null): DeveloperSort {
+  return value === "repos" || value === "stars" ? value : "agent";
+}
+
 export const developerAxes = ["topic", "target", "contribution"] as const;
 type DeveloperAxis = typeof developerAxes[number];
 
@@ -33,7 +42,8 @@ export function developerParams(params: URLSearchParams, page: number) {
     const value = params.get(key);
     if (value) result.set(key, value);
   }
-  if (params.get("sort") === "stars") result.set("sort", "stars");
+  const sort = developerSort(params.get("sort"));
+  if (sort !== "agent") result.set("sort", sort);
   return result.toString();
 }
 
