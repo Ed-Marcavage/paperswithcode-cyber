@@ -164,7 +164,7 @@ def render_discovery_document(page: DiscoveryPage) -> str:
             else ""
         )
         + (
-            f'<nav aria-label="Related research topics"><ul>{entity_links}</ul></nav>'
+            f'<nav aria-label="{escape(page.entity_heading or "Related research topics", quote=True)}"><ul>{entity_links}</ul></nav>'
             if entity_links
             else ""
         )

@@ -386,7 +386,12 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
     assert f"1. [Security agents & harnesses]({ORIGIN}/paper/2610.34435)" in markdown
     assert (markdown.index("## Editor's picks") < markdown.index("## Trending posts about AI agents")
             < markdown.index("## Trending research papers"))
-    assert "Relevant papers" not in markdown
+    assert "Relevant papers" not in markdown and "## Related research" not in markdown
+    # Every heading on "/" names what it lists.
+    headings = [line for line in markdown.splitlines() if line.startswith("## ")]
+    assert headings == ["## Editor's picks", "## More on this site", "## Trending posts about AI agents",
+                        "## Trending research papers"]
+    assert main.select_one('nav[aria-label="More on this site"]') is not None
     assert "featured posts about AI agents" in markdown and "GitHub star growth" in markdown
 
 

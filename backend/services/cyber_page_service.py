@@ -85,6 +85,7 @@ def homepage(db: Session, params) -> DiscoveryPage:
         highlight_heading=block["heading"],
         highlight_links=highlights,
         breadcrumbs=(),
+        entity_heading="More on this site",
         entity_links=(
             DiscoveryLink("/catalog", "Browse catalog"),
             DiscoveryLink("/mcp", "Connect an agent"),

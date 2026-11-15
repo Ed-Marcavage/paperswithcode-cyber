@@ -193,6 +193,8 @@ class DiscoveryPage:
     post_links: tuple[DiscoveryPaperLink, ...] = ()
     # Heading of the papers list; pages that do not set one say "Relevant papers".
     paper_heading: Optional[str] = None
+    # Heading of ``entity_links``; pages that do not set one say "Related research".
+    entity_heading: Optional[str] = None
 
     @property
     def canonical_url(self) -> str:

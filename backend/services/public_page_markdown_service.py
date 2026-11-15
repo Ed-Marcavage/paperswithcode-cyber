@@ -183,7 +183,7 @@ def render_discovery_markdown(page: DiscoveryPage) -> str:
     ]
     if related:
         lines.extend(
-            ["", "## Related research", "", *(f"- {item}" for item in related)]
+            ["", f"## {_markdown_text(page.entity_heading or 'Related research')}", "", *(f"- {item}" for item in related)]
         )
     for heading, links in (
         (page.post_heading or "", page.post_links),
