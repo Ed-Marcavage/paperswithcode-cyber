@@ -673,7 +673,9 @@ a.paper-resource.is-link:focus-visible {
 @container (max-width: 620px) {
   .trending-industry-grid { grid-template-columns: minmax(0, 1fr); gap: 8px; }
   .industry-card { flex-direction: row; align-items: stretch; }
-  .industry-card-thumb { flex: none; width: 104px; aspect-ratio: auto; border-bottom: 0; border-right: 1px solid var(--hairline); }
+  /* The text sets the row's height; the preview fills it rather than stretching it. */
+  .industry-card-thumb { position: relative; flex: none; width: 88px; min-height: 80px; aspect-ratio: auto; border-bottom: 0; border-right: 1px solid var(--hairline); }
+  .industry-card-thumb img { position: absolute; inset: 0; }
   .industry-card-body { flex: 1; padding: 10px 12px; gap: 4px; }
   .industry-card-title { font-size: 15.5px; }
   .industry-card-tldr { display: none; }
