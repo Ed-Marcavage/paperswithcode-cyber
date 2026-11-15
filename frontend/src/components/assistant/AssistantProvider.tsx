@@ -34,6 +34,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const topics = topicsQuery.data ?? [];
   const topic = topicByChat[currentId ?? ""] ?? null;
   const active = useRef<AbortController | null>(null);
+  // A turn whose answer is complete but whose follow-ups are still coming. The composer is
+  // free meanwhile; asking again, Stop or leaving the chat aborts it and drops the follow-ups.
+  const trailing = useRef<AbortController | null>(null);
   const revision = useRef(0);
   const setOpen = useCallback((value: boolean) => { updateOpen(value); remember(OPEN_KEY, String(value)); if (value) assistantEvent("opened", "panel"); }, []);
   const setId = useCallback((id: string | null) => { updateId(id); remember(ID_KEY, id); }, []);
@@ -60,24 +63,26 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }).finally(() => { if (!disposed) setLoading(false); });
     return () => { disposed = true; };
   }, [currentId, queryClient, setId]);
-  useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => () => { active.current?.abort(); trailing.current?.abort(); }, []);
 
-  const stop = useCallback(() => active.current?.abort(), []);
+  const stop = useCallback(() => { active.current?.abort(); trailing.current?.abort(); }, []);
   const selectConversation = useCallback((id: string) => {
     if (id === currentId) return;
-    active.current?.abort(); active.current = null; revision.current += 1;
+    active.current?.abort(); active.current = null; trailing.current?.abort(); trailing.current = null; revision.current += 1;
     setBusy(false); setError(null); setDraft(""); setConversation(empty()); setLoading(true); setId(id);
   }, [currentId, setId]);
   const newChat = useCallback((surface: AssistantSurface = "panel") => {
     assistantEvent("new_chat", surface);
-    active.current?.abort(); active.current = null; revision.current += 1;
+    active.current?.abort(); active.current = null; trailing.current?.abort(); trailing.current = null; revision.current += 1;
     setBusy(false); setLoading(false); setError(null); setDraft(""); setConversation(empty()); setId(null);
     setTopicByChat(({ "": _unsaved, ...saved }) => saved);
   }, [setId]);
 
   const send = useCallback(async (question: string, surface: AssistantSurface, path: string, { fresh = false, keepDraft = false, topic: chosen }: SendOptions = {}) => {
     if (active.current || !availability.available || !question.trim() || question.length > 1000 || (loading && !fresh)) return;
+    trailing.current?.abort(); trailing.current = null;
     const controller = new AbortController();
+    let complete = false; // answer_complete seen: the answer is final, only follow-ups remain
     active.current = controller;
     const version = revision.current;
     const answerId = crypto.randomUUID();
@@ -111,12 +116,24 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
         else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
-        else if (event.type === "done") { updateAnswer(m => ({ ...m, status: event.status, follow_ups: followUps(event.follow_ups) })); assistantEvent("answer_done", surface); if (event.status === "limit_reached") assistantEvent("limit_hit", surface); }
+        else if (event.type === "answer_complete") {
+          complete = true;
+          updateAnswer(m => ({ ...m, status: "done", working_note: undefined, follow_ups_pending: true }));
+          assistantEvent("answer_done", surface);
+          if (active.current === controller) { active.current = null; trailing.current = controller; setBusy(false); }
+        } else if (event.type === "done") {
+          updateAnswer(m => ({ ...m, status: event.status, follow_ups: followUps(event.follow_ups), follow_ups_pending: false }));
+          if (!complete) assistantEvent("answer_done", surface);
+          if (event.status === "limit_reached") assistantEvent("limit_hit", surface);
+        }
         else if (event.type === "error") throw new AssistantError(event.message, event.code, 0, event.retry_at);
       }
     } catch (failure) {
       if (version !== revision.current) return;
-      if (controller.signal.aborted) updateAnswer(m => ({ ...m, status: "cancelled" }));
+      // After answer_complete the saved answer stands; a stop, a new question or a lost
+      // stream only drops the follow-ups still on their way.
+      if (complete) updateAnswer(m => ({ ...m, follow_ups_pending: false }));
+      else if (controller.signal.aborted) updateAnswer(m => ({ ...m, status: "cancelled" }));
       else {
         const problem = failure instanceof AssistantError ? failure : new AssistantError("The assistant could not respond. Please try again.");
         assistantEvent(["usage_limit", "question_limit"].includes(problem.code) ? "limit_hit" : "error", surface);
@@ -128,8 +145,9 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         updateAnswer(m => ({ ...m, status: "failed", error: problem.message }));
       }
     } finally {
-      updateAnswer(m => ({ ...m, working_note: undefined }));
-      if (version === revision.current) { active.current = null; setBusy(false); }
+      updateAnswer(m => ({ ...m, working_note: undefined, follow_ups_pending: false }));
+      if (trailing.current === controller) trailing.current = null;
+      if (active.current === controller) { active.current = null; setBusy(false); }
       void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
     }
   }, [currentId, loading, queryClient, setId, availability.available, topic]);

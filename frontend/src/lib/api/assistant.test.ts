@@ -87,3 +87,11 @@ describe("topics and follow-ups", () => {
     expect(followUps(["One", "", 3, "Two", "Three", "Four"])).toEqual(["One", "Two", "Three"]);
   });
 });
+
+it("passes answer_complete through and keeps reading until done", async () => {
+  vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(
+    'data: {"type":"text_delta","text":"Answer"}\n\ndata: {"type":"answer_complete"}\n\ndata: {"type":"done","status":"done","follow_ups":[]}\n\n')));
+  const events = [];
+  for await (const event of assistantApi.turn("Question", null, "panel", "/", new AbortController().signal)) events.push(event);
+  expect(events.map(event => event.type)).toEqual(["text_delta", "answer_complete", "done"]);
+});

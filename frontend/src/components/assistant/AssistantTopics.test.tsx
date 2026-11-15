@@ -376,3 +376,71 @@ describe("topic analytics", () => {
     expect(capture).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("follow-ups researched after the answer (answer_complete)", () => {
+  function slowFollowUps(follow: string[]) {
+    let finish!: () => void;
+    const gate = new Promise<void>(resolve => { finish = resolve; });
+    const signals: AbortSignal[] = [];
+    const turn = vi.spyOn(assistantApi, "turn").mockImplementation(async function* (question, _id, _s, _p, signal): AsyncGenerator<AssistantEvent> {
+      signals.push(signal);
+      yield { type: "meta", conversation_id: "new", message_id: "m", run_id: `run-${signals.length}`, question_count: signals.length, question_limit: 10 };
+      yield { type: "text_delta", text: `Answer to ${question}` };
+      yield { type: "answer_complete" };
+      await new Promise<void>((resolve, reject) => { void gate.then(resolve); signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError"))); });
+      yield { type: "done", status: "done", follow_ups: follow };
+    });
+    return { turn, signals, finish: () => act(async () => { finish(); }) };
+  }
+  async function askFirst() {
+    const input = await box();
+    fireEvent.change(input, { target: { value: "First" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await screen.findByText("Answer to First");
+    return input;
+  }
+
+  it("finishes the answer at once, frees the composer while waiting, then shows the follow-ups", async () => {
+    const slow = slowFollowUps(["One?", "Two?", "Three?"]);
+    mount();
+    const input = await askFirst();
+    expect((await screen.findByText("Looking for follow-ups…")).closest("[role=status]")).not.toBeNull();
+    await waitFor(() => expect(input).toBeEnabled());
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Good answer" })).toBeEnabled();
+    expect(screen.queryByText("Writing the answer…")).not.toBeInTheDocument();
+    await slow.finish();
+    expect(within(await screen.findByRole("group", { name: "Ask next" })).getAllByRole("button").map(b => b.textContent)).toEqual(["One?", "Two?", "Three?"]);
+    expect(screen.queryByText("Looking for follow-ups…")).not.toBeInTheDocument();
+  });
+
+  it("replaces the waiting state with nothing when done brings no follow-ups", async () => {
+    const slow = slowFollowUps([]);
+    mount();
+    await askFirst();
+    await screen.findByText("Looking for follow-ups…");
+    await slow.finish();
+    await waitFor(() => expect(screen.queryByText("Looking for follow-ups…")).not.toBeInTheDocument());
+    expect(screen.queryByRole("group", { name: "Ask next" })).not.toBeInTheDocument();
+  });
+
+  it("asking again during the wait aborts the old request, keeps its answer and drops its follow-ups", async () => {
+    const slow = slowFollowUps(["Late?"]);
+    mount();
+    const input = await askFirst();
+    await screen.findByText("Looking for follow-ups…");
+    await waitFor(() => expect(input).toBeEnabled());
+    fireEvent.change(input, { target: { value: "Second" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    await screen.findByText("Answer to Second");
+    expect(slow.turn).toHaveBeenCalledTimes(2);
+    expect(slow.signals[0].aborted).toBe(true);
+    expect(screen.getByText("Answer to First")).toBeInTheDocument();
+    expect(screen.queryByText("Stopped. Your partial answer is saved.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Looking for follow-ups…")).toHaveLength(1);
+    await slow.finish();
+    expect(await screen.findByRole("button", { name: "Late?" })).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Late?" })).toHaveLength(1);
+  });
+});

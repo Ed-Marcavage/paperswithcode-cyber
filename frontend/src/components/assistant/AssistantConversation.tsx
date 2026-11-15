@@ -35,6 +35,7 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
   const last = messages[messages.length - 1];
   // Only the latest finished answer offers next questions, and only while one can be asked.
   const suggestions = !disabled && last?.role === "assistant" && last.status === "done" ? followUps(last.follow_ups) : [];
+  const lookingForMore = !disabled && last?.role === "assistant" && last.status === "done" && Boolean(last.follow_ups_pending);
   const ask = (question: string) => { assistantEvent("follow_up_clicked", surface); void chat.send(question, surface, pathname, { keepDraft: true }); };
   const offerTopics = chat.topics.length > 0 && !paused;
   const placeholder = !chat.availability.available ? chat.availability.reason ?? "The assistant is unavailable."
@@ -82,6 +83,9 @@ export function AssistantConversationView({ surface = "panel" }: { surface?: Ass
                 {message.content && <AssistantMarkdown text={message.content} streaming={running} evidence={evidence} surface={surface} />}
                 {message.status === "cancelled" && <p className="assistant-message-note">Stopped. Your partial answer is saved.</p>}
                 <AssistantFeedback message={message} surface={surface} />
+                {message === last && lookingForMore && <div className="assistant-follow-ups is-pending" role="status">
+                  <span className="assistant-pulse" aria-hidden="true"><i /><i /><i /></span><span>Looking for follow-ups…</span>
+                </div>}
                 {message === last && suggestions.length > 0 && <div className="assistant-follow-ups" role="group" aria-labelledby={`assistant-next-${surface}`}>
                   <p id={`assistant-next-${surface}`} className="assistant-follow-ups-label">Ask next</p>
                   <ul>{suggestions.map(question => <li key={question}><button type="button" onClick={() => ask(question)}>

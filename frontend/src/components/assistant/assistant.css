@@ -788,3 +788,5 @@
 .assistant-panel .assistant-topics { margin-top: 18px; }
 .assistant-panel .assistant-topic-chips { gap: 6px; }
 .assistant-panel .assistant-topic-chips button { padding: 4px 10px 4px 11px; font-size: 12.5px; }
+/* The answer is complete and the box is free; next questions are still being looked up. */
+.assistant-follow-ups.is-pending { display: flex; align-items: center; gap: 9px; min-height: 26px; font-size: 12.5px; color: var(--ink-faint); }

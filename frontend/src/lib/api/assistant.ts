@@ -9,6 +9,7 @@ export interface AssistantMessage {
   working_note?: string; // Transient stream state; never persisted as answer text.
   feedback?: { rating: "good" | "bad" | null; note: string | null } | null;
   follow_ups?: string[]; // Assistant messages: up to three suggested next questions.
+  follow_ups_pending?: boolean; // Transient: answer complete, follow-ups not yet arrived.
   topic?: string | null; // User messages sent in this visit: the topic slug they were asked under.
 }
 export interface AssistantTopic { slug: string; label: string; count: number }
@@ -18,6 +19,7 @@ export type AssistantEvent =
   | { type: "meta"; conversation_id: string; message_id: string; run_id: string; question_count: number; question_limit: number }
   | { type: "text_delta" | "working_note"; text: string }
   | { type: "tool_started" | "tool_finished"; id: string; name: string; error?: boolean; result?: string }
+  | { type: "answer_complete" } // Answer text final and saved; follow-ups still being researched.
   | { type: "done"; status: string; follow_ups?: string[] }
   | { type: "error"; code: string; message: string; retry_at?: string | null };
 
