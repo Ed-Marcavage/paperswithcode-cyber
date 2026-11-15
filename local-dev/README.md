@@ -470,7 +470,9 @@ history per question and the application's normal bounded loop. Its JSON Lines
 output records question, named model, answer, status/error, tools and results,
 links, duration, model-call count and input/output tokens (null when absent).
 It writes each row immediately and stops on a provider usage limit. It neither
-writes chat history to the database nor sends analytics.
+writes chat history to the database nor sends analytics. Like chat, it makes
+bounded read-only post-metadata lookups with the backend database settings;
+unavailable enrichment is marked in the tool result and does not fail the turn.
 
 The specification author has authorized the **reviewer** to evaluate up to
 three named models, 20 questions per model. The implementer must not run this

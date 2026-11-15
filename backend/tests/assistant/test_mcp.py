@@ -13,7 +13,7 @@ from backend.services.assistant_mcp import (
 def run(call, handler):
     async def go():
         async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-            return await call(CatalogMcp(client, "http://catalog.test/mcp"))
+            return await call(CatalogMcp(client, "http://catalog.test/mcp", lookup=lambda ids: {}))
     return asyncio.run(go())
 
 

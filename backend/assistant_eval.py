@@ -1,4 +1,6 @@
-"""Run the fixed, sequential catalog evaluation; no database or visitor identity.
+"""Run the fixed catalog evaluation; no chat writes or visitor identity.
+
+Tool results use the same optional read-only post-metadata enrichment as chat.
 
 Usage: uv run --env-file .local.env python -m backend.assistant_eval \
     --model glm-5.3-flash --output .assistant-evals/glm.jsonl

@@ -13,6 +13,7 @@ from typing import Any
 import httpx
 from backend.services.assistant_catalog_links import add_catalog_urls
 from backend.services.assistant_tool_budget import bounded_arguments, bounded_tool, compact_result
+from backend.services.assistant_post_metadata import enrich_posts, lookup_post_metadata
 
 TOOL_NAMES = frozenset({
     "search_papers", "browse_catalog", "catalog_filters", "get_paper_info",
@@ -41,37 +42,33 @@ class ToolResult:
     is_error: bool = False
 
 
-def cap_result(value: dict[str, Any], limit: int, tool: str, arguments: dict | None = None) -> ToolResult:
-    # MCP often repeats the same payload in text and structuredContent. Give
-    # the model one copy; full_bytes measures that uncapped model input, not
-    # the transport envelope (whose independent wire limit remains above).
+def result_payload(value: dict[str, Any]):
+    # One copy of the MCP data, never both the text and structured envelope.
     if value.get("structuredContent") is not None:
-        payload = value["structuredContent"]
-        if not value.get("isError"):
-            payload = compact_result(tool, add_catalog_urls(tool, payload), arguments or {})
-        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
-    else:
-        text = "\n".join(block["text"] for block in value.get("content", [])
-                         if isinstance(block, dict) and block.get("type") == "text"
-                         and isinstance(block.get("text"), str))
-        if not value.get("isError"):
-            try:
-                payload = json.loads(text)
-            except ValueError:
-                pass  # Plain MCP text is already suitable model input.
-            else:
-                text = json.dumps(compact_result(tool, add_catalog_urls(tool, payload), arguments or {}), ensure_ascii=False, separators=(",", ":"))
-    raw = text.encode()
+        return value["structuredContent"], True
+    content = "\n".join(block["text"] for block in value.get("content", [])
+                        if isinstance(block, dict) and block.get("type") == "text"
+                        and isinstance(block.get("text"), str))
+    try:
+        return json.loads(content), True
+    except ValueError:
+        return content, False
+
+
+def cap_payload(payload, *, limit, is_json, is_error):
+    content = json.dumps(payload, ensure_ascii=False, separators=(",", ":")) if is_json else payload
+    raw = content.encode()
     truncated = len(raw) > limit
     if truncated:
-        text = raw[:limit - len(TRUNCATION.encode())].decode("utf-8", errors="ignore") + TRUNCATION
-    return ToolResult(text, len(raw), truncated, bool(value.get("isError")))
+        content = raw[:limit - len(TRUNCATION.encode())].decode("utf-8", errors="ignore") + TRUNCATION
+    return ToolResult(content, len(raw), truncated, is_error)
 
 
 class CatalogMcp:
-    def __init__(self, client: httpx.AsyncClient, endpoint: str):
+    def __init__(self, client: httpx.AsyncClient, endpoint: str, *, lookup=lookup_post_metadata):
         self.client = client
         self.endpoint = endpoint
+        self.lookup = lookup
 
     async def _request(self, method: str, params: dict) -> dict:
         request_id = str(uuid.uuid4())
@@ -118,4 +115,10 @@ class CatalogMcp:
         arguments = bounded_arguments(name, arguments)
         upstream_arguments = {k: v for k, v in arguments.items() if k != "counts_only"}
         result = await self._request("tools/call", {"name": name, "arguments": upstream_arguments})
-        return cap_result(result, READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES, name, arguments)
+        payload, is_json = result_payload(result)
+        is_error = bool(result.get("isError"))
+        if is_json and not is_error:
+            payload = compact_result(name, add_catalog_urls(name, payload), arguments)
+            payload = await enrich_posts(payload, self.lookup)
+        return cap_payload(payload, limit=READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES,
+                           is_json=is_json, is_error=is_error)
