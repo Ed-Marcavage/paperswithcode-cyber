@@ -1,12 +1,12 @@
-"""Mark hand-picked industry posts as curated ("Editor's pick").
+"""Mark hand-picked industry posts as curated, and pinned ones as editor's picks.
 
 Input: local-dev/curated_posts.json, edited by hand: {"pinned": [url, ...],
 "posts": [{url, company, title}, ...]} (a bare list of posts is also accepted).
 Each URL is matched to a reviewed post (one with post_details) after normalising
 scheme, `www.`, fragment and trailing slash. Matched posts get `curated: true`,
 `curated_company` and `curated_title` in post_details; a post listed in
-`pinned` also gets `curated_pin` (1 for the first URL), which fixes its place
-in Trending's industry block. Every pinned URL must also be in `posts`. Posts
+`pinned` also gets `curated_pin` (1 for the first URL), which puts it at the
+top of Trending's posts feed in that order, with an "Editor's pick" badge. Every pinned URL must also be in `posts`. Posts
 no longer listed lose those keys. A rerun with the same file changes nothing.
 import_post_details.py keeps these keys when it rewrites post_details.
 Preview rolls back; pass --execute to commit.

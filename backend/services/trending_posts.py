@@ -1,27 +1,25 @@
-"""Industry posts on the Trending page.
+"""Industry posts on the Trending page: the feed's "Posts" view.
 
-Two views over reviewed industry posts (discovery_works.post_details):
+The owner's pinned posts (``curated_pin`` in post_details, from the curated
+manifest's ``pinned`` list) lead the feed in pin order, whatever their date,
+tier or agent relevance; they are the site's "Editor's picks". After them come
+featured posts with agent relevance of at least ``MIN_AGENT_RELEVANCE``, ranked
+by ``post_score`` halved for every ``DECAY_HALF_LIFE_DAYS`` since publication,
+with the pinned posts left out so nothing is listed twice.
 
-- ``industry_block``: the short list above the Trending feed. Posts the owner
-  pinned (``curated_pin`` in post_details, from the curated manifest's
-  ``pinned`` list) come first in pin order, whatever their date. Remaining
-  slots take curated posts from the date window (newest first), then other
-  featured posts with agent relevance of at least ``MIN_AGENT_RELEVANCE``,
-  ranked by ``post_score`` and then recency.
-- ``posts_feed``: the Trending feed's "Posts" view. Featured posts with agent
-  relevance of at least ``MIN_AGENT_RELEVANCE``, ranked by ``post_score``
-  halved for every ``DECAY_HALF_LIFE_DAYS`` since publication.
+Pinned posts take the first slots of the first page only (at most one page of
+them). A date window keeps only posts published inside it, pinned or not; the
+pinned posts inside the window still come first. Posts marked ``curated`` but
+not pinned get no special place. Everything else stays in the catalog and
+search; it is just not on Trending.
 
-Only hand-picked posts (curated or pinned) skip the agent-relevance rule.
-Everything else stays in the catalog and search; it is just not on Trending.
-
-Ages and windows count back from ``ANCHOR_DATE``. The preview catalog is a
-static snapshot, so the default anchor is the newest reviewed post's
-publication date rather than today's date.
+Ages count back from ``ANCHOR_DATE``. The preview catalog is a static
+snapshot, so the default anchor is the newest reviewed post's publication date
+rather than today's date.
 """
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import date
 from typing import Optional
 
 from sqlalchemy import text
@@ -32,11 +30,7 @@ from backend.services.publishers import PUBLISHER_ORGANIZATION_SQL, publisher_na
 # None anchors to the newest reviewed post's date; set a date to pin it.
 ANCHOR_DATE: Optional[date] = None
 
-BLOCK_LIMIT = 6
-BLOCK_WINDOW_DAYS = 14
-BLOCK_WIDE_WINDOW_DAYS = 30
-THIS_WEEK_DAYS = 7
-# Trending lists posts that are not hand-picked only at this agent relevance (0-4) or above.
+# Trending lists posts that are not pinned only at this agent relevance (0-4) or above.
 MIN_AGENT_RELEVANCE = 3
 DECAY_HALF_LIFE_DAYS = 7
 
@@ -66,7 +60,7 @@ def post_score(post: dict) -> int:
 
 def agent_related(post: dict, min_agent_relevance: int = MIN_AGENT_RELEVANCE) -> bool:
     """Agent relevance at least ``min_agent_relevance`` (the catalog API's parameter of the
-    same name); the default is Trending's rule for posts that are not hand-picked."""
+    same name); the default is Trending's rule for posts that are not pinned."""
     return (post.get("agent_relevance") or 0) >= min_agent_relevance
 
 
@@ -75,38 +69,10 @@ def _published_on(row: dict) -> date:
     return value.date() if hasattr(value, "date") else value
 
 
-def _pin(row: dict) -> Optional[int]:
-    value = row["post"].get("curated_pin")
+def pin(post: dict) -> Optional[int]:
+    """The owner's pin number (1 leads the feed), or None for a post that is not pinned."""
+    value = (post or {}).get("curated_pin")
     return value if type(value) is int and value > 0 else None
-
-
-def select_block(rows: list[dict], anchor: date, limit: int = BLOCK_LIMIT) -> tuple[list[dict], int]:
-    """Pick the block's posts from candidate rows; return them and the window used (days).
-
-    Pinned posts fill the first slots in pin order regardless of date; the date
-    window only governs the slots left after them."""
-    pinned = sorted((row for row in rows if _pin(row) is not None), key=lambda row: (_pin(row), row["paper_id"]))
-    pinned = pinned[:limit]
-    if len(pinned) >= limit:
-        return pinned, BLOCK_WINDOW_DAYS
-    rows = [row for row in rows if _pin(row) is None]
-    window = BLOCK_WINDOW_DAYS
-    for window in (BLOCK_WINDOW_DAYS, BLOCK_WIDE_WINDOW_DAYS):
-        start = anchor - timedelta(days=window)
-        in_window = [row for row in rows if start < _published_on(row) <= anchor]
-        curated = sorted((row for row in in_window if row["post"].get("curated")),
-                         key=lambda row: (_published_on(row), row["paper_id"]), reverse=True)
-        others = sorted(
-            (row for row in in_window if not row["post"].get("curated")
-             and row["post"].get("tier") == "featured"
-             and agent_related(row["post"])),
-            key=lambda row: (post_score(row["post"]), _published_on(row), row["paper_id"]),
-            reverse=True,
-        )
-        chosen = (pinned + curated + others)[:limit]
-        if len(chosen) >= limit:
-            break
-    return chosen, window
 
 
 def decayed_score(post: dict, published: date, anchor: date) -> float:
@@ -126,53 +92,32 @@ def _serialize(row: dict) -> dict:
             "publisher": publisher_name(row["source_url"], row["post"].get("curated_company"), organization)}
 
 
-def block_heading(pinned: int, shown: int, this_week: bool) -> str:
-    """Heading for the block. Only an unpinned block makes a date claim."""
-    if shown and pinned >= shown:
-        return "Editor's picks from industry"
-    if pinned:
-        return "From industry"
-    return "From industry this week" if this_week else "Recent from industry"
-
-
-def industry_block(db: Session, limit: int = BLOCK_LIMIT) -> dict:
-    anchor = anchor_date(db)
-    if anchor is None:
-        return {"anchor_date": None, "window_days": BLOCK_WINDOW_DAYS, "this_week": False, "pinned": 0,
-                "heading": block_heading(0, 0, False), "results": []}
-    rows = [dict(row) for row in db.execute(text(_POSTS + """
-        AND ((p.date_published > :start AND p.date_published <= :anchor
-              AND (w.post_details ->> 'tier' = 'featured' OR w.post_details ->> 'curated' = 'true'))
-             OR w.post_details ? 'curated_pin')
-    """), {"start": anchor - timedelta(days=BLOCK_WIDE_WINDOW_DAYS), "anchor": anchor}).mappings()]
-    chosen, window = select_block(rows, anchor, limit)
-    pinned = sum(1 for row in chosen if _pin(row) is not None)
-    recent = sum(1 for row in chosen if anchor - timedelta(days=THIS_WEEK_DAYS) < _published_on(row) <= anchor)
-    # "This week" only for an unpinned block with at least 3 posts from the last 7 days.
-    this_week = pinned == 0 and recent >= 3
-    return {
-        "anchor_date": anchor.isoformat(),
-        "window_days": window,
-        "this_week": this_week,
-        "pinned": pinned,
-        "heading": block_heading(pinned, len(chosen), this_week),
-        "results": [_serialize(row) for row in chosen],
-    }
+def order_feed(rows: list[dict], anchor: date, page_size: int) -> list[dict]:
+    """The whole Posts view in order: pinned posts in pin order (at most ``page_size``,
+    so they stay on the first page), then the ranked featured, agent-related posts
+    that are not among them."""
+    pinned = sorted((row for row in rows if pin(row["post"]) is not None),
+                    key=lambda row: (pin(row["post"]), row["paper_id"]))[:page_size]
+    leading = {row["paper_id"] for row in pinned}
+    ranked = rank_feed([row for row in rows if row["paper_id"] not in leading
+                        and row["post"].get("tier") == "featured" and agent_related(row["post"])], anchor)
+    return pinned + ranked
 
 
 def posts_feed(db: Session, page: int, page_size: int, start_date: Optional[date] = None,
                end_date: Optional[date] = None) -> tuple[list[dict], int]:
-    """Rows for one page of the Posts view (featured, agent-related, ranked), and the total count."""
+    """Rows for one page of the Posts view (pinned posts, then featured agent-related posts,
+    ranked), and the total count. Rows inside ``start_date``..``end_date`` only, when given."""
     anchor = anchor_date(db)
     if anchor is None:
         return [], 0
     rows = [dict(row) for row in db.execute(text(_POSTS + """
-        AND w.post_details ->> 'tier' = 'featured'
+        AND (w.post_details ->> 'tier' = 'featured' OR w.post_details ? 'curated_pin')
         AND (CAST(:start AS date) IS NULL OR p.date_published >= :start)
         AND (CAST(:end AS date) IS NULL OR p.date_published <= :end)
     """), {"start": start_date, "end": end_date}).mappings()]
-    ranked = rank_feed([row for row in rows if agent_related(row["post"])], anchor)
-    return [_serialize(row) for row in ranked[(page - 1) * page_size: page * page_size]], len(ranked)
+    ordered = order_feed(rows, anchor, page_size)
+    return [_serialize(row) for row in ordered[(page - 1) * page_size: page * page_size]], len(ordered)
 
 
 def posts_feed_ids(db: Session, page: int, page_size: int, start_date: Optional[date] = None,
