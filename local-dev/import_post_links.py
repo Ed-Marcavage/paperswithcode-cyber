@@ -21,12 +21,15 @@ bundle/v2-fields.json), and backend/config/publisher_organizations.json.
    (its snapshot) for later runs; a name first seen before its snapshot exists resolves
    on the run after fetch_developers.py/import_developers.py. `is_official` is set for CREDITED_ROLES only: that
    flag is what star-based Trending and the Developers tab count. `post-review` links the
-   input no longer has are removed; links from reviewed repository manifests are kept
+   input explicitly replaces are removed; omitted posts and missing `code_links` fields
+   are untouched. An explicit empty list clears that post's `post-review` links.
+   Links from reviewed repository manifests are kept
    (their empty role/evidence is filled in).
 
 Stars and developers follow with fetch_developers.py and import_developers.py, which
 collect credited repositories only. Preview rolls back; pass --execute to commit. A rerun
-with the same inputs changes nothing.
+with the same inputs changes nothing. --replace-all requires an explicit code_links
+list for every catalog post; incomplete input is refused before changing links.
 """
 import argparse
 from collections import Counter
@@ -111,6 +114,26 @@ def resolve_organizations(db, counts):
     return ids, table
 
 
+def reviewed_posts(posts, reviews, *, replace_all=False):
+    """Missing data is not an instruction to delete. Validate before any writes."""
+    selected = []
+    for post in posts:
+        review = reviews.get(post[1])
+        if review is None or "code_links" not in review:
+            if replace_all:
+                raise ValueError(f"Full replacement requires code_links for every post; missing {post[1]}")
+            continue
+        if not isinstance(review["code_links"], list):
+            raise ValueError(f"code_links must be an explicit list on {post[1]}")
+        desired_links(review["code_links"], post[1])
+        selected.append(post)
+    return selected
+
+
+def changed_post(counts, paper_id):
+    counts.setdefault("changed_post_ids", set()).add(paper_id)
+
+
 def link_publishers(db, posts, counts):
     org_ids, table = resolve_organizations(db, counts)
     links = {}
@@ -127,6 +150,7 @@ def link_publishers(db, posts, counts):
             if link.source == PUBLISHER_SOURCE and link.organization_id != org_id:
                 db.delete(link)
                 counts["publisher_links_removed"] += 1
+                changed_post(counts, paper_id)
         if org_id is None:
             continue
         same = next((link for link in current if link.organization_id == org_id), None)
@@ -134,9 +158,11 @@ def link_publishers(db, posts, counts):
             db.add(PaperOrganization(paper_id=paper_id, organization_id=org_id,
                                      source=PUBLISHER_SOURCE, role="publisher"))
             counts["publisher_links_added"] += 1
+            changed_post(counts, paper_id)
         elif same.role is None:
             same.role = "publisher"
             counts["publisher_links_updated"] += 1
+            changed_post(counts, paper_id)
     counts["posts_without_publisher"] = sum(unmapped.values())
     counts["unmapped_hosts"] = dict(unmapped)
 
@@ -176,13 +202,14 @@ def known_repositories(db, counts):
 
 
 def link_repositories(db, posts, reviews, counts):
+    posts = reviewed_posts(posts, reviews)
     repositories, _ = known_repositories(db, counts)
     links = {}
     for link in db.query(PaperRepository).filter(PaperRepository.paper_id.in_([p for p, _, _ in posts])):
         links.setdefault(link.paper_id, {})[link.repository_id] = link
     skipped = Counter()
     for paper_id, catalog_id, _ in posts:
-        chosen, skipped_here = desired_links(reviews.get(catalog_id, {}).get("code_links", []), catalog_id)
+        chosen, skipped_here = desired_links(reviews[catalog_id]["code_links"], catalog_id)
         skipped.update(skipped_here)
         current = links.get(paper_id, {})
         wanted = {}  # repository id -> link values; the strongest role when two names meet
@@ -203,20 +230,26 @@ def link_repositories(db, posts, reviews, counts):
             if link is None:
                 db.add(PaperRepository(paper_id=paper_id, repository_id=repo_id, source=LINK_SOURCE, **values))
                 counts["repository_links_added"] += 1
+                changed_post(counts, paper_id)
             elif link.source == LINK_SOURCE:
                 changed = {k: v for k, v in values.items() if getattr(link, k) != v}
                 for k, v in changed.items():
                     setattr(link, k, v)
                 counts["repository_links_updated"] += bool(changed)
+                if changed:
+                    changed_post(counts, paper_id)
             else:  # From a reviewed manifest: keep it, fill in what it lacks.
                 filled = {k: values[k] for k in ("role", "evidence", "link_url") if getattr(link, k) is None}
                 for k, v in filled.items():
                     setattr(link, k, v)
                 counts["manifest_links_filled"] += bool(filled)
+                if filled:
+                    changed_post(counts, paper_id)
         for repo_id, link in current.items():
             if link.source == LINK_SOURCE and repo_id not in wanted:
                 db.delete(link)
                 counts["repository_links_removed"] += 1
+                changed_post(counts, paper_id)
     counts["code_links_skipped"] = dict(skipped)
 
 
@@ -229,7 +262,7 @@ def local_session():
     return db
 
 
-def import_links(db, reviews) -> dict:
+def import_links(db, reviews, *, replace_all=False) -> dict:
     """Apply the links in the open transaction; the caller commits or rolls back."""
     db.execute(text("SELECT pg_advisory_xact_lock(27451504)"))
     migration = Path(__file__).resolve().parents[1] / "backend/database/migrations/add_discovery_post_links.sql"
@@ -241,8 +274,12 @@ def import_links(db, reviews) -> dict:
          WHERE facets -> 'kind' ? 'post' ORDER BY paper_id
     """)).all()
     counts = Counter()
-    link_publishers(db, posts, counts)
-    link_repositories(db, posts, reviews, counts)
+    selected = reviewed_posts(posts, reviews, replace_all=replace_all)
+    link_publishers(db, selected, counts)
+    link_repositories(db, selected, reviews, counts)
+    counts["posts_changed"] = len(counts.get("changed_post_ids", set()))
+    counts["links_added"] = counts["publisher_links_added"] + counts["repository_links_added"]
+    counts["links_removed"] = counts["publisher_links_removed"] + counts["repository_links_removed"]
     db.flush()
     totals = db.execute(text("""
         SELECT coalesce(pr.role, 'none'), count(*), count(DISTINCT pr.repository_id)
@@ -250,7 +287,7 @@ def import_links(db, reviews) -> dict:
          WHERE w.facets -> 'kind' ? 'post' GROUP BY 1 ORDER BY 1
     """)).all()
     return {
-        "posts": len(posts), "reviews": len(reviews),
+        "posts": len(posts), "reviews": len(reviews), "posts_skipped": len(posts) - len(selected),
         "reviews_without_post": len(reviews.keys() - {c for _, c, _ in posts}),
         **{k: counts[k] for k in CHANGE_COUNTS + (
             "organizations_reused", "posts_without_publisher", "repositories_known_under_two_names")},
@@ -260,7 +297,7 @@ def import_links(db, reviews) -> dict:
 
 
 # Counts that are zero when a rerun changes nothing.
-CHANGE_COUNTS = ("organizations_created", "publisher_links_added", "publisher_links_updated",
+CHANGE_COUNTS = ("posts_changed", "links_added", "links_removed", "organizations_created", "publisher_links_added", "publisher_links_updated",
                  "publisher_links_removed", "repositories_created", "repository_links_added",
                  "repository_links_updated", "repository_links_removed", "manifest_links_filled")
 
@@ -269,6 +306,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("fields", type=Path, nargs="+")
     parser.add_argument("--execute", action="store_true")
+    parser.add_argument("--replace-all", action="store_true", help="Require explicit code_links for every catalog post")
     args = parser.parse_args()
     reviews = {}
     for path in args.fields:
@@ -278,7 +316,7 @@ def main():
             raise ValueError(f"Catalog IDs repeated across input files: {repeated[:5]}")
         reviews.update(document)
     with local_session() as db:
-        result = import_links(db, reviews)
+        result = import_links(db, reviews, replace_all=args.replace_all)
         if args.execute:
             db.commit()
         else:
