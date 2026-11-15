@@ -97,13 +97,59 @@ it.each(["done", "error", "stop"])("keeps working notes in the tool line until %
   await waitFor(() => expect(input).toBeEnabled());
   fireEvent.change(input, { target: { value: "Find papers" } });
   fireEvent.keyDown(input, { key: "Enter" });
-  const note = await screen.findByText(/Let me also check the engineering posts/);
-  expect(note.tagName).toBe("SUMMARY");
+  await screen.findByText(/Let me also check the engineering posts/);
+  await waitFor(() => expect(screen.getByText(/Let me also check/).closest(".assistant-tools.is-running")).not.toBeNull());
+  const note = screen.getByText(/Let me also check the engineering posts/);
+  expect(note).toHaveAttribute("role", "status");
   expect(note.closest(".ph-mask")).not.toBeNull();
-  expect(container.querySelector(".assistant-markdown")).not.toHaveTextContent("Let me");
+  expect(container.querySelector(".assistant-markdown")?.textContent ?? "").not.toContain("Let me");
   if (terminal === "stop") fireEvent.click(screen.getByRole("button", { name: "Stop" }));
   else await act(async () => { finish(); });
   await waitFor(() => expect(screen.queryByText(/Let me also check/)).not.toBeInTheDocument());
   if (terminal === "done") expect(await screen.findByText("The final answer.")).toBeInTheDocument();
   expect(JSON.stringify(localStorage)).not.toContain("engineering posts");
+});
+
+it("marks the page so wide layouts reflow while the panel is open, and stands down on the chat page", async () => {
+  mount();
+  expect(document.documentElement).not.toHaveClass("assistant-panel-open");
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+  expect(document.documentElement).toHaveClass("assistant-panel-open");
+  expect(screen.getByRole("button", { name: "New chat" })).toHaveAttribute("title", "New chat");
+  expect(screen.getByRole("link", { name: "All chats" })).toHaveAttribute("href", "/chat");
+  fireEvent.click(screen.getByRole("button", { name: "Close assistant" }));
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(document.documentElement).not.toHaveClass("assistant-panel-open");
+  expect(screen.getByRole("button", { name: "Ask" })).toHaveFocus();
+});
+
+it("keeps a remembered open panel closed on the chat page", () => {
+  localStorage.setItem("pwc:assistant:open", "true");
+  render(<QueryClientProvider client={new QueryClient()}>
+    <MemoryRouter initialEntries={["/chat"]}><AssistantProvider><AssistantAskButton /><AssistantPanel /></AssistantProvider></MemoryRouter>
+  </QueryClientProvider>);
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Ask" })).not.toBeInTheDocument();
+  expect(document.documentElement).not.toHaveClass("assistant-panel-open");
+});
+
+it("shows a working state as soon as a question is sent", async () => {
+  let finish!: () => void;
+  const gate = new Promise<void>(resolve => { finish = resolve; });
+  vi.spyOn(assistantApi, "turn").mockImplementation(async function* (): AsyncGenerator<AssistantEvent> {
+    await gate;
+    yield { type: "tool_started", id: "one", name: "search_papers" };
+    await new Promise(() => {});
+  });
+  mount();
+  fireEvent.click(screen.getByRole("button", { name: "Ask" }));
+  const input = screen.getByRole("textbox", { name: "Your question" });
+  await waitFor(() => expect(input).toBeEnabled());
+  fireEvent.change(input, { target: { value: "Find papers" } });
+  fireEvent.keyDown(input, { key: "Enter" });
+  expect(await screen.findByText("Thinking…")).toHaveAttribute("role", "status");
+  await act(async () => { finish(); });
+  expect(await screen.findByText("Searching papers…")).toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
 });
