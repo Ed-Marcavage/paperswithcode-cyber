@@ -31,6 +31,7 @@ def main(argv=None, *, store=None):
         print(f"Run {run['id']} | {run['status']} | {run['model']}")
         print(f"Prompt {run['prompt_version']} {run['prompt_hash']}")
         print(f"Asked from {run['surface']} at {run['site_path']}")
+        print(f"Topic: {run['topic'] or 'none'}")
         print(f"Question: {run['question']}")
         for position, step in enumerate(run["steps"], 1):
             print(f"\nStep {position}: {step['kind']}")

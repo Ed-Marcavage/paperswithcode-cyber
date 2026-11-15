@@ -50,6 +50,7 @@ class AssistantRun(Base):
     conversation_id = Column(String(36), ForeignKey("assistant_conversations.id", ondelete="CASCADE"), nullable=False, index=True)
     message_id = Column(String(36), ForeignKey("assistant_messages.id", ondelete="CASCADE"), nullable=False, unique=True)
     question = Column(Text, nullable=False)
+    topic = Column(String(100))
     started_at = Column(DateTime(timezone=True), nullable=False, index=True)
     ended_at = Column(DateTime(timezone=True))
     status = Column(String(24), nullable=False)

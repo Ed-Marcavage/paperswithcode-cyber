@@ -17,9 +17,10 @@ from backend.services.assistant_input_budget import (
     estimate_input_tokens, finalizer_messages,
 )
 from backend.services.assistant_tool_budget import bounded_arguments
+from backend.services.assistant_topics import topic_instruction, scoped_result
 from backend.services.assistant_provider import is_busy, is_usage_limit, USAGE_LIMIT_MESSAGE
 
-PROMPT_VERSION = "cyber-assistant-v6"
+PROMPT_VERSION = "cyber-assistant-v7"
 SYSTEM_PROMPT = """You are the assistant for Papers with Code Cyber, a curated
 catalog of security research papers, industry posts, repositories, organizations
 and developers. The audience builds and uses AI agent harnesses for security
@@ -184,7 +185,7 @@ async def model_pass(client, model, messages, tools, result, room, *, final=Fals
 
 async def run_turn(
     client, mcp: CatalogMcp, model: str, history: list[dict], turn: Turn,
-    *, limits: TurnLimits = TurnLimits(), on_step: Callable[[dict], Awaitable[None]] | None = None,
+    *, topic: dict | None = None, limits: TurnLimits = TurnLimits(), on_step: Callable[[dict], Awaitable[None]] | None = None,
     on_provider_limit: Callable[[APIError], Awaitable[dict]] | None = None,
 ):
     """Yield UI events; keep bounded results and partial answers on ``turn``.
@@ -194,7 +195,9 @@ async def run_turn(
     """
     started = time.monotonic()
     deadline = started + limits.seconds
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history]
+    scope_prompt = topic_instruction(topic)
+    scope_messages = [{"role": "system", "content": scope_prompt}] if scope_prompt else []
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *scope_messages, *history]
     tools_used = 0
     model_attempts = 0
     output_used = 0
@@ -309,10 +312,14 @@ async def run_turn(
                 parsed = None
                 cache_key = None
                 cached_from = None
+                default_topic = None
                 try:
                     parsed = json.loads(arguments)
                     if not isinstance(parsed, dict):
                         raise ValueError("Expected an object")
+                    if topic and name in {"find_posts", "browse_catalog"} and "topic" not in parsed:
+                        parsed["topic"] = topic["slug"]
+                        default_topic = topic
                     parsed = bounded_arguments(name, parsed)
                     cache_key = (name, json.dumps(parsed, sort_keys=True, separators=(",", ":")))
                     if cache_key in tool_cache:
@@ -321,6 +328,8 @@ async def run_turn(
                         tool_result = ToolResult(note, len(note.encode()), False, previous.is_error)
                     else:
                         tool_result = await mcp.call(name, parsed)
+                    if default_topic:
+                        tool_result = scoped_result(tool_result, default_topic)
                 except AssistantMcpBusy as busy:
                     error = str(busy)
                     tool_result = ToolResult(error, len(error.encode()), False, True)
@@ -334,7 +343,7 @@ async def run_turn(
                     if cache_key is not None and tool_result is not None and not cached_from:
                         tool_cache[cache_key] = (call["id"], tool_result)
                     await record({"kind": "tool", "name": name, "call_id": call["id"],
-                            "arguments": arguments, "effective_arguments": parsed, "cached_from": cached_from, "result": tool_result.text if tool_result else "",
+                            "arguments": arguments, "effective_arguments": parsed, "default_topic": default_topic["slug"] if default_topic else None, "cached_from": cached_from, "result": tool_result.text if tool_result else "",
                             "limit_bytes": READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES,
                             "full_bytes": tool_result.full_bytes if tool_result else 0,
                             "truncated": tool_result.truncated if tool_result else False,
@@ -377,7 +386,7 @@ async def run_turn(
                     break
                 remaining = limits.input_tokens - input_used
                 token_limit = max(MIN_FINAL_INPUT_TOKENS, min(FINAL_INPUT_TOKENS, remaining // (2 - attempt)))
-                messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, turn.steps, token_limit)
+                messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, turn.steps, token_limit, scope_prompt=scope_prompt)
                 # The first attempt must leave time for the one empty retry.
                 seconds_left = deadline - time.monotonic()
                 allowance = seconds_left / 2 if attempt == 0 else seconds_left

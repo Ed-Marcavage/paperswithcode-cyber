@@ -537,11 +537,11 @@ non-browser clients must send a matching Origin. Bodies require
 `Content-Type: application/json` (an optional charset is accepted).
 
 Before enabling on an existing **local** database, the reviewer applies the
-four additive migrations in order (a new empty database's `init-db.sh` uses
+five additive migrations in order (a new empty database's `init-db.sh` uses
 ORM `create_all`, which includes these tables):
 
 ```sh
-for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql add_assistant_admission.sql
+for migration in add_assistant_history.sql add_assistant_runs.sql add_assistant_provider_limits.sql add_assistant_admission.sql add_assistant_topics_followups.sql
 do
   sh local-dev/compose.sh exec -T db psql -U pwc_local -d pwc_local -v ON_ERROR_STOP=1 < "backend/database/migrations/$migration"
 done
@@ -573,6 +573,15 @@ completing, renaming and giving feedback update last activity; reading does not.
 Expired chats cannot be reopened, continued, renamed or given feedback; late
 completions cannot revive them. The disclosed default is 90 days; update the
 privacy page if changing it.
+
+### Topic-scoped questions
+
+`GET /api/v1/assistant/topics` lists labeled topics with at least 20 research
+papers or agent-related posts, in descending count order. Choices cache for
+five minutes and remain available during provider cooldown. A turn may send
+`topic`; it is validated, recorded on the run/trace, and defaults unscoped post
+and browse calls for that turn only. Apply `add_assistant_topics_followups.sql`
+before using the new fields; subsequent turns must send the topic again.
 
 ### Model evaluation
 

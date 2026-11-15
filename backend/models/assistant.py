@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 class AssistantTurnRequest(BaseModel):
     question: str = Field(min_length=1, max_length=1000)
+    topic: str | None = Field(default=None, max_length=100)
     conversation_id: UUID | None = None
     surface: Literal["landing", "panel", "chat_page"] = "panel"
     site_path: str = Field(default="/", max_length=500)
