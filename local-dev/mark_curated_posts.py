@@ -5,8 +5,9 @@ Input: local-dev/curated_posts.json, edited by hand: {"pinned": [url, ...],
 Each URL is matched to a reviewed post (one with post_details) after normalising
 scheme, `www.`, fragment and trailing slash. Matched posts get `curated: true`,
 `curated_company` and `curated_title` in post_details; a post listed in
-`pinned` also gets `curated_pin` (1 for the first URL), which fixes its place
-in Trending's industry block. Every pinned URL must also be in `posts`. Posts
+`pinned` also gets `curated_pin` (1 for the first URL): the first three pins
+are Trending's Editor's picks block in that order, and every pinned post carries
+the "Editor's pick" badge. Every pinned URL must also be in `posts`. Posts
 no longer listed lose those keys. A rerun with the same file changes nothing.
 import_post_details.py keeps these keys when it rewrites post_details.
 Preview rolls back; pass --execute to commit.

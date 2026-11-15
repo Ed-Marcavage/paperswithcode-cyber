@@ -26,21 +26,29 @@ CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
 # Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote,
 # cyberTrendingPostsDescription, cyberTrendingPapersDescription).
-INDUSTRY_NOTE = "The block at the top shows hand-picked industry engineering posts."
-# React's Trending switch opens on posts (?kind=paper shows papers); the server page
-# lists both feeds, posts first, so crawlers keep the paper links.
+INDUSTRY_NOTE = "Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers."
+# React's Trending opens with the Editor's picks block, then the feed's switch on posts
+# (?kind=paper shows papers); the server page lists the picks, then both feeds, posts
+# first, so crawlers keep the paper links. Pinned posts in the posts list are labelled
+# like React's "Editor's pick" badge.
 POSTS_HEADING = "Trending posts about AI agents"
+PAPERS_HEADING = "Trending research papers"
+EDITORS_PICK = "Editor's pick"
 POSTS_FEED_DESCRIPTION = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication."
 PAPERS_FEED_DESCRIPTION = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality."
 
 
-def _post_link(row: dict) -> DiscoveryPaperLink:
-    """A Trending industry post (block or feed row) as a page link."""
+def _post_link(row: dict, badge: bool = False) -> DiscoveryPaperLink:
+    """A Trending industry post as a page link; with ``badge``, a pinned post is marked
+    as an editor's pick (feed rows; the picks block has its own heading)."""
+    publisher = row.get("publisher") or ""
+    label = " · ".join(value for value in (
+        EDITORS_PICK if badge and trending_posts.pin(row["post"]) is not None else "", publisher) if value)
     return DiscoveryPaperLink(
         quote(row["reference"], safe=""),
         row["post"].get("curated_title") or row["title"],
         date.fromisoformat(row["date_published"]),
-        row.get("publisher") or "",
+        label,
     )
 
 
@@ -57,7 +65,7 @@ def homepage(db: Session, params) -> DiscoveryPage:
     papers = PaperService(db).get_papers(
         page=1, page_size=20, order_by="trending", latest_only=True, **dates
     )
-    # The same industry block React shows above the feed, so the links are crawlable.
+    # The same Editor's picks block React shows above the feed, so the links are crawlable.
     block = trending_posts.industry_block(db)
     highlights = tuple(_post_link(row) for row in block["results"])
     return DiscoveryPage(
@@ -81,7 +89,8 @@ def homepage(db: Session, params) -> DiscoveryPage:
             DiscoveryLink("/mcp", "Connect an agent"),
         ),
         post_heading=POSTS_HEADING,
-        post_links=tuple(_post_link(row) for row in posts),
+        post_links=tuple(_post_link(row, badge=True) for row in posts),
+        paper_heading=PAPERS_HEADING,
         paper_links=tuple(
             DiscoveryPaperLink(
                 get_paper_route_identifier(p.source, p.arxiv_id, int(p.id)),

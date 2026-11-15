@@ -66,12 +66,12 @@ export const TRENDING_INDUSTRY_SURFACE = "trending_industry";
 export const ALL_INDUSTRY_POSTS_HREF = "/catalog?kind=post&order=featured";
 
 /**
- * Trending block heading. The backend sends it ("Editor's picks from industry" when pinned posts
- * fill the block); the fallback says "this week" only when at least 3 posts are from the last 7 days.
+ * An "Editor's pick": a post the editor pinned (`curated_pin`). The first three pins fill Trending's
+ * Editor's picks block; the others rank in the feed like any post. Posts marked `curated` without a
+ * pin get no badge, so the badge means the same on every card.
  */
-export function industryHeading(highlights: { this_week: boolean; heading?: string }): string {
-  if (highlights.heading) return highlights.heading;
-  return highlights.this_week ? "From industry this week" : "Recent from industry";
+export function isEditorsPick(post: { curated_pin?: number | null } | null | undefined): boolean {
+  return (post?.curated_pin ?? 0) > 0;
 }
 
 /** Reviewed repository roles for a post's code links, in display order (the post's own code first). */

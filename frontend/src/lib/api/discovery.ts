@@ -18,22 +18,23 @@ export interface DiscoveryWork {
   has_text: boolean;
   /** Reviewed industry-post fields; null for papers and repositories. */
   post?: CatalogPost | null;
-  /** ISO publication date; sent by the Trending industry highlights. */
+  /** ISO publication date; sent by the Trending Editor's picks. */
   date_published?: string | null;
-  /** Industry posts: company name (highlights: curated name first; then the publisher organization, else the host). */
+  /** Industry posts: company name (picks: curated name first; then the publisher organization, else the host). */
   publisher?: string | null;
+  /** Preview image address (the post's screenshot or the paper's thumbnail); sent by the Editor's picks. */
+  thumbnail_url?: string | null;
 }
-/** Industry posts for the top of Trending (backend `trending_posts.industry_block`). */
+/** Trending's Editor's picks block (backend `trending_posts.industry_block`): the first pins, in pin order. */
 export interface IndustryHighlights {
-  /** Newest reviewed post's date; windows count back from it. */
+  /** Newest reviewed post's date. */
   anchor_date: string | null;
-  /** 14, or 30 when 14 days held too few posts. */
-  window_days: number;
-  /** No pinned posts, and at least 3 of the results are from the 7 days before the anchor. */
+  /** Kept for the route's earlier shape; the picks do not depend on a date window. */
+  window_days: number | null;
   this_week: boolean;
-  /** How many results are owner-pinned (curated manifest `pinned`); they come first. */
+  /** How many results are owner-pinned (curated manifest `pinned`); all of them are. */
   pinned?: number;
-  /** Heading chosen by the backend; it only makes a date claim when nothing is pinned. */
+  /** "Editor's picks". */
   heading?: string;
   results: DiscoveryWork[];
 }

@@ -187,7 +187,7 @@ def render_discovery_markdown(page: DiscoveryPage) -> str:
         )
     for heading, links in (
         (page.post_heading or "", page.post_links),
-        ("Relevant papers", page.paper_links),
+        (page.paper_heading or "Relevant papers", page.paper_links),
     ):
         if not links:
             continue

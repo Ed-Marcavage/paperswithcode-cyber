@@ -77,7 +77,10 @@ class CatalogPost(BaseModel):
     reports_benchmark_results: bool = False
     agent_harness_engineering: bool = False
     entities: List[CatalogPostEntity] = Field(default_factory=list)
-    curated: bool = Field(False, description="Hand-picked by the catalog editor (Editor's pick)")
+    curated: bool = Field(False, description="Hand-picked by the catalog editor")
+    curated_pin: Optional[int] = Field(
+        None, description="The editor's pin number: the first three pins are Trending's Editor's "
+                                "picks block, in this order; every pinned post carries the Editor's pick badge")
     curated_company: Optional[str] = Field(None, description="Company name the editor gives for a curated post")
     curated_title: Optional[str] = Field(None, description="Short display title the editor gives for a curated post")
 

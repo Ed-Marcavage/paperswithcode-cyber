@@ -1,4 +1,4 @@
-"""Industry posts on Trending: block selection, Posts ranking and routes."""
+"""Industry posts on Trending: Editor's picks, Posts ranking and routes."""
 from datetime import date, timedelta
 
 from fastapi.testclient import TestClient
@@ -9,7 +9,7 @@ from backend.main import create_app
 from backend.services import trending_posts
 from backend.services.publishers import publisher_name
 from backend.services.trending_posts import (
-    MIN_AGENT_RELEVANCE, agent_related, block_heading, decayed_score, post_score, rank_feed, select_block,
+    MIN_AGENT_RELEVANCE, agent_related, decayed_score, order_feed, post_score, rank_feed, select_picks,
 )
 
 ANCHOR = date(2026, 11, 12)
@@ -36,47 +36,22 @@ def test_score_adds_one_for_harness_engineering():
     assert post_score(row(1, 0, depth=3, originality=2, harness=True)["post"]) == 6
 
 
-def test_block_puts_curated_first_newest_first_then_scores():
-    rows = [
-        row(1, 1, depth=4, originality=4),
-        row(2, 5, curated=True),
-        row(3, 2, curated=True, tier="catalog", relevance=0),
-        row(4, 3, depth=4, originality=3, harness=True),
-        row(5, 0, depth=2, originality=2),
-        row(6, 0, relevance=2, depth=4, originality=4),  # agent relevance too low
-        row(7, 0, tier="catalog", depth=4, originality=4),  # not featured
-        row(8, 4, depth=2, originality=2),
-        row(9, 6, depth=1, originality=1),
-    ]
-    chosen, window = select_block(rows, ANCHOR)
-    assert window == 14
-    assert ids(chosen) == ["3", "2", "1", "4", "5", "8"]
+def test_picks_are_the_first_three_pins_in_pin_order_whatever_their_date_or_review():
+    rows = [row(1, 0, depth=4, originality=4), row(2, 90, pin=2, tier="catalog", relevance=0), row(3, 3, pin=1),
+            row(4, 1, curated=True), row(5, 2, pin=4), row(6, 0, pin=3), row(7, 5, pin=6)]
+    assert ids(select_picks(rows)) == ["3", "2", "6"]
+    assert ids(select_picks(rows, limit=1)) == ["3"]
+    assert select_picks([row(1, 0), row(2, 0, curated=True)]) == []
 
 
-def test_block_widens_to_30_days_when_14_give_too_few():
-    rows = [row(1, 0), row(2, 13), row(3, 14), row(4, 20), row(5, 29), row(6, 30), row(7, 31)]
-    chosen, window = select_block(rows, ANCHOR)
-    assert window == 30
-    assert ids(chosen) == ["1", "2", "3", "4", "5"]
-
-
-def test_pinned_posts_come_first_in_pin_order_whatever_their_date():
-    rows = [row(1, 0, depth=4, originality=4), row(2, 90, pin=2), row(3, 3, pin=1), row(4, 1, curated=True)]
-    chosen, _ = select_block(rows, ANCHOR, limit=3)
-    assert ids(chosen) == ["3", "2", "4"]
-
-
-def test_pins_alone_can_fill_the_block():
-    rows = [row(i, 40 + i, pin=7 - i) for i in range(1, 7)] + [row(9, 0, curated=True)]
-    chosen, _ = select_block(rows, ANCHOR)
-    assert ids(chosen) == ["6", "5", "4", "3", "2", "1"]
-
-
-def test_heading_makes_a_date_claim_only_without_pins():
-    assert block_heading(6, 6, False) == "Editor's picks from industry"
-    assert block_heading(2, 6, False) == "From industry"
-    assert block_heading(0, 6, True) == "From industry this week"
-    assert block_heading(0, 6, False) == "Recent from industry"
+def test_feed_ranks_later_pins_like_any_post_and_leaves_out_the_picks():
+    rows = [row(1, 0, pin=1), row(2, 0, pin=2), row(3, 0, pin=3),
+            row(4, 20, pin=4, depth=4, originality=4),  # old: ranks low, no special place
+            row(5, 1, pin=5, tier="catalog", relevance=1, depth=4, originality=4),  # pinned skips the feed's rules
+            row(6, 0, depth=3, originality=3), row(7, 2, depth=2, originality=2),
+            row(8, 0, relevance=2), row(9, 0, curated=True, tier="catalog")]
+    ordered = order_feed(rows, ANCHOR, picks={"1", "2", "3"})
+    assert ids(ordered) == ["5", "6", "7", "4"]
 
 
 def test_publisher_name_prefers_curated_then_map_then_host():
@@ -124,11 +99,22 @@ def test_posts_view_lists_only_agent_related_posts():
     assert trending_posts.posts_feed_ids(FakeSession(rows), page=2, page_size=3) == ([9], 4)
 
 
-def test_block_keeps_hand_picked_posts_whatever_their_relevance():
-    rows = [row(1, 0, relevance=0, pin=1), row(2, 1, relevance=1, curated=True),
-            row(3, 2, relevance=2, depth=4, originality=4), row(4, 3, relevance=3)]
-    chosen, _ = select_block(rows, ANCHOR)
-    assert ids(chosen) == ["1", "2", "4"]
+def test_posts_view_leaves_out_the_three_picks_on_every_page():
+    rows = [row(n, n, pin=n, depth=4) for n in range(1, 6)] + [row(9, 0)]
+    page, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=10)
+    assert ids(page) == ["4", "9", "5"]  # pins 4 and 5 ranked with the rest
+    assert total == 3
+
+
+def test_block_returns_the_picks_with_their_preview_and_heading():
+    rows = [dict(row(n, n, pin=n), title=f"Post {n}", reference=str(n), thumbnail_url=f"/p/{n}.jpg")
+            for n in (2, 1, 4, 3)]
+    block = trending_posts.industry_block(FakeSession(rows))
+    assert block["heading"] == "Editor's picks"
+    assert block["pinned"] == 3
+    assert ids(block["results"]) == ["1", "2", "3"]
+    assert block["results"][0]["thumbnail_url"] == "/p/1.jpg"
+    assert block["anchor_date"] == ANCHOR.isoformat()
 
 
 def make_client(monkeypatch):
@@ -143,14 +129,15 @@ def test_highlights_route(monkeypatch):
 
     def industry_block(db, limit):
         seen.append(limit)
-        return {"anchor_date": "2026-11-12", "window_days": 14, "this_week": True, "results": []}
+        return {"anchor_date": "2026-11-12", "window_days": None, "this_week": False, "heading": "Editor's picks",
+                "results": []}
 
     monkeypatch.setattr(trending_posts, "industry_block", industry_block)
     client = make_client(monkeypatch)
     response = client.get("/api/v1/catalog/trending-posts/highlights")
     assert response.status_code == 200
-    assert response.json()["window_days"] == 14
-    assert seen == [6]
+    assert response.json()["heading"] == "Editor's picks"
+    assert seen == [3]
     assert client.get("/api/v1/catalog/trending-posts/highlights?limit=50").status_code == 422
 
 

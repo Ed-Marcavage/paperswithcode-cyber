@@ -31,7 +31,7 @@ beforeEach(() => {
   vi.spyOn(request, "apiRequest").mockImplementation(async (path: string) => {
     calls.push(path);
     if (path.startsWith("/catalog/trending-posts/highlights")) return {
-      anchor_date: "2026-11-12", window_days: 14, this_week: false, results: [{
+      anchor_date: "2026-11-12", window_days: null, this_week: false, pinned: 1, heading: "Editor's picks", results: [{
         paper_id: "9", reference: "9", title: "Highlighted post", source_url: "https://wiz.io/x", artifact_url: null,
         has_text: true, date_published: "2026-11-10", facets: { kind: ["post"] },
         post: { tier: "featured", post_type: "other", tldr: "Summary.", subtopics: [], authors: [], technical_depth: 2,
@@ -56,11 +56,13 @@ const renderFeed = (entry: string) => render(
   </QueryClientProvider>,
 );
 
-it("shows industry posts above the feed, lists posts by default and switches to papers", async () => {
+it("shows the Editor's picks block above the feed, lists posts by default and switches to papers", async () => {
   renderFeed("/");
 
-  expect(await screen.findByRole("heading", { name: "Recent from industry" })).toBeInTheDocument();
-  expect(screen.getByText(/The block at the top shows hand-picked industry engineering posts\./)).toBeInTheDocument();
+  const picks = await screen.findByRole("heading", { name: "Editor's picks" });
+  expect(screen.getByText(/Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers\./)).toBeInTheDocument();
+  // The block sits above the feed's controls.
+  expect(picks.compareDocumentPosition(screen.getByRole("button", { name: "posts" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Trending Research");
   expect(screen.getByRole("link", { name: "Highlighted post" })).toHaveAttribute("href", "/paper/9");
   expect(await screen.findByText("Ranked post")).toBeInTheDocument();

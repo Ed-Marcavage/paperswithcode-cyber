@@ -40,13 +40,15 @@ ROWS = [
 ]
 
 BLOCK = {
-    "heading": "Editor's picks from industry",
+    "heading": "Editor's picks",
     "results": [
-        {"reference": "5289", "title": "Fuzzers vs. AI: Comparing Fuzzilli and BigSleep",
-         "date_published": "2026-10-27", "publisher": "Google Project Zero",
-         "post": {"curated_title": "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"}},
-        {"reference": "77", "title": "Plain post", "date_published": "2026-11-09",
-         "publisher": "Endor Labs", "post": {}},
+        {"reference": "2115", "title": "ARTEX and Beyond: AI-Enabled Penetration Testing Platforms",
+         "date_published": "2026-11-13", "publisher": "Cisco Talos",
+         "post": {"curated_title": "ARTEX and Beyond, AI-Enabled Penetration Testing Platforms", "curated_pin": 1}},
+        {"reference": "2114", "title": "Threat actors running ARTEX agents", "date_published": "2026-11-13",
+         "publisher": "AWS", "post": {"curated_pin": 2}},
+        {"reference": "2116", "title": "Cyber Chaos Monkey", "date_published": "2026-11-12",
+         "publisher": "Shopify", "post": {"curated_pin": 3}},
     ],
 }
 
@@ -54,7 +56,7 @@ FEED = [
     {"reference": "301", "title": "Agent harness for code audit", "date_published": "2026-11-10",
      "publisher": "Endor Labs", "post": {"agent_relevance": 4}},
     {"reference": "302", "title": "Raw title", "date_published": "2026-11-09",
-     "publisher": "Wiz", "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3}},
+     "publisher": "Wiz", "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3, "curated_pin": 5}},
 ]
 
 
@@ -327,18 +329,20 @@ def test_existing_catalog_api_is_not_intercepted(client):
     assert len(response.json()["results"]) == 2
 
 
-def test_homepage_lists_the_industry_block_in_html_and_markdown(client):
+def test_homepage_lists_the_editors_picks_in_html_and_markdown(client):
     html = BeautifulSoup(client.get("/").text, "html.parser")
     section = html.select_one('#root main section[aria-labelledby="highlights-heading"]')
-    assert section.h2.text == "Editor's picks from industry"
+    assert section.h2.text == "Editor's picks"
     links = [(a["href"], a.text) for a in section.select("a")]
-    assert links == [("/paper/5289", "Fuzzers vs. AI, Comparing Fuzzilli and BigSleep"), ("/paper/77", "Plain post")]
-    assert "Google Project Zero · 2026-10-27" in section.text
-    assert "hand-picked industry engineering posts" in html.select_one("#root main header").text
+    assert links == [("/paper/2115", "ARTEX and Beyond, AI-Enabled Penetration Testing Platforms"),
+                     ("/paper/2114", "Threat actors running ARTEX agents"), ("/paper/2116", "Cyber Chaos Monkey")]
+    # The block's heading says what it is, so its rows carry no badge.
+    assert "Cisco Talos · 2026-11-13" in section.text and "Editor's pick ·" not in section.text
+    assert "Editor's picks are three hand-picked industry posts" in html.select_one("#root main header").text
     markdown = client.get("/index.md").text
-    assert "## Editor's picks from industry" in markdown
-    assert f"- [Plain post]({ORIGIN}/paper/77) — Endor Labs · 2026-11-09" in markdown
-    assert markdown.index("Editor's picks") < markdown.index("## Relevant papers")
+    assert "## Editor's picks\n" in markdown
+    assert f"- [Cyber Chaos Monkey]({ORIGIN}/paper/2116) — Shopify · 2026-11-12" in markdown
+    assert markdown.index("## Editor's picks") < markdown.index("## Trending research papers")
 
 
 def test_homepage_lists_posts_then_papers_for_every_kind(client):
@@ -351,7 +355,9 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
     assert [(a["href"], a.text) for a in posts.select("a")] == [
         ("/paper/301", "Agent harness for code audit"), ("/paper/302", "Evaluating security agents")]
     assert "Endor Labs · 2026-11-10" in posts.text
-    assert papers.h2.text == "Relevant papers"
+    # A pinned post after the three picks ranks in the list and keeps the badge.
+    assert "Editor's pick · Wiz · 2026-11-09" in posts.text
+    assert papers.h2.text == "Trending research papers"
     assert [(a["href"], a.text) for a in papers.select("a")] == [
         ("/paper/2610.34435", "Security agents & harnesses")]
     sections = [section["aria-labelledby"] for section in main.select("section")]
@@ -375,9 +381,11 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
 
     markdown = client.get("/index.md").text
     assert f"1. [Agent harness for code audit]({ORIGIN}/paper/301) — Endor Labs · 2026-11-10" in markdown
+    assert f"2. [Evaluating security agents]({ORIGIN}/paper/302) — Editor's pick · Wiz · 2026-11-09" in markdown
     assert f"1. [Security agents & harnesses]({ORIGIN}/paper/2610.34435)" in markdown
     assert (markdown.index("## Editor's picks") < markdown.index("## Trending posts about AI agents")
-            < markdown.index("## Relevant papers"))
+            < markdown.index("## Trending research papers"))
+    assert "Relevant papers" not in markdown
     assert "featured posts about AI agents" in markdown and "GitHub star growth" in markdown
 
 
