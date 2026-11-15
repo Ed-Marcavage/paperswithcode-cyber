@@ -13,7 +13,7 @@ class AssistantSettings(BaseSettings):
     mcp_url: str = "http://mcp:7860/mcp"
     api_key: SecretStr = SecretStr("")
     base_url: str = "https://ollama.com/v1"
-    model: str = "glm-5.3-flash"
+    model: str = "deepseek-v4.1-flash:1017"
     retention_days: int = Field(default=90, ge=1)
     turns_per_hour: int = Field(default=30, ge=1)
     turns_per_day: int = Field(default=100, ge=1)

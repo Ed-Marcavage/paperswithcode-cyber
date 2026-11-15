@@ -67,8 +67,10 @@ FINAL_RETRY_OUTPUT_TOKENS = 8192
 
 
 def generation_options(*, final=False, retry=False):
-    # Ollama's OpenAI API maps none to think=false: off where supported,
-    # otherwise the lowest level (GLM/GPT-OSS cannot disable thinking).
+    # DeepSeek v4.1 Flash 1017 advertises false/low/high/max in /api/show.
+    # Ollama maps none to think=false, so research uses low and finalization
+    # disables thinking. Other models may fall back to their lowest level.
+    # https://docs.ollama.com/api/openai-compatibility#v1chatcompletions
     return {"reasoning_effort": "none" if final else "low",
             "max_tokens": (FINAL_RETRY_OUTPUT_TOKENS if retry else FINAL_OUTPUT_TOKENS)
             if final else RESEARCH_OUTPUT_TOKENS}

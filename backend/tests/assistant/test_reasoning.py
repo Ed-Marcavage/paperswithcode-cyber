@@ -45,7 +45,10 @@ def test_two_empty_finalizers_fall_back_within_eight_call_budget():
 
 def test_answering_finalizer_is_not_retried_and_research_uses_low_effort():
     services = FakeServices([[tool_chunk()], [text_chunk("Answer")]])
-    turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
+    from backend.assistant_config import AssistantSettings
+    model = AssistantSettings.model_fields["model"].default
+    turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1), model_name=model))
+    assert all(request["model"] == "deepseek-v4.1-flash:1017" for request in services.model_requests)
     assert turn.text == "Answer" and len(services.model_requests) == 2
     assert services.model_requests[0]["reasoning_effort"] == "low"
     assert generation_options(final=True)["reasoning_effort"] == "none"

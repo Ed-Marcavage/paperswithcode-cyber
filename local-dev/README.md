@@ -479,7 +479,7 @@ key is required by the frontend or MCP. Settings:
 | Setting | Default |
 | --- | --- |
 | `PWC_ASSISTANT_BASE_URL` | `https://ollama.com/v1` |
-| `PWC_ASSISTANT_MODEL` | `glm-5.3-flash` (provisional until evaluation) |
+| `PWC_ASSISTANT_MODEL` | `deepseek-v4.1-flash:1017` |
 | `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
 | `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
 | `PWC_ASSISTANT_TURNS_PER_HOUR` | `30` (rolling hour) |
@@ -549,6 +549,13 @@ privacy page if changing it.
 
 ### Model evaluation
 
+The 20-question local-stack evaluation selected `deepseek-v4.1-flash:1017` as
+the default: its mean score was 2.90/3, compared with 2.30 for `glm-5.3-flash`
+and 2.55 for `kimi-k3.1-pro`. It invented no links and used about 1.3 times the
+GLM baseline's allowance. Research keeps `reasoning_effort=low` and the finalizer
+uses `none` (thinking off): Ollama's model metadata lists `false`, `low`, `high`
+and `max`, and its [compatibility API maps `none` to `false`](https://docs.ollama.com/api/openai-compatibility#v1chatcompletions).
+
 `backend.assistant_eval` asks the same 20 fixed questions in order, with fresh
 history per question and the application's normal bounded loop. Its JSON Lines
 output records question, named model, answer, status/error, tools and results,
@@ -570,16 +577,16 @@ Inside an already-running backend container, use its process environment
 
 ```sh
 python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /path/to/work/assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://mcp:7860/mcp \
+  --output /path/to/work/assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
 From the host, the equivalent command is:
 
 ```sh
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://mcp:7860/mcp \
-  --output /path/to/work/assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://mcp:7860/mcp \
+  --output /path/to/work/assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
 Retain the JSONL outside the container before it is replaced. To run directly on
@@ -587,8 +594,8 @@ the host instead, use the externally published local MCP endpoint:
 
 ```sh
 uv run --env-file .local.env python -m backend.assistant_eval \
-  --model glm-5.3-flash --mcp-url http://localhost:8095/mcp \
-  --output .assistant-evals/glm-5.3-flash.jsonl
+  --model deepseek-v4.1-flash:1017 --mcp-url http://localhost:8095/mcp \
+  --output .assistant-evals/deepseek-v4.1-flash-1017.jsonl
 ```
 
 Outputs are ignored by Git and exclusive-created (use a new name for a repeat).

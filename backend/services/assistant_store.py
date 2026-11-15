@@ -66,7 +66,7 @@ class AssistantStore:
         return row
 
     def begin(self, visitor: str, conversation_id: str | None, question: str, *,
-              model: str = "glm-5.3-flash", surface: str = "panel", site_path: str = "/",
+              model: str | None = None, surface: str = "panel", site_path: str = "/",
               analytics_session_id: str | None = None, now: datetime | None = None) -> SavedTurn:
         now = now or datetime.now(UTC)
         run_id = identifier()
@@ -102,7 +102,7 @@ class AssistantStore:
             ])
             db.flush()
             db.add(AssistantRun(id=run_id, conversation_id=conversation_id, message_id=answer_id,
-                               question=question, started_at=now, status="running", model=model,
+                               question=question, started_at=now, status="running", model=model if model is not None else get_assistant_settings().model,
                                prompt_hash=hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest(),
                                prompt_version=PROMPT_VERSION, surface=surface, site_path=site_path,
                                analytics_session_id=analytics_session_id))
