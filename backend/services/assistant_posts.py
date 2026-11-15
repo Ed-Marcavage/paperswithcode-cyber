@@ -56,9 +56,7 @@ WITH posts AS (
            + coalesce((post_details ->> 'originality')::integer, 0)
            + CASE WHEN post_details ->> 'agent_harness_engineering' = 'true' THEN 1 ELSE 0 END AS score
       FROM posts
-)
-"""
-FILTERED_SQL = """, filtered AS (
+), matched AS (
     SELECT scored.*, CASE WHEN date_published IS NULL THEN 0 ELSE
            score * power(0.5, greatest(anchor.day - date_published::date, 0)::double precision / :half_life)
            END AS score_recent
@@ -76,7 +74,7 @@ ANY_WORD = """CAST((SELECT string_agg(quote_literal(term), ' | ')
     FROM unnest(tsvector_to_array(to_tsvector('english', :query))) AS words(term)) AS tsquery)"""
 
 
-def search_statement(arguments, *, any_word=False, relax_relevance=False, seen=None):
+def search_statement(arguments, *, any_word=False, relax_relevance=False):
     args = FindPostsArguments.model_validate(arguments)
     params = {"min_agent_relevance": args.min_agent_relevance, "limit": args.limit,
               "anchor": trending_posts.ANCHOR_DATE, "half_life": trending_posts.DECAY_HALF_LIFE_DAYS,
@@ -88,6 +86,7 @@ def search_statement(arguments, *, any_word=False, relax_relevance=False, seen=N
         # The model supplies keywords, not necessarily a verbatim phrase. Use
         # PostgreSQL's built-in English stemming, as the catalog paper search does.
         params["query"] = args.query
+        clauses.append(f"AND {TEXT_VECTOR} @@ {ANY_WORD if any_word else ALL_WORDS}")
     if args.topic:
         params["topic"] = json.dumps({"topic": [args.topic]})
         clauses.append("AND facets @> CAST(:topic AS jsonb)")
@@ -107,49 +106,11 @@ def search_statement(arguments, *, any_word=False, relax_relevance=False, seen=N
     if args.published_after:
         params["published_after"] = args.published_after
         clauses.append("AND date_published::date > :published_after")
-    sql = BASE_SQL + FILTERED_SQL + "\n".join(clauses) + "\n), matched AS (SELECT * FROM filtered"
-    if args.query:
-        sql += f" WHERE {TEXT_VECTOR} @@ {ANY_WORD if any_word else ALL_WORDS}"
-    sql += ")"
-    if seen is not None:
-        params.update(seen_ids=sorted(seen.ids), seen_arxiv=sorted(seen.arxiv))
-        if any_word:
-            from backend.services.assistant_post_verification import subject_count_statement
-            return subject_count_statement(sql, params, TEXT_VECTOR, ALL_WORDS)
-        sql += """
- SELECT count(DISTINCT id) AS match_count,
-         count(DISTINCT id) FILTER (WHERE NOT (
-             id::text = ANY(CAST(:seen_ids AS text[]))
-             OR coalesce(arxiv_id, '') = ANY(CAST(:seen_arxiv AS text[])))) AS new_match_count
-    FROM matched
-"""
-        return text(sql), params
     order = f"ts_rank_cd({TEXT_VECTOR}, {ANY_WORD}) DESC, score DESC" if any_word else ORDERS[args.sort]
-    sql += """
- SELECT id, title, date_published, source_url, post_details, publisher,
+    sql = BASE_SQL + "\n".join(clauses) + """
+) SELECT id, title, date_published, source_url, post_details, publisher,
          count(*) OVER () AS total FROM matched ORDER BY """ + order + ", date_published DESC NULLS LAST, id DESC LIMIT :limit"
     return text(sql), params
-
-
-def ranked_search(arguments, search, total):
-    """One sparse-search policy for model results and follow-up verification.
-
-    The count query need not sort rows: it counts the entire ranked candidate
-    relation, applying its additional subject floor only in the any-word pass.
-    """
-    relaxations = []
-    relaxed_relevance = False
-    rows = search(any_word=False, relax_relevance=False)
-    if arguments.get('query') and total(rows) < 3 and 'min_agent_relevance' not in arguments:
-        relaxed_relevance = True
-        relaxations.append('Removed the default agent relevance filter to include broader reporting.')
-        rows = search(any_word=False, relax_relevance=True)
-    any_word = bool(arguments.get('query') and total(rows) < 3)
-    if any_word:
-        relaxations.append('Loosened text matching from all words to any word; ranked by text relevance, then score.')
-        rows = search(any_word=True, relax_relevance=relaxed_relevance)
-    return rows, {'match_mode': 'any_word' if any_word else 'all_words' if arguments.get('query') else 'filters',
-                  'relaxations': relaxations, 'relevance_relaxed': relaxed_relevance}
 
 
 def short(value):
@@ -176,23 +137,39 @@ def read_posts(arguments, sessions=None, deadline=None):
     if sessions is None:
         from backend.database.assistant import assistant_sessions
         sessions = assistant_sessions()
+    relaxations = []
+    relaxed_relevance = False
+    any_word = False
     # All attempts share one read-only transaction and one wall-clock budget.
     with sessions() as db:
         db.execute(text("SET TRANSACTION READ ONLY"))
 
-        def search(*, any_word, relax_relevance):
+        def search():
             remaining_ms = int((deadline - time.monotonic()) * 1000)
             if remaining_ms <= 0:
                 raise TimeoutError()
             db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"),
                        {"timeout": str(min(1500, remaining_ms))})
-            statement, params = search_statement(arguments, any_word=any_word, relax_relevance=relax_relevance)
+            statement, params = search_statement(arguments, any_word=any_word, relax_relevance=relaxed_relevance)
             return list(db.execute(statement, params).mappings())
 
-        rows, mode = ranked_search(arguments, search, lambda rows: int(rows[0]['total']) if rows else 0)
+        def sparse(rows):
+            # A requested limit of one must not loosen a query with many matches.
+            return not rows or int(rows[0]["total"]) < 3
+
+        rows = search()
+        if args.query and sparse(rows) and "min_agent_relevance" not in arguments:
+            relaxed_relevance = True
+            relaxations.append("Removed the default agent relevance filter to include broader reporting.")
+            rows = search()
+        if args.query and sparse(rows):
+            any_word = True
+            relaxations.append("Loosened text matching from all words to any word; ranked by text relevance, then score.")
+            rows = search()
     result = {"total": int(rows[0]["total"]) if rows else 0, "results": [post_item(row) for row in rows],
-              "sort": "text_rank_then_score" if mode['match_mode'] == 'any_word' else args.sort,
-              "match_mode": mode['match_mode'], "relaxations": mode['relaxations']}
+              "sort": "text_rank_then_score" if any_word else args.sort,
+              "match_mode": "any_word" if any_word else "all_words" if args.query else "filters",
+              "relaxations": relaxations}
     if not rows:
         # Keep the advice specific to the strongest optional restriction.
         field = next((key for key in ("query", "subtopic", "publisher", "post_type", "published_after", "topic", "tier") if arguments.get(key)), None)

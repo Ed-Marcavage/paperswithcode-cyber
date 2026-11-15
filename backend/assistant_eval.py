@@ -4,7 +4,7 @@ Tool results use the same optional read-only post-metadata enrichment as chat.
 
 Usage: uv run --env-file .local.env python -m backend.assistant_eval \
     --model glm-5.3-flash --output .assistant-evals/glm.jsonl
-A full evaluation can use up to 180 model requests (including follow-ups). Run only with the owner's
+A full evaluation can use up to 240 model requests (including follow-ups). Run only with the owner's
 explicit budget authorization, not as an automated test or startup check.
 """
 
@@ -63,18 +63,21 @@ def result_row(index, question, model, turn, elapsed):
         tokens[field] = sum(values) if values and all(v is not None for v in values) else None
     expected = question in TOPIC_QUESTIONS
     follow_ups = turn.follow_ups if turn.status in {"done", "limit_reached"} else []
-    follow_up_steps = [s for s in turn.steps if s["kind"] == "follow_ups"]
-    checked = any(s["status"] == "done" for s in follow_up_steps)
+    follow_up_steps = [s for s in turn.steps if s.get("phase") == "follow_ups" or s["kind"] == "follow_ups"]
+    checked = any(s.get("name") == "submit_follow_ups" and not s.get("error") for s in follow_up_steps)
+    follow_up_models = [s for s in follow_up_steps if s['kind'] in {'model', 'follow_ups'}]
     return {"question_id": index, "question": question, "model": model,
             "topic": TOPIC_QUESTIONS.get(question), "follow_ups": follow_ups,
             "follow_ups_check": {"expected": expected, "passed": bool(checked and follow_ups) if expected else None},
             "answer": turn.text, "status": turn.status, "error": turn.error,
             "tools": [s for s in turn.steps if s["kind"] == "tool"],
             "follow_up_steps": follow_up_steps,
+            "follow_up_tokens": {key: sum(s[key] for s in follow_up_models) if follow_up_models and all(s.get(key) is not None for s in follow_up_models) else None
+                                 for key in ('input_tokens', 'output_tokens')},
             "links": sorted(set(re.findall(r"\]\((https?://[^\s)]+|/[^\s)]+)\)", turn.text))),
             "duration_ms": round(elapsed * 1000), "tokens": tokens,
             "model_calls": len(model_steps),
-            "research_model_calls": sum(s["kind"] == "model" for s in model_steps)}
+            "research_model_calls": sum(s["kind"] == "model" and s.get('phase') != 'follow_ups' for s in model_steps)}
 
 
 async def evaluate(client, mcp, model, output, *, questions=QUESTIONS, follow_ups_enabled=None):
@@ -91,7 +94,7 @@ async def evaluate(client, mcp, model, output, *, questions=QUESTIONS, follow_up
         output.write(json.dumps(row, ensure_ascii=False) + "\n")
         output.flush()
         print(f"Question {index}/{len(questions)}: {turn.status}; {row['duration_ms']} ms", file=sys.stderr)
-        if turn.status == "provider_limit" or any(s["status"] == "usage_limit" for s in row["follow_up_steps"]):
+        if turn.status == "provider_limit" or any(s.get("status") == "usage_limit" for s in row["follow_up_steps"]):
             return False
     return True
 

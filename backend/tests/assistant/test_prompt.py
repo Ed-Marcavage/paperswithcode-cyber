@@ -8,7 +8,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     services = FakeServices([[tool_chunk()], [text_chunk('Found one useful post.')]])
     turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
-    assert PROMPT_VERSION == 'cyber-assistant-v9' and turn.status == 'limit_reached'
+    assert PROMPT_VERSION == 'cyber-assistant-v11' and turn.status == 'limit_reached'
     assert services.model_requests[0]['messages'][0]['content'] == SYSTEM_PROMPT
     final_messages = services.model_requests[-1]['messages']
     assert final_messages[0]['content'] == SYSTEM_PROMPT

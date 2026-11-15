@@ -1,6 +1,7 @@
 """Environment-only settings for the independent Cyber catalog assistant."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,6 +12,7 @@ class AssistantSettings(BaseSettings):
 
     enabled: bool = False
     follow_ups_enabled: bool = True
+    history_context: Literal['answers', 'digest', 'full'] = 'full'
     mcp_url: str = "http://mcp:7860/mcp"
     api_key: SecretStr = SecretStr("")
     base_url: str = "https://ollama.com/v1"

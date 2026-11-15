@@ -5,7 +5,7 @@ import json
 import pytest
 
 from backend.services.assistant_input_budget import (
-    INPUT_TOKEN_BUDGET, FINAL_INPUT_TOKENS, estimate_input_tokens, finalizer_messages,
+    INPUT_TOKEN_BUDGET, FINAL_INPUT_TOKENS, estimate_input_tokens, finalizer_messages, history_token_estimate,
 )
 from backend.services.assistant_loop import SYSTEM_PROMPT, FINALIZER_PROMPT, TurnLimits
 from backend.services.assistant_mcp import TOOL_NAMES, MAX_RESULT_BYTES
@@ -89,13 +89,14 @@ def test_identical_effective_calls_reuse_the_first_result_without_network_or_evi
 
 def test_reported_input_budget_stops_research_and_still_finalizes():
     services = FakeServices([[tool_chunk(), chunk(usage={"prompt_tokens": 33000, "completion_tokens": 20, "total_tokens": 33020})], [text_chunk("Limited evidence answer")]])
-    turn, _ = asyncio.run(services.run())
+    turn, _ = asyncio.run(services.run(TurnLimits(input_tokens=96000)))
     assert turn.status == "limit_reached" and turn.text == "Limited evidence answer"
     assert len(services.model_requests) == 2 and "tools" not in services.model_requests[-1]
     assert not services.tool_requests
     assert turn.steps[0]["input_token_charge"] == 33000
     assert not turn.steps[0]["input_tokens_estimated"]
-    assert turn.steps[0]["input_token_budget"] == INPUT_TOKEN_BUDGET == 64000
+    assert turn.steps[0]["input_token_budget"] == 96000
+    assert INPUT_TOKEN_BUDGET == 256000
 
 
 def test_unknown_usage_is_estimated_and_charged_to_cumulative_budget():
@@ -112,8 +113,10 @@ def test_finalizer_input_is_bounded_preserves_question_and_marks_shortened_evide
     question = "Which organizations publish the most about AI agent sandboxing?"
     history = [{"role": "user", "content": "old " * 10000}, {"role": "assistant", "content": "prior " * 10000}, {"role": "user", "content": question}]
     steps = [{"kind": "tool", "name": "search_papers", "result": "Evidence " * 10000} for _ in range(10)]
-    messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, steps, FINAL_INPUT_TOKENS)
-    assert estimate_input_tokens(messages) <= FINAL_INPUT_TOKENS
+    allowance = FINAL_INPUT_TOKENS + history_token_estimate(history)
+    messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, steps, allowance)
+    assert estimate_input_tokens(messages) <= allowance
+    assert messages[1:3] == history[:2]
     assert any(m["content"] == question for m in messages)
     assert "Shortened for input budget" in json.dumps(messages)
 
@@ -124,7 +127,7 @@ def test_reported_cumulative_growth_in_review_trace_goes_to_finalizer_before_fou
         replies.append([tool_chunk(arguments=json.dumps({"query": str(i)})), chunk(usage={
             "prompt_tokens": tokens, "completion_tokens": 20, "total_tokens": tokens + 20})])
     services = FakeServices([*replies, [text_chunk("Answer from bounded evidence")]])
-    turn, _ = asyncio.run(services.run())
+    turn, _ = asyncio.run(services.run(TurnLimits(input_tokens=96000)))
     model_steps = [s for s in turn.steps if s["kind"] == "model"]
     assert len(model_steps) == 4 and model_steps[-1]["phase"] == "finalizer"
     assert model_steps[2]["cumulative_input_tokens"] == 34100
