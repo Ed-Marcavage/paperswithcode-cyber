@@ -53,3 +53,10 @@ it("shows a working state at once, then the latest tool or working note", () => 
   expect(screen.queryByRole("status")).toBeNull();
   expect(screen.getByText("Searched the catalog · 1 step")).toBeInTheDocument();
 });
+
+it("does not turn a bare word or relative path into a link", () => {
+  for (const href of ["catalog_url_placeholder", "paper/123", "./paper/123"]) {
+    expect(allowedLink(href, new Set())).toBeNull();
+  }
+  expect(allowedLink("/paper/123", new Set())).toEqual({ href: "/paper/123", local: true });
+});

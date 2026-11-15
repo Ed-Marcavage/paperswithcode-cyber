@@ -29,6 +29,8 @@ export function allowedLink(href: string, evidence: Set<string>): { href: string
     const url = new URL(href, origin);
     if (!["http:", "https:"].includes(url.protocol) || url.username || url.password) return null;
     const localPath = href.startsWith("/") && !href.startsWith("//");
+    // A bare word such as "catalog_url_placeholder" resolves against this page; it is not a link.
+    if (!localPath && !/^https?:\/\//i.test(href)) return null;
     const sameOrigin = url.origin === origin;
     if (!localPath && !sameOrigin && !evidence.has(href)) return null;
     const catalog = url.origin === "https://paperswithcode-cyber.com";

@@ -1,6 +1,7 @@
 """Bounded assistant-only post search using the existing assistant session pool."""
 
 import json
+import logging
 
 import anyio
 from sqlalchemy import text
@@ -30,10 +31,12 @@ filter on zero matches; zero matches for a narrow request do not prove missing c
 # Only fixed SQL fragments are composed here. Every filter, mapping and date is
 # a bind parameter. Resolve publisher before filtering/limiting, matching the
 # curated -> linked -> longest mapped host -> raw host priority in publishers.py.
+logger = logging.getLogger(__name__)
+
 BASE_SQL = r"""
 WITH posts AS (
     SELECT p.id, p.title, p.date_published, w.facets, w.post_details, w.source_url,
-           substring(w.source_url from '(?i)^https?://(?:www[.])?([^/:?#]+)') AS source_host,
+           substring(w.source_url from '(?i)^https?://(?\:www[.])?([^/:?#]+)') AS source_host,
            """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + r""" AS organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
      WHERE w.facets -> 'kind' ? 'post' AND w.post_details IS NOT NULL
@@ -138,6 +141,8 @@ async def find_posts(arguments, sessions=None):
     try:
         with anyio.fail_after(QUERY_SECONDS):
             return await anyio.to_thread.run_sync(read_posts, arguments, sessions, abandon_on_cancel=True), False
-    except (SQLAlchemyError, OSError, TimeoutError):
+    except (SQLAlchemyError, OSError, TimeoutError) as error:
         # Never include DB connection details, SQL or bound arguments in errors.
+        # Log the failure by type only, so a broken query is visible to the operator.
+        logger.warning("assistant find_posts failed: %s", type(error).__name__)
         return {"error": "Post search is temporarily unavailable. Try browse_catalog or search_papers; this is not a zero-match result."}, True
