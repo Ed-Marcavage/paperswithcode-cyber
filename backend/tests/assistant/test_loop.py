@@ -215,6 +215,6 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
 
 def test_prompt_links_catalog_titles_before_original_sources():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v3"
+    assert PROMPT_VERSION == "cyber-assistant-v4"
     assert "catalog_url" in SYSTEM_PROMPT
-    assert "second, shorter" in SYSTEM_PROMPT
+    assert "[Title](catalog_url) ([source](source_url))" in SYSTEM_PROMPT
