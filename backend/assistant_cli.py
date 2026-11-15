@@ -37,6 +37,7 @@ def main(argv=None, *, store=None):
             print(f"\nStep {position}: {step['kind']}")
             print(json.dumps(step, ensure_ascii=False, indent=2))
         print(f"\nAnswer: {run['answer']}")
+        print(f"Follow-ups: {json.dumps(run['follow_ups'], ensure_ascii=False)}")
         print(f"Error: {run['error']}\nFeedback: {json.dumps(run['feedback'], ensure_ascii=False)}")
     else:
         for run in store.runs(args.days):

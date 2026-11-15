@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 BASE_SQL = r"""
 WITH posts AS (
-    SELECT p.id, p.title, p.date_published, w.facets, w.post_details, w.source_url,
+    SELECT p.id, p.arxiv_id, p.title, p.date_published, w.facets, w.post_details, w.source_url,
            substring(w.source_url from '(?i)^https?://(?\:www[.])?([^/:?#]+)') AS source_host,
            """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + r""" AS organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
@@ -74,7 +74,7 @@ ANY_WORD = """CAST((SELECT string_agg(quote_literal(term), ' | ')
     FROM unnest(tsvector_to_array(to_tsvector('english', :query))) AS words(term)) AS tsquery)"""
 
 
-def search_statement(arguments, *, any_word=False, relax_relevance=False):
+def search_statement(arguments, *, any_word=False, relax_relevance=False, seen=None):
     args = FindPostsArguments.model_validate(arguments)
     params = {"min_agent_relevance": args.min_agent_relevance, "limit": args.limit,
               "anchor": trending_posts.ANCHOR_DATE, "half_life": trending_posts.DECAY_HALF_LIFE_DAYS,
@@ -106,6 +106,17 @@ def search_statement(arguments, *, any_word=False, relax_relevance=False):
     if args.published_after:
         params["published_after"] = args.published_after
         clauses.append("AND date_published::date > :published_after")
+    if seen is not None:
+        # Verification deliberately uses strict filters, not sparse-search fallbacks.
+        params.update(seen_ids=sorted(seen.ids), seen_arxiv=sorted(seen.arxiv))
+        sql = BASE_SQL + "\n".join(clauses) + """
+) SELECT count(DISTINCT id) AS match_count,
+         count(DISTINCT id) FILTER (WHERE NOT (
+             id::text = ANY(CAST(:seen_ids AS text[]))
+             OR coalesce(arxiv_id, '') = ANY(CAST(:seen_arxiv AS text[])))) AS new_match_count
+    FROM matched
+"""
+        return text(sql), params
     order = f"ts_rank_cd({TEXT_VECTOR}, {ANY_WORD}) DESC, score DESC" if any_word else ORDERS[args.sort]
     sql = BASE_SQL + "\n".join(clauses) + """
 ) SELECT id, title, date_published, source_url, post_details, publisher,

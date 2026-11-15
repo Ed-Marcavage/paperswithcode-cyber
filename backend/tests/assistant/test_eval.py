@@ -3,12 +3,21 @@ import io
 import json
 
 import httpx
+import pytest
 from openai import AsyncOpenAI
 
-from backend.assistant_eval import QUESTIONS, evaluate, result_row
+from backend.assistant_eval import QUESTIONS, TOPIC_QUESTIONS, evaluate, result_row
 from backend.services.assistant_loop import Turn
 from backend.services.assistant_mcp import CatalogMcp
 from backend.tests.assistant.test_loop import FakeServices, chunk, text_chunk, tool_chunk
+
+
+@pytest.fixture(autouse=True)
+def topic_choices(monkeypatch):
+    from backend import assistant_eval
+    monkeypatch.setattr(assistant_eval, "resolve_topic", lambda slug, sessions: {
+        "slug": slug, "label": slug.replace("-", " ").title(), "count": 40,
+    })
 
 
 def test_twenty_questions_use_named_model_and_write_grounded_results():
@@ -34,7 +43,13 @@ def test_twenty_questions_use_named_model_and_write_grounded_results():
         assert row["tools"][0]["name"] == "search_papers"
         assert row["duration_ms"] >= 0 and row["model_calls"] == 2
         assert row["tokens"] == {"input_tokens": None, "output_tokens": None}
+        assert row["topic"] == TOPIC_QUESTIONS.get(row["question"])
+        assert row["follow_ups"] == []
+        assert row["follow_ups_check"] == {"expected": row["question"] in TOPIC_QUESTIONS,
+                                           "passed": False if row["question"] in TOPIC_QUESTIONS else None}
     assert all(r["model"] == "named-test-model" for r in services.model_requests)
+    scoped = [r for r in services.model_requests if len(r["messages"]) > 1 and r["messages"][1]["role"] == "system"]
+    assert len(scoped) == 8  # Both model passes of each of the four topic questions.
 
 
 def test_evaluation_stops_after_quota_and_writes_partial_row():
@@ -105,9 +120,35 @@ def test_owner_questions_lead_the_twenty_item_evaluation_without_duplicate_gener
         "Which organizations have research in the catalog?",
         "Which developers contribute to catalog repositories?",
         "Show engineering posts about security from the catalog.",
+        "Which catalog topics and target categories can I browse?",
+        "Show catalog work on vulnerability repair.",
+        "Find security work involving AI systems.",
+        "List trending security papers and link their catalog pages.",
     }
     assert not dropped.intersection(QUESTIONS)
     assert any("cached text" in question for question in QUESTIONS)
     assert any("ZZZ-Unpublished-Quantum-Toaster-999" in question for question in QUESTIONS)
     assert any("organization page" in question for question in QUESTIONS)
     assert any("profile link" in question for question in QUESTIONS)
+    assert len(TOPIC_QUESTIONS) == 4 and set(TOPIC_QUESTIONS).issubset(QUESTIONS)
+
+
+def test_topic_evaluation_records_verified_followups(monkeypatch):
+    from backend.services import assistant_followups
+    from backend.tests.assistant.test_followups import QUESTION, CHECK
+    monkeypatch.setattr(assistant_followups, "read_counts", lambda *args: {"match_count": 5, "new_match_count": 3})
+    replies = [[tool_chunk()], [tool_chunk(name="suggest_follow_ups", arguments=json.dumps({"candidates": [{"question": QUESTION, "check": CHECK}]}))],
+               [text_chunk("Grounded answer")]]
+    services = FakeServices(replies * 4)
+    output = io.StringIO()
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(services.model)) as model_http:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(services.mcp)) as mcp_http:
+                async with AsyncOpenAI(api_key="fake", base_url="http://model.test/v1", max_retries=0, http_client=model_http) as model:
+                    return await evaluate(model, CatalogMcp(mcp_http, "http://catalog.test/mcp"), "named", output, questions=tuple(TOPIC_QUESTIONS))
+    assert asyncio.run(run())
+    for row in map(json.loads, output.getvalue().splitlines()):
+        assert row["follow_ups_check"] == {"expected": True, "passed": True}
+        assert row["follow_ups"] == [QUESTION]
+        decision = json.loads(row["tools"][-1]["result"])["candidates"][0]
+        assert decision["match_count"] == 5 and decision["new_match_count"] == 3 and decision["kept"]

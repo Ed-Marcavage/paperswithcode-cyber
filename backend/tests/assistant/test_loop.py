@@ -72,7 +72,7 @@ def test_plain_answer_and_private_request_contract():
     turn, events = asyncio.run(services.run())
     assert turn.text == "An answer"
     assert turn.status == "done"
-    assert events[-1] == {"type": "done", "status": "done"}
+    assert events[-1] == {"type": "done", "status": "done", "follow_ups": []}
     request = services.model_requests[0]
     assert request["messages"][0]["content"] == SYSTEM_PROMPT
     assert "user" not in request and "tool_choice" not in request
@@ -215,6 +215,6 @@ def test_working_notes_use_output_budget_but_not_finalizer_history():
 
 def test_prompt_leaves_link_style_to_the_model_but_forbids_invented_addresses():
     from backend.services.assistant_loop import PROMPT_VERSION
-    assert PROMPT_VERSION == "cyber-assistant-v7"
+    assert PROMPT_VERSION == "cyber-assistant-v8"
     assert "catalog_url" not in SYSTEM_PROMPT
     assert "Use only addresses present in tool results and never invent one" in SYSTEM_PROMPT

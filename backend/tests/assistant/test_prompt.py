@@ -7,7 +7,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     services = FakeServices([[tool_chunk()], [text_chunk('Found one useful post.')]])
     turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
-    assert PROMPT_VERSION == 'cyber-assistant-v7' and turn.status == 'limit_reached'
+    assert PROMPT_VERSION == 'cyber-assistant-v8' and turn.status == 'limit_reached'
     assert services.model_requests[0]['messages'][0]['content'] == SYSTEM_PROMPT
     final_messages = services.model_requests[-1]['messages']
     assert final_messages[0]['content'] == SYSTEM_PROMPT
@@ -27,3 +27,6 @@ def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     assert 'completed search actually supports that claim' in SYSTEM_PROMPT
     assert 'budget stop does not show' in FINALIZER_PROMPT
     assert 'not evidence of\nmissing coverage' in SYSTEM_PROMPT
+    assert 'BEFORE writing the answer, call suggest_follow_ups once' in SYSTEM_PROMPT
+    assert 'not a fixed list' in SYSTEM_PROMPT and 'including two not shown yet' in SYSTEM_PROMPT
+    assert 'do not repeat them in the answer' in SYSTEM_PROMPT

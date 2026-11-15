@@ -144,6 +144,7 @@ class AssistantStore:
                 return  # The visitor may delete a chat while it is streaming.
             message.content = turn.text
             message.status = turn.status
+            message.follow_ups = list(turn.follow_ups) if turn.status in {"done", "limit_reached"} else []
             run = db.get(AssistantRun, saved.run_id)
             run.status, run.error, run.ended_at = turn.status, turn.error, datetime.now(UTC)
             positions = set(db.scalars(select(AssistantRunStep.position).where(AssistantRunStep.run_id == saved.run_id)))
@@ -190,6 +191,7 @@ class AssistantStore:
                 steps.setdefault(call.message_id, []).append(call.detail)
             result["messages"] = [{"id": m.id, "role": m.role, "content": m.content, "status": m.status,
                                    "tool_steps": steps.get(m.id, []),
+                                   **({"follow_ups": m.follow_ups or []} if m.role == "assistant" else {}),
                                    "run_id": runs[m.id].id if m.id in runs else None,
                                    "error": runs[m.id].error if m.id in runs else None,
                                    "feedback": {"rating": runs[m.id].feedback_rating, "note": runs[m.id].feedback_note}
@@ -218,7 +220,7 @@ class AssistantStore:
             tokens[key] = sum(values) if values and all(v is not None for v in values) else None
         answer = db.get(AssistantMessage, run.message_id)
         return {"id": run.id, "conversation_id": run.conversation_id, "question": run.question, "topic": run.topic,
-                "answer": answer.content, "started_at": run.started_at.isoformat(),
+                "answer": answer.content, "follow_ups": answer.follow_ups or [], "started_at": run.started_at.isoformat(),
                 "ended_at": run.ended_at.isoformat() if run.ended_at else None,
                 "duration_ms": round((run.ended_at - run.started_at).total_seconds() * 1000) if run.ended_at else None,
                 "status": run.status, "error": run.error, "model": run.model,

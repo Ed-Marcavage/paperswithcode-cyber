@@ -880,17 +880,16 @@ class PaperRetrievalService:
             func.regexp_replace(func.btrim(DBPaper.title), r"\s+", " ", "g")
         )
 
-    def _search_papers_fts(
+    def keyword_candidates(
         self,
         query: str,
-        limit: int,
         start_date: date | None = None,
         end_date: date | None = None,
         has_official_implementation: bool = False,
         has_code: bool = False,
         has_hf_artifacts: bool = False,
-    ) -> List[DBPaper]:
-        """Weighted PostgreSQL FTS with deterministic identity overrides."""
+    ):
+        """Shared SQL candidates for keyword retrieval and bounded catalog counts."""
         normalized_title = " ".join(query.lower().split())
         normalized_arxiv_id = self._normalize_arxiv_search_query(query)
         ts_query = func.websearch_to_tsquery("english", query)
@@ -982,6 +981,24 @@ class PaperRetrievalService:
                 candidates.c.date_published,
             )
             .subquery()
+        )
+        return ranked_candidates
+
+    def _search_papers_fts(
+        self,
+        query: str,
+        limit: int,
+        start_date: date | None = None,
+        end_date: date | None = None,
+        has_official_implementation: bool = False,
+        has_code: bool = False,
+        has_hf_artifacts: bool = False,
+    ) -> List[DBPaper]:
+        """Weighted PostgreSQL FTS with deterministic identity overrides."""
+        ranked_candidates = self.keyword_candidates(
+            query, start_date=start_date, end_date=end_date,
+            has_official_implementation=has_official_implementation,
+            has_code=has_code, has_hf_artifacts=has_hf_artifacts,
         )
         # Rank narrow candidate rows before fetching full paper records. The
         # citation/date tie-breakers are identical in every lane for a paper.

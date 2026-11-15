@@ -1,7 +1,7 @@
 """Arguments for assistant-only catalog reads; no public API route."""
 
 from datetime import date
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -25,3 +25,37 @@ class FindPostsArguments(BaseModel):
     @classmethod
     def parse_date(cls, value):
         return date.fromisoformat(value) if isinstance(value, str) else value
+
+
+class FollowUpPostCheck(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+    query: str = Field(default="", max_length=200)
+    topic: str = Field(default="", max_length=100)
+    subtopic: str = Field(default="", max_length=100)
+    post_type: str = Field(default="", max_length=64)
+    publisher: str = Field(default="", max_length=160)
+    harness_engineering: bool | None = None
+    min_agent_relevance: int = Field(default=3, ge=0, le=4)
+    published_after: date | None = None
+
+    _parse_date = field_validator("published_after", mode="before")(FindPostsArguments.parse_date.__func__)
+
+
+class FollowUpCandidate(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True, str_strip_whitespace=True)
+
+    question: str = Field(min_length=1, max_length=120, description="A self-contained question the visitor would type; no implied topic from this turn.")
+    check: FollowUpPostCheck | Annotated[str, Field(min_length=1, max_length=200)] = Field(description="Post filters, or a short paper search phrase. Checks must find several useful unseen works.")
+
+    @field_validator("check")
+    @classmethod
+    def bounded_phrase(cls, value):
+        if isinstance(value, str) and not 1 <= len(value.strip()) <= 200:
+            raise ValueError("Use a paper search phrase of 1–200 characters.")
+        return value
+
+
+class SuggestFollowUpsArguments(BaseModel):
+    model_config = ConfigDict(extra="forbid", strict=True)
+    candidates: list[FollowUpCandidate] = Field(max_length=4)

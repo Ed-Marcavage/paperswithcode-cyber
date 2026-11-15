@@ -29,6 +29,7 @@ class AssistantMessage(Base):
     position = Column(Integer, nullable=False)
     role = Column(String(16), nullable=False)
     content = Column(Text, nullable=False, default="")
+    follow_ups = Column(JSON, nullable=False, default=list, server_default="[]")
     status = Column(String(24), nullable=False)
     created_at = Column(DateTime(timezone=True), nullable=False)
 

@@ -583,6 +583,15 @@ five minutes and remain available during provider cooldown. A turn may send
 and browse calls for that turn only. Apply `add_assistant_topics_followups.sql`
 before using the new fields; subsequent turns must send the topic again.
 
+After research the model may call `suggest_follow_ups` once. Direct, read-only
+database checks keep up to three useful questions with at least three matches,
+including two works not already shown; all checks share a three-second deadline.
+No extra model call is made to request suggestions. The terminal `done` event
+and reloaded assistant messages carry `follow_ups` (an empty list when absent).
+The trace records every candidate's counts and rejection reason. Reapply the
+idempotent `add_assistant_topics_followups.sql` if only its topic column was
+previously installed; it now also adds the message `follow_ups` column.
+
 ### Model evaluation
 
 The 20-question local-stack evaluation selected `deepseek-v4.1-flash:1017` as
@@ -596,6 +605,11 @@ and `max`, and its [compatibility API maps `none` to `false`](https://docs.ollam
 history per question and the application's normal bounded loop. Its JSON Lines
 output records question, named model, answer, status/error, tools and results,
 links, duration, model-call count and input/output tokens (null when absent).
+Four questions also select a topic and record a `follow_ups_check` that passes
+only when the model calls the verifier and at least one suggestion survives;
+review their candidate checks in the tool trace for relevance and useful novelty.
+These replace the generic taxonomy, vulnerability-repair, AI-system-security
+and trending-paper prompts; the owner's four landing questions remain first.
 It writes each row immediately and stops on a provider usage limit. It neither
 writes chat history to the database nor sends analytics. Like chat, it makes
 bounded read-only post-metadata lookups with the backend database settings;
