@@ -32,7 +32,7 @@ describe("PrivacyView catalog analytics", () => {
       render(<PrivacyView />);
       const recording = screen.getByText(/We also record sessions/);
       expect(recording).toHaveTextContent(/pointer movement, clicks and scrolling/);
-      expect(recording).toHaveTextContent(/does not include text you type into the search box or any other field/);
+      expect(recording).toHaveTextContent(/does not include text you type into the search box, the assistant or any other field/);
       expect(recording).toHaveTextContent(/kept for 30 days/);
       expect(screen.getByText(/we record that site's domain/)).toHaveTextContent(/not the address of the page that linked here/);
       expect(screen.getByText(/Do Not Track or Global Privacy Control/)).toHaveTextContent(
