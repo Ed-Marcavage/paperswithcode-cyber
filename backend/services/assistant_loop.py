@@ -28,6 +28,19 @@ You cannot browse the web or change the catalog."""
 FINALIZER_PROMPT = """The research budget is exhausted. Tools are now unavailable.
 Give your best concise answer from the evidence already collected. Clearly say
 what could not be established. Do not ask to run more tools or invent evidence."""
+RESEARCH_OUTPUT_TOKENS = 2048
+FINAL_OUTPUT_TOKENS = 4096
+FINAL_RETRY_OUTPUT_TOKENS = 8192
+
+
+def generation_options(*, final=False, retry=False):
+    # Ollama's OpenAI API maps none to think=false: off where supported,
+    # otherwise the lowest level (GLM/GPT-OSS cannot disable thinking).
+    return {"reasoning_effort": "none" if final else "low",
+            "max_tokens": (FINAL_RETRY_OUTPUT_TOKENS if retry else FINAL_OUTPUT_TOKENS)
+            if final else RESEARCH_OUTPUT_TOKENS}
+
+
 PROVIDER_ERROR = "The model provider could not answer. Please try again."
 
 
@@ -37,12 +50,12 @@ class AssistantProviderError(Exception):
 
 @dataclass(frozen=True)
 class TurnLimits:
-    # Reserve the last of eight model calls, 15 seconds and 4,000 characters
-    # for a tools-off final answer. All reserves are inside the total limits.
+    # Reserve two of eight model calls, 30 seconds and 4,000 characters for
+    # a tools-off final answer and one empty-answer retry, inside total limits.
     model_turns: int = 8
     tool_calls: int = 10
     seconds: float = 90
-    final_seconds: float = 15
+    final_seconds: float = 30
     output_chars: int = 16000
     final_chars: int = 4000
 
@@ -54,6 +67,8 @@ class ModelPass:
     finish_reason: str | None = None
     input_tokens: int | None = None
     output_tokens: int | None = None
+    reasoning_tokens: int | None = None
+    reasoning_chars: int = 0
     limited: bool = False
 
 
@@ -72,10 +87,10 @@ def model_client(settings: AssistantSettings) -> AsyncOpenAI:
     )
 
 
-async def model_pass(client, model, messages, tools, result, room):
+async def model_pass(client, model, messages, tools, result, room, *, final=False, retry=False):
     """Assemble interleaved streamed tool calls; always close the response."""
     kwargs = dict(model=model, messages=messages, stream=True,
-                  stream_options={"include_usage": True}, max_tokens=2048)
+                  stream_options={"include_usage": True}, **generation_options(final=final, retry=retry))
     if tools:
         kwargs["tools"] = tools
     # Ollama cloud does not reliably support tool_choice; omit tools to finalize.
@@ -86,12 +101,17 @@ async def model_pass(client, model, messages, tools, result, room):
             if chunk.usage is not None:
                 result.input_tokens = chunk.usage.prompt_tokens
                 result.output_tokens = chunk.usage.completion_tokens
+                details = chunk.usage.completion_tokens_details
+                result.reasoning_tokens = details.reasoning_tokens if details else None
             if not chunk.choices:
                 continue
             choice = chunk.choices[0]
             if choice.finish_reason:
                 result.finish_reason = choice.finish_reason
             delta = choice.delta
+            reasoning = getattr(delta, "reasoning", None) or getattr(delta, "reasoning_content", None)
+            if isinstance(reasoning, str):
+                result.reasoning_chars += len(reasoning)
             for part in delta.tool_calls or []:
                 if part.index not in calls:
                     calls[part.index] = {"id": "", "type": "function",
@@ -147,14 +167,14 @@ async def run_turn(
         if on_step:
             await on_step(step)
 
-    async def generate_once(tools, room):
+    async def generate_once(tools, room, *, final=False, retry=False):
         nonlocal model_attempts, output_used
         model_attempts += 1
         result = ModelPass()
         began = time.monotonic()
         status = "done"
         try:
-            async with aclosing(model_pass(client, model, messages, tools, result, room)) as stream:
+            async with aclosing(model_pass(client, model, messages, tools, result, room, final=final, retry=retry)) as stream:
                 async for event in stream:
                     # With tools enabled, text is ambiguous until the pass ends:
                     # a later tool call makes all of it a working note. Only the
@@ -181,7 +201,10 @@ async def run_turn(
                     "status": status, "text": result.text, "tool_calls": result.calls,
                     "error": PROVIDER_ERROR if status == "failed" else None,
                     "finish_reason": result.finish_reason,
-                    "input_tokens": result.input_tokens, "output_tokens": result.output_tokens})
+                    "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
+                    "reasoning_tokens": result.reasoning_tokens, "reasoning_chars": result.reasoning_chars,
+                    "phase": "finalizer_retry" if retry else "finalizer" if final else "research",
+                    **generation_options(final=final, retry=retry)})
         if tools and result.text:
             if result.calls:
                 yield {"type": "working_note", "text": result.text}
@@ -200,7 +223,7 @@ async def run_turn(
                 return
             except APIError as error:
                 if (not is_busy(error) or output_used != previous_output or retry == 2
-                        or model_attempts >= limits.model_turns - 1):
+                        or model_attempts >= limits.model_turns - 2):
                     raise
                 # Brief retries use the existing per-turn time/model budgets.
                 await asyncio.sleep(0.5 * (retry + 1))
@@ -208,7 +231,7 @@ async def run_turn(
     async def research():
         nonlocal tools_used
         tools = await mcp.tools()
-        while model_attempts < limits.model_turns - 1:
+        while model_attempts < limits.model_turns - 2:
             room = limits.output_chars - limits.final_chars - output_used
             if room <= 0:
                 return
@@ -282,17 +305,30 @@ async def run_turn(
             # The finalizer alone supplies the answer after a research limit.
             # Discard unfinished research text; its trace remains available.
             turn.text = ""
-            try:
-                async with asyncio.timeout(max(0.001, deadline - time.monotonic())):
-                    async with aclosing(generate([], limits.output_chars - output_used)) as stream:
-                        async for event in stream:
-                            if event["type"] != "model_result":
-                                yield event
-            except TimeoutError:
-                text = "\nThe time limit was reached. Please narrow your question."
-                text = text[:limits.output_chars - len(turn.text)]
-                turn.text += text
-                yield {"type": "text_delta", "text": text}
+            for attempt in range(2):
+                if model_attempts >= limits.model_turns or time.monotonic() >= deadline:
+                    break
+                # The first attempt must leave time for the one empty retry.
+                seconds_left = deadline - time.monotonic()
+                allowance = seconds_left / 2 if attempt == 0 else seconds_left
+                try:
+                    async with asyncio.timeout(allowance):
+                        async with aclosing(generate_once([], limits.output_chars - output_used,
+                                                          final=True, retry=bool(attempt))) as stream:
+                            async for event in stream:
+                                if event["type"] != "model_result":
+                                    yield event
+                except TimeoutError:
+                    pass
+                except APIError as error:
+                    if not is_busy(error) or attempt or turn.text.strip():
+                        raise
+                    # Keep the existing brief busy retry, using the reserved
+                    # second finalizer attempt rather than an extra model call.
+                    await asyncio.sleep(min(0.5, max(0, deadline - time.monotonic())))
+                if turn.text.strip():
+                    break
+                turn.text = ""
             if not turn.text:
                 text = "I could not establish an answer within this turn's limits. Please narrow your question."
                 turn.text = text[:limits.output_chars]

@@ -33,7 +33,8 @@ def fake_services(monkeypatch, replies):
 @pytest.mark.parametrize("fail", [False, True])
 def test_full_trace_from_http_turn(client, store, monkeypatch, caplog, fail):
     fake_services(monkeypatch, [[tool_chunk()], 500 if fail else [text_chunk("Evidence answer"), chunk(usage={
-        "prompt_tokens": 50, "completion_tokens": 8, "total_tokens": 58})]])
+        "prompt_tokens": 50, "completion_tokens": 8, "total_tokens": 58,
+        "completion_tokens_details": {"reasoning_tokens": 3}})]])
     with caplog.at_level(logging.INFO, logger=assistant.__name__):
         response = client.post("/api/v1/assistant/turn", json={"question": "Private question", "surface": "landing",
             "site_path": "/catalog?query=private#fragment", "analytics_session_id": str(uuid4())})
@@ -44,6 +45,7 @@ def test_full_trace_from_http_turn(client, store, monkeypatch, caplog, fail):
     assert run["surface"] == "landing"
     assert len(run["prompt_hash"]) == 64
     assert [s["kind"] for s in run["steps"]] == ["model", "tool", "model"]
+    assert run["steps"][-1]["reasoning_tokens"] == (None if fail else 3)
     assert run["steps"][1]["full_bytes"] > 0
     assert run["steps"][1]["limit_bytes"] == 16384
     assert run["steps"][1]["result"] in json.dumps(run["steps"][1], ensure_ascii=False).replace('\\"', '"')

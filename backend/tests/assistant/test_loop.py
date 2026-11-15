@@ -72,7 +72,7 @@ def test_plain_answer_and_private_request_contract():
     request = services.model_requests[0]
     assert request["messages"][0]["content"] == SYSTEM_PROMPT
     assert "user" not in request and "tool_choice" not in request
-    assert set(request) == {"model", "messages", "stream", "stream_options", "max_tokens", "tools"}
+    assert set(request) == {"model", "messages", "stream", "stream_options", "max_tokens", "tools", "reasoning_effort"}
     assert request["stream_options"] == {"include_usage": True}
     assert turn.steps[0]["input_tokens"] == 12
 
@@ -94,11 +94,11 @@ def test_interleaved_tool_calls_and_grounded_answer():
     assert turn.steps[0]["input_tokens"] is None
 
 
-def test_model_turn_limit_reserves_eighth_pass_for_finalizer():
-    services = FakeServices([[tool_chunk()]] * 7 + [[text_chunk("Final answer")]])
+def test_model_turn_limit_reserves_two_passes_for_finalizer():
+    services = FakeServices([[tool_chunk()]] * 6 + [[text_chunk("Final answer")]])
     turn, _ = asyncio.run(services.run())
     assert turn.status == "limit_reached"
-    assert len(services.model_requests) == 8
+    assert len(services.model_requests) == 7
     assert "tools" not in services.model_requests[-1]
     assert "tool_choice" not in services.model_requests[-1]
 
@@ -122,7 +122,7 @@ def test_output_cap_and_finalizer():
 
 
 def test_empty_finalizer_still_gives_a_bounded_plain_answer():
-    services = FakeServices([[tool_chunk()]] * 7 + [[chunk(finish="length")]])
+    services = FakeServices([[tool_chunk()]] * 6 + [[chunk(finish="length")]] * 2)
     turn, events = asyncio.run(services.run())
     assert turn.status == "limit_reached"
     assert "narrow your question" in turn.text
