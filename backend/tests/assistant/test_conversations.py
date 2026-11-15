@@ -85,8 +85,9 @@ def test_titles_cut_at_a_word_boundary(client, store):
         "  Short   question  ": "Short question",
         "a" * 60: "a" * 60,
     }
-    for question, title in cases.items():
-        saved = store.begin(visitor, None, question)
+    for index, (question, title) in enumerate(cases.items()):
+        # One answer may be in flight per visitor, so each case uses its own visitor.
+        saved = store.begin(f"{visitor}-{index}", None, question)
         with store.sessions() as db:
             stored = db.get(AssistantConversation, saved.conversation_id).title
         assert stored == title and len(stored) <= 60
