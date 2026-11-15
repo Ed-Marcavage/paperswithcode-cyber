@@ -69,11 +69,15 @@ def test_evaluation_stops_after_quota_and_writes_partial_row():
 def test_token_totals_only_when_every_call_reports_usage():
     turn = Turn(text="Answer", status="done", steps=[{"kind": "model", "input_tokens": 4, "output_tokens": 2}] * 2)
     assert result_row(1, "Question", "model", turn, 1.25)["tokens"] == {"input_tokens": 8, "output_tokens": 4}
+    turn.steps.append({"kind": "follow_ups", "status": "done", "input_tokens": 6, "output_tokens": 3})
+    row = result_row(1, "Question", "model", turn, 1.25)
+    assert row["tokens"] == {"input_tokens": 14, "output_tokens": 7}
+    assert row["model_calls"] == 3 and row["research_model_calls"] == 2
 
 
 def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch, capsys):
     from backend import assistant_eval
-    replies = [[tool_chunk()], [text_chunk("Answer")]] * len(QUESTIONS)
+    replies = [[tool_chunk()], [text_chunk("Answer")], [text_chunk('{"candidates":[]}')]] * len(QUESTIONS)
     services = FakeServices(replies)
     mcp_urls = []
 
@@ -93,6 +97,7 @@ def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch
     monkeypatch.chdir(tmp_path)  # No environment file is present or needed.
     monkeypatch.setenv("PWC_ASSISTANT_API_KEY", "evaluation-test-key")
     monkeypatch.setenv("PWC_ASSISTANT_BASE_URL", "http://model.test/v1")
+    monkeypatch.setenv("PWC_ASSISTANT_FOLLOW_UPS_ENABLED", "true")
     monkeypatch.setattr(assistant_eval.httpx, "AsyncClient", TestHttpClient)
     monkeypatch.setattr(assistant_eval, "model_client", lambda settings: AsyncOpenAI(
         api_key=settings.api_key.get_secret_value(), base_url=settings.base_url,
@@ -103,6 +108,7 @@ def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch
     rows = [json.loads(line) for line in output.read_text().splitlines()]
     assert len(rows) == 20
     assert all(row["model"] == "named-container-model" and row["status"] == "done" for row in rows)
+    assert all(row["model_calls"] == 3 and row["research_model_calls"] == 2 for row in rows)
     captured = capsys.readouterr()
     assert "evaluation-test-key" not in output.read_text() + captured.out + captured.err
 
@@ -137,18 +143,34 @@ def test_topic_evaluation_records_verified_followups(monkeypatch):
     from backend.services import assistant_followups
     from backend.tests.assistant.test_followups import QUESTION, CHECK
     monkeypatch.setattr(assistant_followups, "read_counts", lambda *args: {"match_count": 5, "new_match_count": 3})
-    replies = [[tool_chunk()], [tool_chunk(name="suggest_follow_ups", arguments=json.dumps({"candidates": [{"question": QUESTION, "check": CHECK}]}))],
-               [text_chunk("Grounded answer")]]
+    replies = [[tool_chunk()], [text_chunk("Grounded answer")],
+               [text_chunk(json.dumps({"candidates": [{"question": QUESTION, "check": CHECK}]}))]]
     services = FakeServices(replies * 4)
     output = io.StringIO()
     async def run():
         async with httpx.AsyncClient(transport=httpx.MockTransport(services.model)) as model_http:
             async with httpx.AsyncClient(transport=httpx.MockTransport(services.mcp)) as mcp_http:
                 async with AsyncOpenAI(api_key="fake", base_url="http://model.test/v1", max_retries=0, http_client=model_http) as model:
-                    return await evaluate(model, CatalogMcp(mcp_http, "http://catalog.test/mcp"), "named", output, questions=tuple(TOPIC_QUESTIONS))
+                    return await evaluate(model, CatalogMcp(mcp_http, "http://catalog.test/mcp"), "named", output,
+                                          questions=tuple(TOPIC_QUESTIONS), follow_ups_enabled=True)
     assert asyncio.run(run())
     for row in map(json.loads, output.getvalue().splitlines()):
         assert row["follow_ups_check"] == {"expected": True, "passed": True}
         assert row["follow_ups"] == [QUESTION]
-        decision = json.loads(row["tools"][-1]["result"])["candidates"][0]
+        decision = row["follow_up_steps"][0]["candidates"][0]
         assert decision["match_count"] == 5 and decision["new_match_count"] == 3 and decision["kept"]
+
+
+def test_evaluation_stops_on_optional_usage_limit_without_failing_the_answer():
+    services = FakeServices([[text_chunk("Complete answer")], httpx.Response(429, json={"error": "weekly usage limit exceeded"})])
+    output = io.StringIO()
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(services.model)) as model_http:
+            async with httpx.AsyncClient(transport=httpx.MockTransport(services.mcp)) as mcp_http:
+                async with AsyncOpenAI(api_key="fake", base_url="http://model.test/v1", max_retries=0, http_client=model_http) as model:
+                    return await evaluate(model, CatalogMcp(mcp_http, "http://catalog.test/mcp"), "named", output,
+                                          questions=("Question", "Not asked"), follow_ups_enabled=True)
+    assert not asyncio.run(run())
+    row = json.loads(output.getvalue())
+    assert row["status"] == "done" and row["answer"] == "Complete answer"
+    assert row["follow_up_steps"][0]["status"] == "usage_limit" and len(services.model_requests) == 2

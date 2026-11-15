@@ -158,6 +158,19 @@ class AssistantStore:
                 db.add(AssistantToolCall(id=identifier(), message_id=saved.message_id,
                                         position=position, detail=step))
 
+    def save_answer(self, saved: SavedTurn, turn):
+        """Checkpoint the complete answer without releasing the active-turn lease."""
+        with self.sessions.begin() as db:
+            conversation = db.scalar(select(AssistantConversation).where(
+                AssistantConversation.id == saved.conversation_id,
+                AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update())
+            if conversation is None:
+                return  # Never revive an expired or deleted conversation.
+            message = db.get(AssistantMessage, saved.message_id)
+            if message is not None:
+                message.content, message.status, message.follow_ups = turn.text, turn.status, []
+                conversation.updated_at = datetime.now(UTC)
+
     def feedback(self, visitor, run_id, rating, note):
         with self.sessions.begin() as db:
             run = db.get(AssistantRun, run_id)
@@ -213,7 +226,7 @@ class AssistantStore:
     def trace(db, run):
         steps = [s.detail for s in db.scalars(select(AssistantRunStep).where(
             AssistantRunStep.run_id == run.id).order_by(AssistantRunStep.position))]
-        model_steps = [s for s in steps if s["kind"] == "model"]
+        model_steps = [s for s in steps if s["kind"] in {"model", "follow_ups"}]
         tokens = {}
         for key in ("input_tokens", "output_tokens"):
             values = [s.get(key) for s in model_steps]

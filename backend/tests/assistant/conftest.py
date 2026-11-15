@@ -60,6 +60,13 @@ def client(monkeypatch, store):
 
 
 @pytest.fixture(autouse=True)
+def isolate_optional_followups(monkeypatch):
+    # Existing research tests isolate the original loop. Follow-up tests opt in.
+    from backend.assistant_config import get_assistant_settings
+    monkeypatch.setattr(get_assistant_settings(), "follow_ups_enabled", False)
+
+
+@pytest.fixture(autouse=True)
 def isolated_filter_cache(monkeypatch):
     from backend.services import assistant_mcp
     monkeypatch.setattr(assistant_mcp, "FILTER_CACHE", {})

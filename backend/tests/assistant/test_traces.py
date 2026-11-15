@@ -66,7 +66,7 @@ def test_cancelled_trace_records_partial_model_step(store, monkeypatch):
     monkeypatch.setattr(CatalogMcp, "tools", no_tools)
     saved = store.begin("owner", None, "Question")
     async def go():
-        events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(), saved, store)
+        events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(follow_ups_enabled=False), saved, store)
         async with aclosing(events):
             await anext(events)
             await anext(events)
@@ -82,7 +82,7 @@ def test_client_closing_at_done_cannot_change_completed_trace(store, monkeypatch
     fake_services(monkeypatch, [[text_chunk("Completed answer")]])
     saved = store.begin("owner", None, "Question")
     async def go():
-        events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(), saved, store)
+        events = assistant.turn_events(AssistantTurnRequest(question="Question"), AssistantSettings(follow_ups_enabled=False), saved, store)
         async with aclosing(events):
             async for event in events:
                 if event.startswith("event: done"):
