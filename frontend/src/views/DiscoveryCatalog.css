@@ -1,6 +1,7 @@
-/* Filters: an inline row on wider screens, a Filters button and sheet on phones. */
+/* Filters: an inline row on wider screens, a Filters button and sheet on phones. The small
+   basis keeps "Try chat" on the filters' row when the Ask panel narrows the page. */
 .discovery-filters {display:flex;flex-wrap:wrap;align-items:flex-end;gap:14px 16px;margin:1.5rem 0 0;}
-.discovery-filters label {position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;flex:1 1 150px;min-width:0;max-width:240px;font:11px var(--mono);color:var(--ink-faint);}
+.discovery-filters label {position:relative;display:grid;grid-template-columns:minmax(0,1fr);gap:6px;flex:1 1 110px;min-width:0;max-width:240px;font:11px var(--mono);color:var(--ink-faint);}
 .discovery-filters label::after {content:"";position:absolute;right:12px;bottom:14px;width:6px;height:6px;border-right:1.5px solid var(--ink-faint);border-bottom:1.5px solid var(--ink-faint);transform:rotate(45deg);pointer-events:none;}
 .discovery-filters select {appearance:none;-webkit-appearance:none;width:100%;height:36px;padding:0 30px 0 10px;border:1px solid var(--hairline);border-radius:7px;background:var(--bg-elevated);color:var(--ink);font:13px var(--sans);text-overflow:ellipsis;cursor:pointer;transition:border-color .15s;}
 .discovery-filters select:hover:not(:disabled) {border-color:var(--hairline-strong);}

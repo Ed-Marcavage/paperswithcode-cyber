@@ -418,6 +418,12 @@
   .assistant-panel-backdrop { display: none; }
   html.assistant-panel-open :is(main:not(main main), .site-footer, .reader-route-content) { padding-right: var(--assistant-panel-width); }
 }
+/* Laptop widths with the panel open: Trending drops its left sidebar (domains and agent
+   links come back when the panel closes) so the feed and Editor's picks keep a usable width. */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  html.assistant-panel-open .layout-with-sidebar:has(> .feed-sidebar) { grid-template-columns: minmax(0, 1fr); }
+  html.assistant-panel-open .layout-with-sidebar > .feed-sidebar { display: none; }
+}
 @media (max-width: 640px) {
   .assistant-panel { border-left: 0; box-shadow: none; }
   .assistant-panel-header { padding-left: 16px; }
