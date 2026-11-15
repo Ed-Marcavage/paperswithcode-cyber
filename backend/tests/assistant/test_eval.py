@@ -90,3 +90,24 @@ def test_cli_uses_backend_environment_and_internal_mcp_url(tmp_path, monkeypatch
     assert all(row["model"] == "named-container-model" and row["status"] == "done" for row in rows)
     captured = capsys.readouterr()
     assert "evaluation-test-key" not in output.read_text() + captured.out + captured.err
+
+
+def test_owner_questions_lead_the_twenty_item_evaluation_without_duplicate_generic_prompts():
+    assert QUESTIONS[:4] == (
+        "Which posts show cutting-edge harness design for automated pentesting?",
+        "How are teams benchmarking AI agents on security tasks, and what did they find?",
+        "What do defenders report about ARTEX and other agentic attack frameworks?",
+        "How are companies using agents to triage and fix vulnerabilities?",
+    )
+    assert len(QUESTIONS) == len(set(QUESTIONS)) == 20
+    dropped = {
+        "Show me recent security papers in the catalog.",
+        "Which organizations have research in the catalog?",
+        "Which developers contribute to catalog repositories?",
+        "Show engineering posts about security from the catalog.",
+    }
+    assert not dropped.intersection(QUESTIONS)
+    assert any("cached text" in question for question in QUESTIONS)
+    assert any("ZZZ-Unpublished-Quantum-Toaster-999" in question for question in QUESTIONS)
+    assert any("organization page" in question for question in QUESTIONS)
+    assert any("profile link" in question for question in QUESTIONS)

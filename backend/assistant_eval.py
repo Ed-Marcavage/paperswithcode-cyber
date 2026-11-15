@@ -24,10 +24,12 @@ from backend.services.assistant_loop import Turn, model_client, run_turn
 from backend.services.assistant_mcp import CatalogMcp
 
 QUESTIONS = (
-    "Show me recent security papers in the catalog.",
-    "Which organizations have research in the catalog?",
+    "Which posts show cutting-edge harness design for automated pentesting?",
+    "How are teams benchmarking AI agents on security tasks, and what did they find?",
+    "What do defenders report about ARTEX and other agentic attack frameworks?",
+    "How are companies using agents to triage and fix vulnerabilities?",
+
     "Show me repositories for security research.",
-    "Which developers contribute to catalog repositories?",
     "What is EVMbench, and where can I read its catalog page?",
     "Find Cybench and summarize what it evaluates, with catalog links.",
     "Find ChatAFL and its official repository in the catalog.",
@@ -36,7 +38,6 @@ QUESTIONS = (
     "Find research about smart-contract security.",
     "Show catalog work on vulnerability repair.",
     "Find security work involving AI systems.",
-    "Show engineering posts about security from the catalog.",
     "Which catalog repositories have the most stars? Explain what the counts mean.",
     "List trending security papers and link their catalog pages.",
     "Pick a listed organization and describe its catalog work with a link to its organization page.",
