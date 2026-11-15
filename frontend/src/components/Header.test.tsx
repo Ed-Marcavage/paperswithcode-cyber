@@ -4,15 +4,18 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import Header from "@/components/Header";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { assistantApi } from "@/lib/api/assistant";
+import { AssistantProvider } from "@/components/assistant/AssistantProvider";
 
-const buildFlags = vi.hoisted(() => ({ authDisabled: false, chatEnabled: true }));
+const buildFlags = vi.hoisted(() => ({ authDisabled: false, chatEnabled: true, assistantEnabled: false, discovery: false }));
 
 vi.mock("@/lib/apiUrl", () => ({
   CANONICAL_CHAT_URL: "https://paperswithcode.co/chat",
-  isDiscoveryCatalog: () => false,
+  isDiscoveryCatalog: () => buildFlags.discovery,
   isAuthDisabled: () => buildFlags.authDisabled,
   isChatEnabled: () => buildFlags.chatEnabled,
-  isAssistantEnabled: () => false,
+  isAssistantEnabled: () => buildFlags.assistantEnabled,
   isChatMirror: () => buildFlags.authDisabled && !buildFlags.chatEnabled,
 }));
 
@@ -28,6 +31,8 @@ beforeEach(() => {
   localStorage.clear();
   buildFlags.authDisabled = false;
   buildFlags.chatEnabled = true;
+  buildFlags.assistantEnabled = false;
+  buildFlags.discovery = false;
 });
 afterEach(() => vi.restoreAllMocks());
 
@@ -218,5 +223,43 @@ describe("Header navigation", () => {
       "href",
       "https://github.com/huggingface/paperswithcode",
     );
+  });
+});
+
+describe("Assistant chat navigation", () => {
+  function renderAt(path: string) {
+    vi.spyOn(assistantApi, "status").mockResolvedValue({ available: true, code: null, reason: null, retry_at: null });
+    return render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={[path]}>
+          <AssistantProvider><Header onOpenSearch={vi.fn()} /></AssistantProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+  beforeEach(() => {
+    buildFlags.chatEnabled = false;
+    buildFlags.assistantEnabled = true;
+    buildFlags.discovery = true;
+  });
+
+  it("adds a Chat tab after Trending, active on /chat and /chat/:id", () => {
+    const first = renderAt("/chat");
+    const links = within(screen.getByRole("navigation")).getAllByRole("link");
+    expect(links[1]).toHaveAccessibleName("Chat");
+    expect(links[1]).toHaveAttribute("href", "/chat");
+    expect(links[1]).toHaveClass("active");
+    first.unmount();
+    renderAt("/chat/abc");
+    expect(within(screen.getByRole("navigation")).getByRole("link", { name: "Chat" })).toHaveClass("active");
+  });
+
+  it("shows the Ask panel button elsewhere and drops it on the chat page", () => {
+    const home = renderAt("/");
+    expect(within(screen.getByRole("navigation")).getByRole("link", { name: "Chat" })).not.toHaveClass("active");
+    expect(screen.getByRole("button", { name: "Ask" })).toHaveAttribute("aria-controls", "assistant-panel");
+    home.unmount();
+    renderAt("/chat/abc");
+    expect(screen.queryByRole("button", { name: "Ask" })).not.toBeInTheDocument();
   });
 });

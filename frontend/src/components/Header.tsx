@@ -101,10 +101,14 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
     ? { to: "/chat", label: "Chat", end: false, badge: "New" }
     : isChatMirror()
       ? { to: "/chat", label: "Chat", end: false, badge: "New", href: CANONICAL_CHAT_URL }
-      : null;
+      : isAssistantEnabled()
+        // The assistant's own chat page; the header Ask button opens the side panel.
+        ? { to: "/chat", label: "Chat", end: false }
+        : null;
   const navLinks: readonly HeaderNavLink[] = isDiscoveryCatalog()
     ? [
         NAV_LINKS[0],
+        ...(chatLink ? [chatLink] : []),
         { to: "/catalog", label: "Browse catalog", end: false },
         { to: "/organizations", label: "Organizations", end: false },
         { to: "/developers", label: "Developers", end: false },

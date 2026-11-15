@@ -263,6 +263,18 @@ const SiteLayout: React.FC<{ reader?: boolean }> = ({ reader = false }) => {
       </div>
     );
   }
+  // The assistant's chat page fills the viewport below the header: no footer,
+  // no page scroll, only its transcript scrolls.
+  if (isAssistantEnabled() && !isChatEnabled() && /^\/chat(\/|$)/.test(pathname)) {
+    return (
+      <div className="assistant-page-shell">
+        {header}
+        <main>{page}</main>
+        {search}
+        <AssistantPanel />
+      </div>
+    );
+  }
   return (
     <>
       {header}

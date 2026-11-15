@@ -6,6 +6,7 @@ import { assistantApi, type AssistantConversation } from "@/lib/api/assistant";
 import { AssistantProvider } from "./AssistantProvider";
 import AssistantPage from "./AssistantPage";
 import { ASSISTANT_PROMPTS } from "./prompts";
+import { friendlyDate } from "./format";
 
 const saved: AssistantConversation = { id: "saved", title: "Old title", updated_at: "2026-11-14T12:00:00Z", question_count: 1, question_limit: 10,
   messages: [{ id: "a", role: "assistant", content: "Saved answer", status: "done", tool_steps: [] }] };
@@ -51,4 +52,17 @@ it("offers four prompts and lets the mobile history drawer close", async () => {
   await screen.findByText("Saved answer");
   fireEvent.click(screen.getByRole("button", { name: "New chat" }));
   await screen.findByText(ASSISTANT_PROMPTS[0]);
+});
+it("reads chat dates naturally and keeps quiet icon actions labelled", async () => {
+  const now = new Date(2026, 10, 14, 15, 0);
+  expect(friendlyDate(new Date(2026, 10, 14, 9, 0).toISOString(), now)).toBe("Today");
+  expect(friendlyDate(new Date(2026, 10, 13, 23, 0).toISOString(), now)).toBe("Yesterday");
+  expect(friendlyDate(new Date(2026, 10, 12, 8, 0).toISOString(), now)).toBe("Nov 12");
+  expect(friendlyDate(new Date(2025, 10, 12, 8, 0).toISOString(), now)).toBe("Nov 12, 2025");
+  mount("/chat/saved");
+  await screen.findByText("Saved answer");
+  const item = screen.getByRole("link", { name: /Old title/ }).closest("li")!;
+  expect(item).toHaveClass("is-current");
+  expect(within(item).getByRole("button", { name: "Rename chat" })).toHaveAttribute("title", "Rename");
+  expect(within(item).getByRole("button", { name: "Delete chat" })).toHaveAttribute("title", "Delete");
 });
