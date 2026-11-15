@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { assistantApi, assistantKeys, AssistantError, type AssistantConversation, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { assistantApi, assistantKeys, AssistantError, followUps, type AssistantConversation, type AssistantMessage, type AssistantSurface } from "@/lib/api/assistant";
 import { AssistantContext } from "./context";
 import "./assistant.css";
 import { useAvailability } from "./useAvailability";
@@ -12,6 +12,7 @@ function stored(key: string) { try { return localStorage.getItem(key); } catch {
 function remember(key: string, value: string | null) {
   try { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value); } catch { /* Private browsing still supports this visit. */ }
 }
+interface SendOptions { fresh?: boolean; keepDraft?: boolean; topic?: string | null }
 function empty(): AssistantConversation {
   return { id: "", title: "New chat", updated_at: "", question_count: 0, question_limit: 10, messages: [] };
 }
@@ -26,10 +27,28 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(Boolean(currentId));
   const [error, setError] = useState<AssistantError | null>(null);
+  // The chosen topic per conversation ("" is the new, unsaved chat). Memory only, never
+  // localStorage: it stays set for the conversation until removed or a new chat starts.
+  const [topicByChat, setTopicByChat] = useState<Record<string, string>>({});
+  const topicsQuery = useQuery({ queryKey: assistantKeys.topics, queryFn: assistantApi.topics, staleTime: 30 * 60_000, retry: false });
+  const topics = topicsQuery.data ?? [];
+  const topic = topicByChat[currentId ?? ""] ?? null;
   const active = useRef<AbortController | null>(null);
+  // A turn whose answer is complete but whose follow-ups are still coming. The composer is
+  // free meanwhile; asking again, Stop or leaving the chat aborts it and drops the follow-ups.
+  const trailing = useRef<AbortController | null>(null);
   const revision = useRef(0);
   const setOpen = useCallback((value: boolean) => { updateOpen(value); remember(OPEN_KEY, String(value)); if (value) assistantEvent("opened", "panel"); }, []);
   const setId = useCallback((id: string | null) => { updateId(id); remember(ID_KEY, id); }, []);
+  const setTopic = useCallback((slug: string | null, surface: AssistantSurface = "panel") => {
+    const key = currentId ?? "";
+    setTopicByChat(previous => {
+      const next = { ...previous };
+      if (slug) next[key] = slug; else delete next[key];
+      return next;
+    });
+    if (slug) assistantEvent("topic_chosen", surface, slug);
+  }, [currentId]);
 
   useEffect(() => {
     if (!currentId || active.current) return;
@@ -44,32 +63,36 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       }).finally(() => { if (!disposed) setLoading(false); });
     return () => { disposed = true; };
   }, [currentId, queryClient, setId]);
-  useEffect(() => () => active.current?.abort(), []);
+  useEffect(() => () => { active.current?.abort(); trailing.current?.abort(); }, []);
 
-  const stop = useCallback(() => active.current?.abort(), []);
+  const stop = useCallback(() => { active.current?.abort(); trailing.current?.abort(); }, []);
   const selectConversation = useCallback((id: string) => {
     if (id === currentId) return;
-    active.current?.abort(); active.current = null; revision.current += 1;
+    active.current?.abort(); active.current = null; trailing.current?.abort(); trailing.current = null; revision.current += 1;
     setBusy(false); setError(null); setDraft(""); setConversation(empty()); setLoading(true); setId(id);
   }, [currentId, setId]);
   const newChat = useCallback((surface: AssistantSurface = "panel") => {
     assistantEvent("new_chat", surface);
-    active.current?.abort(); active.current = null; revision.current += 1;
+    active.current?.abort(); active.current = null; trailing.current?.abort(); trailing.current = null; revision.current += 1;
     setBusy(false); setLoading(false); setError(null); setDraft(""); setConversation(empty()); setId(null);
+    setTopicByChat(({ "": _unsaved, ...saved }) => saved);
   }, [setId]);
 
-  const send = useCallback(async (question: string, surface: AssistantSurface, path: string, fresh = false) => {
+  const send = useCallback(async (question: string, surface: AssistantSurface, path: string, { fresh = false, keepDraft = false, topic: chosen }: SendOptions = {}) => {
     if (active.current || !availability.available || !question.trim() || question.length > 1000 || (loading && !fresh)) return;
+    trailing.current?.abort(); trailing.current = null;
     const controller = new AbortController();
+    let complete = false; // answer_complete seen: the answer is final, only follow-ups remain
     active.current = controller;
     const version = revision.current;
     const answerId = crypto.randomUUID();
     const answer: AssistantMessage = { id: answerId, role: "assistant", content: "", status: "running", tool_steps: [] };
     const priorId = fresh ? null : currentId;
+    const sentTopic = chosen === undefined ? topic : chosen;
     assistantEvent("message_sent", surface);
-    setBusy(true); setError(null); setDraft("");
+    setBusy(true); setError(null); if (!keepDraft) setDraft("");
     setConversation(previous => ({ ...previous, messages: [...previous.messages,
-      { id: crypto.randomUUID(), role: "user", content: question, status: "done", tool_steps: [] }, answer] }));
+      { id: crypto.randomUUID(), role: "user", content: question, status: "done", tool_steps: [], topic: sentTopic }, answer] }));
     const updateAnswer = (update: (message: AssistantMessage) => AssistantMessage) => {
       if (version !== revision.current) return;
       setConversation(previous => ({ ...previous, messages: previous.messages.map(m => m.id === answerId ? update(m) : m) }));
@@ -79,9 +102,11 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
       // a simultaneous sidebar request through the same TanStack Query key.
       await queryClient.ensureQueryData({ queryKey: assistantKeys.list, queryFn: assistantApi.list });
       controller.signal.throwIfAborted();
-      for await (const event of assistantApi.turn(question, priorId, surface, path, controller.signal)) {
+      for await (const event of assistantApi.turn(question, priorId, surface, path, controller.signal, ...(sentTopic ? [sentTopic] as const : [] as const))) {
         if (version !== revision.current) break;
         if (event.type === "meta") {
+          // A new chat's topic now belongs to its saved id.
+          if (!priorId) setTopicByChat(({ "": unsaved, ...saved }) => unsaved ? { ...saved, [event.conversation_id]: unsaved } : saved);
           setId(event.conversation_id);
           setConversation(previous => ({ ...previous, id: event.conversation_id,
             question_count: event.question_count, question_limit: event.question_limit }));
@@ -91,16 +116,28 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         else if (event.type === "tool_started") updateAnswer(m => ({ ...m, tool_steps: [...m.tool_steps,
           { name: event.name, call_id: event.id, pending: true }] }));
         else if (event.type === "tool_finished") updateAnswer(m => ({ ...m, tool_steps: m.tool_steps.map(s => s.call_id === event.id ? { ...s, pending: false, error: event.error, result: event.result } : s) }));
-        else if (event.type === "done") { updateAnswer(m => ({ ...m, status: event.status })); assistantEvent("answer_done", surface); if (event.status === "limit_reached") assistantEvent("limit_hit", surface); }
+        else if (event.type === "answer_complete") {
+          complete = true;
+          updateAnswer(m => ({ ...m, status: "done", working_note: undefined, follow_ups_pending: true }));
+          assistantEvent("answer_done", surface);
+          if (active.current === controller) { active.current = null; trailing.current = controller; setBusy(false); }
+        } else if (event.type === "done") {
+          updateAnswer(m => ({ ...m, status: event.status, follow_ups: followUps(event.follow_ups), follow_ups_pending: false }));
+          if (!complete) assistantEvent("answer_done", surface);
+          if (event.status === "limit_reached") assistantEvent("limit_hit", surface);
+        }
         else if (event.type === "error") throw new AssistantError(event.message, event.code, 0, event.retry_at);
       }
     } catch (failure) {
       if (version !== revision.current) return;
-      if (controller.signal.aborted) updateAnswer(m => ({ ...m, status: "cancelled" }));
+      // After answer_complete the saved answer stands; a stop, a new question or a lost
+      // stream only drops the follow-ups still on their way.
+      if (complete) updateAnswer(m => ({ ...m, follow_ups_pending: false }));
+      else if (controller.signal.aborted) updateAnswer(m => ({ ...m, status: "cancelled" }));
       else {
         const problem = failure instanceof AssistantError ? failure : new AssistantError("The assistant could not respond. Please try again.");
         assistantEvent(["usage_limit", "question_limit"].includes(problem.code) ? "limit_hit" : "error", surface);
-        setError(problem); setDraft(question);
+        setError(problem); if (!keepDraft) setDraft(question);
         if (["usage_limit", "disabled", "not_configured"].includes(problem.code)) {
           queryClient.setQueryData(assistantKeys.status, { available: false, code: problem.code, reason: problem.message, retry_at: problem.retryAt });
         }
@@ -108,14 +145,19 @@ export function AssistantProvider({ children }: { children: ReactNode }) {
         updateAnswer(m => ({ ...m, status: "failed", error: problem.message }));
       }
     } finally {
-      updateAnswer(m => ({ ...m, working_note: undefined }));
-      if (version === revision.current) { active.current = null; setBusy(false); }
+      updateAnswer(m => ({ ...m, working_note: undefined, follow_ups_pending: false }));
+      if (trailing.current === controller) trailing.current = null;
+      if (active.current === controller) { active.current = null; setBusy(false); }
       void queryClient.invalidateQueries({ queryKey: assistantKeys.list });
     }
-  }, [currentId, loading, queryClient, setId, availability.available]);
+  }, [currentId, loading, queryClient, setId, availability.available, topic]);
 
-  const launch = (question: string, path: string) => { newChat("landing"); assistantEvent("asked_from_landing", "landing"); void send(question, "landing", path, true); };
+  const launch = (question: string, path: string, chosen: string | null = null) => {
+    newChat("landing"); assistantEvent("asked_from_landing", "landing");
+    if (chosen) setTopicByChat(previous => ({ ...previous, "": chosen }));
+    void send(question, "landing", path, { fresh: true, topic: chosen });
+  };
 
   return <AssistantContext.Provider value={{ open, setOpen, currentId, conversation, draft, setDraft, busy, loading, error,
-    availability, launch, send, selectConversation, newChat, stop }}>{children}</AssistantContext.Provider>;
+    availability, launch, send, selectConversation, newChat, stop, topics, topic, setTopic }}>{children}</AssistantContext.Provider>;
 }

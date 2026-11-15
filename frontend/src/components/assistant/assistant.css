@@ -615,3 +615,178 @@
 .assistant-panel .assistant-composer-hint { display: none; }
 /* Desktop: the sidebar marks the open chat and the question heads the transcript, so the title bar is phone-only. */
 @media (min-width: 901px) { .assistant-page-bar { display: none; } }
+
+/* === Topics, the "/" command list and follow-ups === */
+/* Chips under the example questions: smaller and rounder than the example cards, so they read
+   as filters to add to a question rather than questions to send. */
+.assistant-topics { margin-top: 22px; }
+.assistant-topics-label { margin-bottom: 9px; font-size: 12.5px; color: var(--ink-faint); }
+.assistant-topic-chips { display: flex; flex-wrap: wrap; gap: 7px; min-width: 0; }
+.assistant-topic-chips button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 7px;
+  flex: none;
+  padding: 5px 11px 5px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  color: var(--ink-soft);
+  font-size: 13px;
+  line-height: 1.35;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.assistant-topic-chips button:hover:not(:disabled) { border-color: var(--hairline-strong); color: var(--ink); }
+.assistant-topic-chips button[aria-pressed="true"] { border-color: color-mix(in oklch, var(--accent-text) 40%, transparent); background: var(--accent-soft); color: var(--accent-text); }
+.assistant-topic-chips button:disabled { opacity: 0.5; cursor: default; }
+.assistant-topic-count { flex: none; font-family: var(--mono); font-size: 10.5px; font-variant-numeric: tabular-nums; color: var(--ink-faint); }
+.assistant-topic-chips button[aria-pressed="true"] .assistant-topic-count { color: inherit; opacity: 0.7; }
+.assistant-page .assistant-topics { margin-top: 30px; }
+/* Phones: one row that scrolls sideways under the examples instead of five wrapped rows;
+   it bleeds to the screen edges and fades there to show there is more. */
+@media (max-width: 640px) {
+  .assistant-topic-chips {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    margin: 0 -16px;
+    padding: 0 16px 4px;
+    scroll-padding: 0 16px;
+    scrollbar-width: none;
+    -webkit-mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 32px), transparent);
+    mask-image: linear-gradient(to right, transparent, #000 14px, #000 calc(100% - 32px), transparent);
+  }
+  .assistant-topic-chips::-webkit-scrollbar { display: none; }
+}
+
+/* The chosen topic sits on the composer, above the question. */
+.assistant-field, .assistant-landing-field { position: relative; flex-wrap: wrap; }
+.assistant-field { row-gap: 4px; }
+.assistant-field.has-topics { padding-left: 7px; }
+.assistant-field.has-topics .assistant-topic-tag-row { padding-left: 2px; }
+.assistant-topic-tag-row { flex: 0 0 100%; display: flex; min-width: 0; padding-top: 1px; }
+.assistant-topic-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+  height: 26px;
+  padding: 0 3px 0 9px;
+  border-radius: 7px;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-size: 12.5px;
+  cursor: default;
+}
+.assistant-topic-tag-key { flex: none; font-family: var(--mono); font-size: 10.5px; opacity: 0.75; }
+.assistant-topic-tag-label { min-width: 0; overflow: hidden; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.assistant-topic-tag button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 5px;
+  color: inherit;
+  opacity: 0.75;
+  transition: background 0.15s, opacity 0.15s;
+}
+.assistant-topic-tag button:hover { opacity: 1; background: color-mix(in oklch, currentColor 14%, transparent); }
+
+/* The "/" key beside the question opens the same list as typing a slash. */
+.assistant-topic-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  align-self: flex-end;
+  width: 30px;
+  height: 30px;
+  margin-bottom: 2px;
+  border-radius: 8px;
+  color: var(--ink-faint);
+  transition: background 0.15s, color 0.15s;
+}
+.assistant-topic-button span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 5px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1;
+}
+.assistant-topic-button:hover:not(:disabled), .assistant-topic-button[aria-expanded="true"] { background: var(--bg-subtle); color: var(--ink); }
+.assistant-topic-button:disabled { opacity: 0.5; cursor: default; }
+.assistant-landing .assistant-topic-button { width: 34px; height: 34px; margin-bottom: 2px; }
+
+.assistant-command-menu {
+  position: absolute;
+  z-index: 5;
+  left: 0;
+  bottom: calc(100% + 8px);
+  width: min(100%, 360px);
+  max-height: min(340px, 52vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 5px;
+  border: 1px solid var(--hairline-strong);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: 0 18px 44px -22px rgb(20 18 14 / 0.45);
+  cursor: default;
+}
+.assistant-landing .assistant-command-menu { z-index: 30; top: calc(100% + 8px); bottom: auto; }
+.assistant-command-heading { padding: 6px 10px 5px; font-family: var(--mono); font-size: 10.5px; color: var(--ink-faint); }
+.assistant-command-menu [role="option"] {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 7px 10px;
+  border-radius: 7px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.4;
+  cursor: pointer;
+}
+.assistant-command-menu [role="option"].is-active { background: var(--bg-subtle); color: var(--ink); }
+.assistant-command-menu [role="option"].is-active .assistant-topic-count { color: var(--ink-soft); }
+.assistant-command-empty { padding: 8px 10px; font-size: 13px; color: var(--ink-faint); }
+
+/* The question's heading names the topic it was asked under. */
+.assistant-question-topic { margin-bottom: 6px; font-family: var(--mono); font-size: 11px; color: var(--accent-text); }
+
+/* Next questions under the latest answer: a ruled list, unlike the answer text and the chips. */
+.assistant-follow-ups { max-width: 640px; margin-top: 16px; }
+.assistant-follow-ups-label { margin-bottom: 5px; font-size: 12px; color: var(--ink-faint); }
+.assistant-follow-ups ul { list-style: none; border-top: 1px solid var(--hairline); }
+.assistant-follow-ups li { border-bottom: 1px solid var(--hairline); }
+.assistant-follow-ups button {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 8px 9px 2px;
+  color: var(--ink-soft);
+  font-size: 13.5px;
+  line-height: 1.45;
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition: color 0.15s;
+}
+.assistant-follow-ups button .assistant-icon { margin-top: 2px; color: var(--ink-faint); transition: color 0.15s, transform 0.15s; }
+.assistant-follow-ups button:hover { color: var(--ink); }
+.assistant-follow-ups button:hover .assistant-icon { color: var(--accent-text); transform: translateX(2px); }
+.assistant-page .assistant-follow-ups button { font-size: 14px; }
+@media (prefers-reduced-motion: reduce) { .assistant-follow-ups button .assistant-icon { transition: none; } }
+/* The panel is narrow: smaller chips, so more share a row. */
+.assistant-panel .assistant-topics { margin-top: 18px; }
+.assistant-panel .assistant-topic-chips { gap: 6px; }
+.assistant-panel .assistant-topic-chips button { padding: 4px 10px 4px 11px; font-size: 12.5px; }
+/* The answer is complete and the box is free; next questions are still being looked up. */
+.assistant-follow-ups.is-pending { display: flex; align-items: center; gap: 9px; min-height: 26px; font-size: 12.5px; color: var(--ink-faint); }
