@@ -21,8 +21,7 @@ from backend.services.assistant_catalog_links import add_catalog_urls
 from backend.services.assistant_facets import FACET_TOOLS, describe_facets, explain_empty, invalid_facet, vocabulary
 from backend.services.assistant_tool_budget import bounded_arguments, bounded_tool, compact_result
 from backend.services.assistant_post_metadata import enrich_posts, lookup_post_metadata
-from backend.models.assistant_tools import FindPostsArguments, SuggestFollowUpsArguments
-from backend.services.assistant_followups import FollowUpState, DESCRIPTION as FOLLOW_UP_DESCRIPTION
+from backend.models.assistant_tools import FindPostsArguments
 from backend.services.assistant_posts import DESCRIPTION as POSTS_DESCRIPTION, find_posts
 
 MCP_TOOL_NAMES = frozenset({
@@ -30,7 +29,7 @@ MCP_TOOL_NAMES = frozenset({
     "list_developers", "get_developer", "list_organizations", "get_organization",
     "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper",
 })
-TOOL_NAMES = MCP_TOOL_NAMES | {"find_posts", "suggest_follow_ups"}
+TOOL_NAMES = MCP_TOOL_NAMES | {"find_posts"}
 MAX_RESPONSE_BYTES = 1024 * 1024
 MAX_RESULT_BYTES = 16 * 1024
 READ_PAPER_BYTES = 8 * 1024
@@ -106,7 +105,6 @@ class CatalogMcp:
         self.endpoint = endpoint
         self.lookup = lookup
         self.sessions = sessions
-        self.follow_up_state = FollowUpState(sessions=sessions)
         self.rate_limited = False
         if visitor_hash is not None and not re.fullmatch(r"[0-9a-f]{64}", visitor_hash):
             raise ValueError("Expected a hashed visitor identity")
@@ -179,12 +177,7 @@ class CatalogMcp:
                 FILTER_CACHE[self.endpoint] = payload
             return FILTER_CACHE[self.endpoint]
 
-    def begin_turn(self, question):
-        self.follow_up_state = FollowUpState(question, self.sessions)
-
     async def tools(self) -> list[dict]:
-        if self.follow_up_state.used:
-            return []  # Verification ends research; next pass writes the answer.
         lock = TOOL_LOCKS.setdefault(self.endpoint, asyncio.Lock())
         async with lock:
             cached = TOOL_CACHE.get(self.endpoint)
@@ -207,8 +200,6 @@ class CatalogMcp:
             raise AssistantMcpError("The catalog tool schemas are invalid.")
         selected.append({"name": "find_posts", "description": POSTS_DESCRIPTION,
                          "inputSchema": FindPostsArguments.model_json_schema()})
-        selected.append({"name": "suggest_follow_ups", "description": FOLLOW_UP_DESCRIPTION,
-                         "inputSchema": SuggestFollowUpsArguments.model_json_schema()})
         choices = vocabulary(await self.filters())
         return [describe_facets(bounded_tool(tool), choices) for tool in selected]
 
@@ -217,12 +208,6 @@ class CatalogMcp:
         if name not in TOOL_NAMES:
             raise AssistantMcpError("This tool is not allowed.")
         arguments = bounded_arguments(name, arguments)
-        if name == "suggest_follow_ups":
-            payload = await self.follow_up_state.suggest(arguments)
-            return cap_payload(payload, limit=MAX_RESULT_BYTES, is_json=True, is_error=False)
-        if self.follow_up_state.used:
-            return cap_payload({"error": "Research has ended. Write the answer using collected evidence and kept follow-ups."},
-                               limit=MAX_RESULT_BYTES, is_json=True, is_error=True)
         if name == "catalog_filters":
             return cap_payload(await self.filters(), limit=MAX_RESULT_BYTES, is_json=True, is_error=False)
         if name in FACET_TOOLS and any(axis in arguments and arguments[axis] != "" for axis in ("topic", "target", "contribution", "kind", "year")):

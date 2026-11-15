@@ -10,6 +10,7 @@ class AssistantSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="PWC_ASSISTANT_", env_file=None)
 
     enabled: bool = False
+    follow_ups_enabled: bool = True
     mcp_url: str = "http://mcp:7860/mcp"
     api_key: SecretStr = SecretStr("")
     base_url: str = "https://ollama.com/v1"

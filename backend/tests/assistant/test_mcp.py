@@ -34,7 +34,7 @@ def test_allowlist_is_exact_and_discovery_excludes_other_tools():
     assert TOOL_NAMES == {
         "search_papers", "browse_catalog", "catalog_filters", "get_paper_info",
         "list_developers", "get_developer", "list_organizations", "get_organization",
-        "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper", "find_posts", "suggest_follow_ups",
+        "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper", "find_posts",
     }
     tools = run(lambda m: m.tools(), lambda r: response(r, {"tools": [
         {"name": name, "inputSchema": {"type": "object"}}

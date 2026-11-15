@@ -19,18 +19,6 @@ MIN_FOLLOW_UP_MATCHES = 3
 MIN_NEW_FOLLOW_UP_MATCHES = 2
 MAX_FOLLOW_UPS = 3
 FOLLOW_UP_SECONDS = 3
-DESCRIPTION = """Call suggest_follow_ups ONCE at the end of research, before writing your
-answer, with up to four useful, self-contained next questions and their checks.
-A check is a find_posts filter object OR a short paper search phrase (string).
-Verification needs at least three matches, two not already shown this turn.
-Post checks use strict filters and all-word matching, without search fallbacks.
-No topic carries over implicitly: name the needed subject in the question and check.
-Good: narrow to a publisher/post type well represented in results; ask which
-approaches released code when results showed code; explore newer work on a shown
-subtopic or compare two approaches supported by results. Bad: generic questions,
-unsupported promises, or repeating the visitor's question. Mention only kept
-questions; do not mention rejected candidates. When there is nothing useful to
-suggest, omit the tool or send an empty list."""
 
 
 @dataclass
@@ -54,19 +42,24 @@ class SeenWorks:
             payload = json.loads(result)
         except ValueError:
             return
-        def walk(value):
-            if isinstance(value, list):
-                for item in value:
-                    walk(item)
-            elif isinstance(value, dict):
-                if 'title' in value or str(value.get('catalog_url', '')).startswith('/paper/'):
-                    for key in ('id', 'paper_id', 'reference', 'arxiv_id', 'paper'):
-                        if isinstance(value.get(key), (str, int)) and not isinstance(value[key], bool):
-                            self.add(value[key])
-                for key in ('results', 'items', 'data', 'paper', 'papers', 'discovery', 'top_trending_paper'):
-                    if key in value:
-                        walk(value[key])
-        walk(payload)
+        for item in work_items(payload):
+            for key in ('id', 'paper_id', 'reference', 'arxiv_id', 'paper'):
+                if isinstance(item.get(key), (str, int)) and not isinstance(item[key], bool):
+                    self.add(item[key])
+
+
+def work_items(value):
+    """Known work containers only; shared by novelty tracking and the digest."""
+    if isinstance(value, list):
+        for item in value:
+            yield from work_items(item)
+    elif isinstance(value, dict):
+        if 'title' in value or str(value.get('catalog_url', '')).startswith('/paper/'):
+            yield value
+        for key in ('results', 'items', 'data', 'paper', 'papers', 'discovery', 'top_trending_paper'):
+            if key in value:
+                yield from work_items(value[key])
+
 
 
 STOP_WORDS = frozenset('a an the and or of to for from in on with about by as is are was were do does did can could should would i we me you it they their this that these those what which how why when where show tell find read learn more next other useful good best new newest recent latest work works paper papers post posts item items'.split())

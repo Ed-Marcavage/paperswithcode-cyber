@@ -482,6 +482,7 @@ key is required by the frontend or MCP. Settings:
 | --- | --- |
 | `PWC_ASSISTANT_BASE_URL` | `https://ollama.com/v1` |
 | `PWC_ASSISTANT_MODEL` | `deepseek-v4.1-flash:1017` |
+| `PWC_ASSISTANT_FOLLOW_UPS_ENABLED` | `true` (optional suggestions after the answer) |
 | `PWC_ASSISTANT_MCP_URL` | `http://mcp:7860/mcp` |
 | `PWC_ASSISTANT_LIMIT_COOLDOWN_MINUTES` | `30` |
 | `PWC_ASSISTANT_TURNS_PER_HOUR` | `30` (rolling hour) |
@@ -583,12 +584,18 @@ five minutes and remain available during provider cooldown. A turn may send
 and browse calls for that turn only. Apply `add_assistant_topics_followups.sql`
 before using the new fields; subsequent turns must send the topic again.
 
-After research the model may call `suggest_follow_ups` once. Direct, read-only
-database checks keep up to three useful questions with at least three matches,
-including two works not already shown; all checks share a three-second deadline.
-No extra model call is made to request suggestions. The terminal `done` event
-and reloaded assistant messages carry `follow_ups` (an empty list when absent).
-The trace records every candidate's counts and rejection reason. Reapply the
+After the answer is fully streamed and saved, one optional tools-off model call
+proposes follow-ups: reasoning off, 1,024 output tokens, six seconds, and at most
+2,800 estimated input tokens for the question, answer, topic and work digest.
+Read-only database checks then share a three-second deadline, keeping at most
+three questions with three matches including two works not already shown.
+Generation timeout, invalid output, errors or Stop leave the answer intact with no suggestions;
+a provider usage limit still activates the normal cooldown. Set
+`PWC_ASSISTANT_FOLLOW_UPS_ENABLED=false` to skip the step entirely.
+The terminal `done` and reloaded assistant messages retain the same `follow_ups`
+array. The separate `follow_ups` trace step records tokens, latency, proposals and
+verification outcomes; its tokens count toward run totals, outside research budgets.
+Reapply the
 idempotent `add_assistant_topics_followups.sql` if only its topic column was
 previously installed; it now also adds the message `follow_ups` column.
 
@@ -606,18 +613,21 @@ history per question and the application's normal bounded loop. Its JSON Lines
 output records question, named model, answer, status/error, tools and results,
 links, duration, model-call count and input/output tokens (null when absent).
 Four questions also select a topic and record a `follow_ups_check` that passes
-only when the model calls the verifier and at least one suggestion survives;
-review their candidate checks in the tool trace for relevance and useful novelty.
+only when the dedicated step verifies at least one suggestion; review its
+`follow_up_steps` candidate counts for relevance and useful novelty. `model_calls`
+and tokens include that optional call; `research_model_calls` reports the answer
+loop alone. Compare research status/tool counts separately from suggestion quality.
 These replace the generic taxonomy, vulnerability-repair, AI-system-security
 and trending-paper prompts; the owner's four landing questions remain first.
-It writes each row immediately and stops on a provider usage limit. It neither
+It writes each row immediately and stops on a provider usage limit, including one
+from the optional step even though that answer's status stays done. It neither
 writes chat history to the database nor sends analytics. Like chat, it makes
 bounded read-only post-metadata lookups with the backend database settings;
 unavailable enrichment is marked in the tool result and does not fail the turn.
 
 Evaluate one named model at a time and reserve enough provider allowance before
-starting. Each full run asks 20 questions and can make up to 160 model requests
-within the per-question limits; comparing three models can use up to 480
+starting. Each full run asks 20 questions and can make up to 180 model requests
+(eight research/answer calls plus one optional call per question); comparing three models can use up to 540
 requests. Live evaluation shares the provider allowance with the assistant.
 Use fake providers for implementation tests, and stop live runs when the
 remaining allowance is needed for interactive use.

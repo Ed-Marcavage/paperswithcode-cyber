@@ -117,11 +117,15 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
             reset = await quota_reset(error, settings)
             return await run_in_threadpool(store.record_provider_limit,
                 safe_provider_message(error, settings.api_key.get_secret_value()), reset)
+    async def save_answer():
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(store.save_answer, saved, turn)
     try:
         yield sse({"type": "meta", **saved.metadata()})
         async with model_client(settings) as client, httpx.AsyncClient() as http:
             events = run_turn(client, CatalogMcp(http, settings.mcp_url, sessions=store.sessions, visitor_hash=saved.visitor_hash), settings.model, saved.history, turn,
-                              on_step=record, on_provider_limit=provider_limit, topic=saved.topic)
+                              on_step=record, on_provider_limit=provider_limit, topic=saved.topic,
+                              on_answer=save_answer, follow_ups_enabled=settings.follow_ups_enabled)
             async with aclosing(events):
                 async for event in events:
                     if event["type"] in {"done", "error"}:
@@ -134,7 +138,9 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
                     yield sse(event)
     except (asyncio.CancelledError, GeneratorExit):
         if not finalized:
-            turn.status = "cancelled"
+            turn.follow_ups = []
+            if not turn.answer_complete:
+                turn.status = "cancelled"
         raise
     finally:
         if turn.status == "running":
@@ -145,7 +151,7 @@ async def turn_events(payload: AssistantTurnRequest, settings: AssistantSettings
                 await run_in_threadpool(store.finish, saved, turn)
         logger.info("assistant_run id=%s status=%s model_steps=%d tool_steps=%d duration_ms=%d",
                     saved.run_id, turn.status,
-                    sum(s["kind"] == "model" for s in turn.steps),
+                    sum(s["kind"] in {"model", "follow_ups"} for s in turn.steps),
                     sum(s["kind"] == "tool" for s in turn.steps),
                     round((time.monotonic() - began) * 1000))
 
