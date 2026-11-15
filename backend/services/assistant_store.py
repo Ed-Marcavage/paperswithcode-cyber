@@ -52,11 +52,14 @@ class AssistantStore:
     def __init__(self, sessions):
         self.sessions = sessions
 
-    @staticmethod
-    def owned(db, conversation_id, visitor, *, lock=False):
+    def retention_cutoff(self):
+        return datetime.now(UTC) - timedelta(days=get_assistant_settings().retention_days)
+
+    def owned(self, db, conversation_id, visitor, *, lock=False):
         query = select(AssistantConversation).where(
             AssistantConversation.id == conversation_id,
-            AssistantConversation.visitor_hash == visitor_hash(visitor))
+            AssistantConversation.visitor_hash == visitor_hash(visitor),
+            AssistantConversation.updated_at >= self.retention_cutoff())
         row = db.scalar(query.with_for_update() if lock else query)
         if row is None:
             raise ConversationNotFound()
@@ -113,7 +116,8 @@ class AssistantStore:
     def record_step(self, saved: SavedTurn, position: int, step: dict):
         with self.sessions.begin() as db:
             if db.scalar(select(AssistantConversation).where(
-                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                AssistantConversation.id == saved.conversation_id,
+                AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update()) is None:
                 return
             if db.get(AssistantRun, saved.run_id) is not None:
                 db.add(AssistantRunStep(id=identifier(), run_id=saved.run_id, position=position,
@@ -123,7 +127,8 @@ class AssistantStore:
         with self.sessions.begin() as db:
             assistant_admission.release(db, saved.run_id)
             if db.scalar(select(AssistantConversation).where(
-                AssistantConversation.id == saved.conversation_id).with_for_update()) is None:
+                AssistantConversation.id == saved.conversation_id,
+                AssistantConversation.updated_at >= self.retention_cutoff()).with_for_update()) is None:
                 return
             message = db.get(AssistantMessage, saved.message_id)
             if message is None:
@@ -160,7 +165,8 @@ class AssistantStore:
     def list_conversations(self, visitor):
         with self.sessions() as db:
             return [self.summary(row) for row in db.scalars(select(AssistantConversation).where(
-                AssistantConversation.visitor_hash == visitor_hash(visitor))
+                AssistantConversation.visitor_hash == visitor_hash(visitor),
+                AssistantConversation.updated_at >= self.retention_cutoff())
                 .order_by(AssistantConversation.updated_at.desc(), AssistantConversation.id))]
 
     def get_conversation(self, visitor, conversation_id):
@@ -214,7 +220,8 @@ class AssistantStore:
 
     def show_run(self, run_id):
         with self.sessions() as db:
-            run = db.get(AssistantRun, run_id)
+            run = db.scalar(select(AssistantRun).join(AssistantConversation).where(
+                AssistantRun.id == run_id, AssistantConversation.updated_at >= self.retention_cutoff()))
             if run is None:
                 raise ConversationNotFound()
             return self.trace(db, run)
@@ -222,7 +229,8 @@ class AssistantStore:
     def runs(self, days):
         cutoff = datetime.now(UTC) - timedelta(days=days)
         with self.sessions() as db:
-            rows = db.scalars(select(AssistantRun).where(AssistantRun.started_at >= cutoff)
+            rows = db.scalars(select(AssistantRun).join(AssistantConversation).where(
+                AssistantRun.started_at >= cutoff, AssistantConversation.updated_at >= self.retention_cutoff())
                               .order_by(AssistantRun.started_at.desc(), AssistantRun.id)
                               .execution_options(yield_per=100))
             for row in rows:

@@ -532,11 +532,16 @@ sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli export -
 sh local-dev/compose.sh exec -T backend python -m backend.assistant_cli purge
 ```
 
-Schedule the purge command daily in the review/deployment environment when
-chat is enabled. It removes chats older than the configured last-activity
+**A scheduled, monitored daily purge is a prerequisite for enabling the
+assistant.** Configure the job in the target environment, verify a successful
+run, and alert on failures or a missed daily run before enabling chat. Access
+checks hide and reject expired chats immediately, even if the purge has not
+run; they do not replace physical deletion by the scheduled job. It removes chats older than the configured last-activity
 retention, including messages, tools, runs, steps and feedback. Sending,
 completing, renaming and giving feedback update last activity; reading does not.
-The disclosed default is 90 days; update the privacy page if changing it.
+Expired chats cannot be reopened, continued, renamed or given feedback; late
+completions cannot revive them. The disclosed default is 90 days; update the
+privacy page if changing it.
 
 ### Model evaluation
 
