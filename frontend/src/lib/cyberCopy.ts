@@ -1,5 +1,5 @@
 // Keep these descriptions aligned with backend/services/cyber_page_service.py.
-export const cyberHomeTitle = "AI Pentesting Tools & Agent Harnesses | Papers With Code Cyber";
+export const cyberHomeTitle = "AI Pentesting & Security Agent Harnesses | Papers With Code Cyber";
 export const cyberHomeDescription = "Explore AI pentesting tools and security agent harnesses: industry posts, papers, code and benchmarks for vulnerability discovery, code audit and fuzzing.";
 /** Shown after the home description on Trending, above the Editor's picks block. */
 export const cyberTrendingIndustryNote = "Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers.";

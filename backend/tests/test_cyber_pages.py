@@ -365,7 +365,7 @@ def test_homepage_lists_posts_then_papers_for_every_kind(client):
     header = main.select_one("header").text
     assert "featured posts about AI agents" in header and "GitHub star growth" in header
     assert html.title.text == pages.HOME_TITLE
-    assert len(pages.HOME_TITLE) <= 62 and "AI Pentesting Tools" in pages.HOME_TITLE
+    assert len(pages.HOME_TITLE) <= 65 and "Security Agent Harnesses" in pages.HOME_TITLE
     assert len(pages.HOME_DESCRIPTION) <= 155
     assert html.select_one('meta[name="description"]')["content"] == pages.HOME_DESCRIPTION
     assert "industry posts, papers, code and benchmarks" in pages.HOME_DESCRIPTION

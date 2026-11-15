@@ -21,7 +21,7 @@ AXES = ("topic", "target", "contribution", "kind", "year")
 # Keep aligned with frontend/src/lib/cyberCopy.ts (cyberHomeTitle, cyberHomeDescription).
 # "/" lists industry posts and papers, so the description names both. Search results cut
 # descriptions after about 155 characters and titles after about 60.
-HOME_TITLE = "AI Pentesting Tools & Agent Harnesses | Papers With Code Cyber"
+HOME_TITLE = "AI Pentesting & Security Agent Harnesses | Papers With Code Cyber"
 HOME_DESCRIPTION = "Explore AI pentesting tools and security agent harnesses: industry posts, papers, code and benchmarks for vulnerability discovery, code audit and fuzzing."
 CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
