@@ -682,7 +682,7 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
                 cards={cards}
                 skeleton="card"
                 rootMargin="400px"
-                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : showPosts ? "No featured posts about AI agents in this window." : "No papers in this window."}
+                empty={error ? null : topicOnly ? <>No papers about your topic match these filters. Widen the date range or <button type="button" className="link-button" onClick={() => setEditingTopic(true)}>edit your topic</button>.</> : following ? <>No papers from your topic or follows match these filters. Widen the date range, or follow more from <Link to="/tasks">tasks</Link>, <Link to="/methods">methods</Link>, benchmark, author, or organization pages.</> : mode === "x" ? "No papers shared on X in this window." : showPosts ? "No featured posts about AI agents in this window." : localCatalog && !dateRange.startDate && !dateRange.endDate ? <>No trending papers right now: paper ranking needs GitHub star counts from the last 24 hours. <Link to="/catalog?kind=paper">Browse all papers in the catalog</Link>.</> : "No papers in this window."}
               />
             )}
           </div>

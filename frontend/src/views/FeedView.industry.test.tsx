@@ -91,3 +91,14 @@ it("keeps the kind URL parameter working", async () => {
   expect(await screen.findByText("Ranked post")).toBeInTheDocument();
   expect(screen.getByRole("button", { name: "posts" })).toHaveAttribute("aria-pressed", "true");
 });
+
+it("explains an empty Papers view instead of showing a blank area", async () => {
+  vi.mocked(papersApi.list).mockResolvedValue({ count: 0, next_page: null, previous_page: null, results: [] } as never);
+  renderFeed("/?kind=paper");
+  expect(await screen.findByText(/No trending papers right now: paper ranking needs GitHub star counts from the last 24 hours\./)).toBeInTheDocument();
+  expect(screen.getByRole("link", { name: "Browse all papers in the catalog" })).toHaveAttribute("href", "/catalog?kind=paper");
+  cleanup();
+
+  renderFeed("/?kind=paper&start_date=2026-11-01&end_date=2026-11-07");
+  expect(await screen.findByText("No papers in this window.")).toBeInTheDocument();
+});
