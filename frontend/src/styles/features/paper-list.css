@@ -123,6 +123,13 @@
   height: 220px;
 }
 .paper-card:first-child { padding-top: 0; }
+/* The whole row opens the entry: the title link is stretched over the card, and
+   every other link or button in the row sits above it and keeps its own target.
+   Visitors were clicking the summary text, which did nothing. */
+.paper-card { position: relative; }
+.paper-card .paper-title > a::after { content: ""; position: absolute; inset: 0; }
+.paper-card :is(a, button, summary):not(.paper-title > a) { position: relative; z-index: 1; }
+.paper-card:hover .paper-title > a { text-decoration: underline; text-underline-offset: 3px; }
 .paper-rank {
   font-family: var(--serif);
   font-size: 32px;
