@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from typing import Any
 
 import httpx
+from backend.services.assistant_catalog_links import add_catalog_urls
 
 TOOL_NAMES = frozenset({
     "search_papers", "browse_catalog", "catalog_filters", "get_paper_info",
@@ -39,16 +40,26 @@ class ToolResult:
     is_error: bool = False
 
 
-def cap_result(value: dict[str, Any], limit: int) -> ToolResult:
+def cap_result(value: dict[str, Any], limit: int, tool: str) -> ToolResult:
     # MCP often repeats the same payload in text and structuredContent. Give
     # the model one copy; full_bytes measures that uncapped model input, not
     # the transport envelope (whose independent wire limit remains above).
     if value.get("structuredContent") is not None:
-        text = json.dumps(value["structuredContent"], ensure_ascii=False, separators=(",", ":"))
+        payload = value["structuredContent"]
+        if not value.get("isError"):
+            payload = add_catalog_urls(tool, payload)
+        text = json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     else:
         text = "\n".join(block["text"] for block in value.get("content", [])
                          if isinstance(block, dict) and block.get("type") == "text"
                          and isinstance(block.get("text"), str))
+        if not value.get("isError"):
+            try:
+                payload = json.loads(text)
+            except ValueError:
+                pass  # Plain MCP text is already suitable model input.
+            else:
+                text = json.dumps(add_catalog_urls(tool, payload), ensure_ascii=False, separators=(",", ":"))
     raw = text.encode()
     truncated = len(raw) > limit
     if truncated:
@@ -107,4 +118,4 @@ class CatalogMcp:
         if name not in TOOL_NAMES:
             raise AssistantMcpError("This tool is not allowed.")
         result = await self._request("tools/call", {"name": name, "arguments": arguments})
-        return cap_result(result, READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES)
+        return cap_result(result, READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES, name)
