@@ -12,6 +12,11 @@ from openai import APIError, AsyncOpenAI
 
 from backend.assistant_config import AssistantSettings
 from backend.services.assistant_mcp import AssistantMcpError, CatalogMcp, ToolResult, MAX_RESULT_BYTES, READ_PAPER_BYTES
+from backend.services.assistant_input_budget import (
+    INPUT_TOKEN_BUDGET, FINAL_INPUT_TOKENS, FINAL_INPUT_RESERVE, MIN_FINAL_INPUT_TOKENS,
+    estimate_input_tokens, finalizer_messages,
+)
+from backend.services.assistant_tool_budget import bounded_arguments
 from backend.services.assistant_provider import is_busy, is_usage_limit, USAGE_LIMIT_MESSAGE
 
 PROMPT_VERSION = "cyber-assistant-v2"
@@ -58,6 +63,7 @@ class TurnLimits:
     final_seconds: float = 30
     output_chars: int = 16000
     final_chars: int = 4000
+    input_tokens: int = INPUT_TOKEN_BUDGET
 
 
 @dataclass
@@ -160,6 +166,8 @@ async def run_turn(
     tools_used = 0
     model_attempts = 0
     output_used = 0
+    input_used = 0
+    tool_cache = {}
     terminal = False
 
     async def record(step):
@@ -168,9 +176,10 @@ async def run_turn(
             await on_step(step)
 
     async def generate_once(tools, room, *, final=False, retry=False):
-        nonlocal model_attempts, output_used
+        nonlocal model_attempts, output_used, input_used
         model_attempts += 1
         result = ModelPass()
+        input_estimate = estimate_input_tokens(messages, tools)
         began = time.monotonic()
         status = "done"
         try:
@@ -193,6 +202,8 @@ async def run_turn(
             raise
         finally:
             output_used += len(result.text)
+            charge = result.input_tokens if result.input_tokens is not None else input_estimate
+            input_used += charge
             # Keep a partial answer on failure/cancellation, but never promote
             # text from a pass that already requested tools to answer history.
             if tools and not result.calls and status != "done":
@@ -203,6 +214,10 @@ async def run_turn(
                     "finish_reason": result.finish_reason,
                     "input_tokens": result.input_tokens, "output_tokens": result.output_tokens,
                     "reasoning_tokens": result.reasoning_tokens, "reasoning_chars": result.reasoning_chars,
+                    "input_token_charge": charge, "input_tokens_estimated": result.input_tokens is None,
+                    "input_token_estimate": input_estimate,
+                    "input_messages": messages if final else None,
+                    "cumulative_input_tokens": input_used, "input_token_budget": limits.input_tokens,
                     "phase": "finalizer_retry" if retry else "finalizer" if final else "research",
                     **generation_options(final=final, retry=retry)})
         if tools and result.text:
@@ -223,7 +238,8 @@ async def run_turn(
                 return
             except APIError as error:
                 if (not is_busy(error) or output_used != previous_output or retry == 2
-                        or model_attempts >= limits.model_turns - 2):
+                        or model_attempts >= limits.model_turns - 2
+                        or input_used + estimate_input_tokens(messages, tools) + FINAL_INPUT_RESERVE > limits.input_tokens):
                     raise
                 # Brief retries use the existing per-turn time/model budgets.
                 await asyncio.sleep(0.5 * (retry + 1))
@@ -233,7 +249,8 @@ async def run_turn(
         tools = await mcp.tools()
         while model_attempts < limits.model_turns - 2:
             room = limits.output_chars - limits.final_chars - output_used
-            if room <= 0:
+            if (room <= 0 or input_used + estimate_input_tokens(messages, tools)
+                    + FINAL_INPUT_RESERVE > limits.input_tokens):
                 return
             async with aclosing(generate(tools, room)) as stream:
                 async for event in stream:
@@ -241,6 +258,8 @@ async def run_turn(
                         yield event
                     else:
                         result = event["result"]
+            if result.calls and input_used >= limits.input_tokens - FINAL_INPUT_RESERVE:
+                return
             selected = result.calls[:max(0, limits.tool_calls - tools_used)]
             assistant = {"role": "assistant", "content": None if result.calls else result.text or None}
             if selected:
@@ -253,17 +272,29 @@ async def run_turn(
                 began = time.monotonic()
                 tool_result = None
                 error = None
+                parsed = None
+                cache_key = None
+                cached_from = None
                 try:
                     parsed = json.loads(arguments)
                     if not isinstance(parsed, dict):
                         raise ValueError("Expected an object")
-                    tool_result = await mcp.call(name, parsed)
+                    parsed = bounded_arguments(name, parsed)
+                    cache_key = (name, json.dumps(parsed, sort_keys=True, separators=(",", ":")))
+                    if cache_key in tool_cache:
+                        cached_from, previous = tool_cache[cache_key]
+                        note = f"Already fetched as tool call {cached_from}; reuse that result above. No new catalog request."
+                        tool_result = ToolResult(note, len(note.encode()), False, previous.is_error)
+                    else:
+                        tool_result = await mcp.call(name, parsed)
                 except (ValueError, AssistantMcpError):
                     error = "The catalog tool failed. Try a narrower query."
                     tool_result = ToolResult(error, len(error.encode()), False, True)
                 finally:
+                    if cache_key is not None and tool_result is not None and not cached_from:
+                        tool_cache[cache_key] = (call["id"], tool_result)
                     await record({"kind": "tool", "name": name, "call_id": call["id"],
-                            "arguments": arguments, "result": tool_result.text if tool_result else "",
+                            "arguments": arguments, "effective_arguments": parsed, "cached_from": cached_from, "result": tool_result.text if tool_result else "",
                             "limit_bytes": READ_PAPER_BYTES if name == "read_paper" else MAX_RESULT_BYTES,
                             "full_bytes": tool_result.full_bytes if tool_result else 0,
                             "truncated": tool_result.truncated if tool_result else False,
@@ -294,20 +325,17 @@ async def run_turn(
             pass
         if turn.status != "done":
             turn.status = "limit_reached"
-            # Text evidence avoids unfinished tool-call protocol pairs and
-            # includes results even if a timeout interrupted a parallel reply.
-            evidence = [
-                {"role": "user", "content": "Catalog tool evidence:\n" + step["result"]}
-                for step in turn.steps if step["kind"] == "tool" and step["result"]
-            ]
-            messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history,
-                        *evidence, {"role": "system", "content": FINALIZER_PROMPT}]
+            # Rebuild tools-off input from unique completed evidence, including
+            # interrupted parallel batches, without replaying protocol fragments.
             # The finalizer alone supplies the answer after a research limit.
             # Discard unfinished research text; its trace remains available.
             turn.text = ""
             for attempt in range(2):
                 if model_attempts >= limits.model_turns or time.monotonic() >= deadline:
                     break
+                remaining = limits.input_tokens - input_used
+                token_limit = max(MIN_FINAL_INPUT_TOKENS, min(FINAL_INPUT_TOKENS, remaining // (2 - attempt)))
+                messages = finalizer_messages(SYSTEM_PROMPT, FINALIZER_PROMPT, history, turn.steps, token_limit)
                 # The first attempt must leave time for the one empty retry.
                 seconds_left = deadline - time.monotonic()
                 allowance = seconds_left / 2 if attempt == 0 else seconds_left

@@ -57,9 +57,11 @@ def test_structured_content_is_one_compact_copy_before_capping():
                 "structuredContent": data, "isError": False}
     assert len(json.dumps(envelope).encode()) > MAX_RESULT_BYTES
     result = run(lambda m: m.call("browse_catalog", {}), lambda r: response(r, envelope))
-    compact = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
-    assert result.text == compact
-    assert result.full_bytes == len(compact.encode())
+    projected = json.loads(result.text)
+    assert projected["total"] == 45 and projected["returned"] == 10
+    assert projected["results"] == data["results"][:10]
+    assert "structuredContent" not in result.text and '"content"' not in result.text
+    assert result.full_bytes == len(result.text.encode())
     assert not result.truncated and not result.is_error
 
 

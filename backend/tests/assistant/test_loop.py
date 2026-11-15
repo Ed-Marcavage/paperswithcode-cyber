@@ -104,7 +104,7 @@ def test_model_turn_limit_reserves_two_passes_for_finalizer():
 
 
 def test_tool_limit_including_multi_call_reply():
-    services = FakeServices([[tool_chunk(i) for i in range(12)], [text_chunk("Final")]])
+    services = FakeServices([[tool_chunk(i, arguments=json.dumps({"query": str(i)})) for i in range(12)], [text_chunk("Final")]])
     turn, _ = asyncio.run(services.run())
     assert len(services.tool_requests) == 10
     assert len(turn.steps[0]["tool_calls"]) == 12  # trace includes unexecuted calls too
