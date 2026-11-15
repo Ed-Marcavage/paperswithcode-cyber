@@ -18,7 +18,8 @@ if site.scheme != "https" or not site.hostname or site.username or site.password
 out = args.output.resolve()
 if out.exists():
     parser.error("--output must be a new directory")
-public_keys = {"VITE_POSTHOG_PROJECT_TOKEN", "VITE_POSTHOG_HOST"}
+# VITE_ASSISTANT_ENABLED is a plain on/off switch, kept so an assistant-enabled release can be built.
+public_keys = {"VITE_POSTHOG_PROJECT_TOKEN", "VITE_POSTHOG_HOST", "VITE_ASSISTANT_ENABLED"}
 values = {key: os.environ.get(key, "") for key in public_keys}
 if args.config.exists():
     for line in args.config.read_text().splitlines():
@@ -29,6 +30,7 @@ if values["VITE_POSTHOG_PROJECT_TOKEN"] and (not values["VITE_POSTHOG_PROJECT_TO
         values["VITE_POSTHOG_HOST"] not in {"https://us.i.posthog.com", "https://eu.i.posthog.com"}):
     parser.error("Use a public PostHog project token and its regional ingest host")
 env = {k: v for k, v in os.environ.items() if not k.startswith("VITE_")}
+values["VITE_ASSISTANT_ENABLED"] = "true" if values["VITE_ASSISTANT_ENABLED"].strip().lower() in {"1", "true", "yes"} else "false"
 env.update(values, VITE_API_URL="", VITE_LOCAL_CATALOG="true", VITE_DISABLE_AUTH="1",
            VITE_PUBLIC_SITE_URL=args.site.rstrip("/"), VITE_CATALOG_ANALYTICS_ENV=args.environment, VITE_CHAT_ENABLED="false", VITE_CHAT_LIVE="false",
            VITE_CHAT_MCP_APPS_HOST_ENABLED="false", VITE_NATIVE_PDF_READER_ENABLED="false",

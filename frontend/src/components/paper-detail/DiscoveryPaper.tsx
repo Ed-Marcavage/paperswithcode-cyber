@@ -16,7 +16,8 @@ import "@/views/DiscoveryCatalog.css";
 export function DiscoveryPaper({ paperId, thumbnailUrl = null, title = "" }: { paperId: string; thumbnailUrl?: string | null; title?: string }) {
   const { data: paper, isError } = useQuery(discoveryPaperQuery(paperId));
   const terms = useQuery(filtersQuery);
-  const [previewFailed, setPreviewFailed] = useState(false);
+  // Remember which image failed, so a different post or a refreshed image is shown again.
+  const [failedPreview, setFailedPreview] = useState<string | null>(null);
   const lastOpen = useRef<string>();
   useEffect(() => {
     if (paper && lastOpen.current !== paper.paper_id) {
@@ -33,7 +34,7 @@ export function DiscoveryPaper({ paperId, thumbnailUrl = null, title = "" }: { p
     post.agent_harness_engineering && "Agent harness engineering",
   ].filter(Boolean) : [];
   const sourceLink = <a onClick={() => resourceClicked(paper.paper_id, externalResource(paper.source_url, "source"))} href={paper.source_url} target="_blank" rel="noreferrer">{kind === "post" ? "Read original post" : kind === "repository" ? "View original repository" : "Read at source"} ↗</a>;
-  const preview = post && thumbnailUrl && !previewFailed ? thumbnailUrl : null;
+  const preview = post && thumbnailUrl && thumbnailUrl !== failedPreview ? thumbnailUrl : null;
   const label = post?.curated_title || title || paper.title;
   return <section className={`discovery-paper${preview ? " has-preview" : ""}`} aria-label="Catalog details">
     <h2>Catalog details</h2>
@@ -71,7 +72,7 @@ export function DiscoveryPaper({ paperId, thumbnailUrl = null, title = "" }: { p
         <a className="discovery-paper-shot" href={paper.source_url} target="_blank" rel="noopener noreferrer"
           aria-label={`Open the original post: ${label}`}
           onClick={() => resourceClicked(paper.paper_id, externalResource(paper.source_url, "source"))}>
-          <img src={preview} alt="" width={400} height={550} loading="lazy" decoding="async" onError={() => setPreviewFailed(true)} />
+          <img src={preview} alt="" width={400} height={550} loading="lazy" decoding="async" onError={() => setFailedPreview(preview)} />
         </a>
         {sourceLink}
       </aside>}

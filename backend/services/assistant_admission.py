@@ -28,7 +28,12 @@ def admit(db, visitor_hash, run_id, new_conversation, settings, now):
         index_elements=[AssistantAdmission.visitor_hash], set_={"visitor_hash": visitor_hash},
     ).returning(AssistantAdmission))
     timestamp = now.timestamp()
-    if row.active_until and row.active_until.replace(tzinfo=UTC).timestamp() > timestamp:
+    # PostgreSQL returns an aware datetime in the session's zone; only SQLite's naive
+    # values are UTC by convention. Replacing the zone on an aware value would shift it.
+    active_until = row.active_until
+    if active_until is not None and active_until.tzinfo is None:
+        active_until = active_until.replace(tzinfo=UTC)
+    if active_until and active_until.timestamp() > timestamp:
         raise VisitorLimitReached("You already have an answer in progress. Please wait for it to finish.")
     turns = [t for t in row.turns if t > timestamp - 86400]
     conversations = [t for t in row.conversations if t > timestamp - 86400]

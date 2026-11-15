@@ -141,3 +141,21 @@ def test_stream_timeout_releases_admission(client, store, monkeypatch):
         assert client.post("/api/v1/assistant/turn", json={"question": "Timeout"}).status_code == 200
     with store.sessions() as db:
         assert db.scalar(select(AssistantAdmission)).active_run_id is None
+
+
+def test_active_lease_compares_instants_for_aware_timestamps_in_any_zone():
+    """PostgreSQL may return the lease in a non-UTC session zone; it must not be reread as UTC."""
+    from datetime import UTC, datetime, timedelta, timezone
+    from types import SimpleNamespace
+
+    import pytest
+
+    from backend.services import assistant_admission
+
+    now = datetime(2026, 11, 14, 12, 0, tzinfo=UTC)
+    for offset in (-5, 9):
+        zone = timezone(timedelta(hours=offset))
+        row = SimpleNamespace(active_until=(now + timedelta(minutes=5)).astimezone(zone), turns=[], conversations=[])
+        db = SimpleNamespace(bind=SimpleNamespace(dialect=SimpleNamespace(name="sqlite")), scalar=lambda statement: row)
+        with pytest.raises(assistant_admission.VisitorLimitReached):
+            assistant_admission.admit(db, "v", "run", True, SimpleNamespace(), now)

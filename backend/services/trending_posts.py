@@ -34,6 +34,8 @@ ANCHOR_DATE: Optional[date] = None
 
 # The block shows this many picks: the first pins, in pin order.
 PICKS_LIMIT = 3
+# The highlights route once reported its date window; older clients expect a number.
+LEGACY_WINDOW_DAYS = 14
 PICKS_HEADING = "Editor's picks"
 # Trending lists posts that are not pinned only at this agent relevance (0-4) or above.
 MIN_AGENT_RELEVANCE = 3
@@ -125,7 +127,8 @@ def industry_block(db: Session, limit: int = PICKS_LIMIT) -> dict:
     anchor = anchor_date(db)
     return {
         "anchor_date": anchor.isoformat() if anchor else None,
-        "window_days": None,
+        # Always numeric, as it was before the block stopped using a date window.
+        "window_days": LEGACY_WINDOW_DAYS,
         "this_week": False,
         "pinned": len(chosen),
         "heading": PICKS_HEADING,

@@ -129,7 +129,7 @@ def test_highlights_route(monkeypatch):
 
     def industry_block(db, limit):
         seen.append(limit)
-        return {"anchor_date": "2026-11-12", "window_days": None, "this_week": False, "heading": "Editor's picks",
+        return {"anchor_date": "2026-11-12", "window_days": 14, "this_week": False, "heading": "Editor's picks",
                 "results": []}
 
     monkeypatch.setattr(trending_posts, "industry_block", industry_block)
