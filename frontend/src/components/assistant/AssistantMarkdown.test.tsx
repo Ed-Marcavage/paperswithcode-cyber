@@ -97,3 +97,13 @@ it("never turns a site link into one that leaves the site after normalisation", 
   expect(allowedLink("https://evil.test/x", new Set())).toBeNull();
   expect(allowedLink("https://example.com/evidence", new Set(["https://example.com/evidence"]))).toEqual({ href: "https://example.com/evidence", local: false });
 });
+
+it("turns bare catalog paths into links without touching existing links or code", async () => {
+  const { linkBareCatalogPaths } = await import("./markdown");
+  expect(linkBareCatalogPaths('Shopify, "Building a harness" (/paper/1699) is good.'))
+    .toBe('Shopify, "Building a harness" ([catalog page](/paper/1699)) is good.');
+  expect(linkBareCatalogPaths("See /orgs/endor-labs and /repos/a/b.")).toBe("See [catalog page](/orgs/endor-labs) and [catalog page](/repos/a/b).");
+  for (const untouched of ["[Title](/paper/1699)", "[/paper/1699](/paper/1699)", "run `/paper/1699` now", "```\n/paper/1699\n```", "https://x.test/paper/1699", "a/paper/1"]) {
+    expect(linkBareCatalogPaths(untouched)).toBe(untouched);
+  }
+});

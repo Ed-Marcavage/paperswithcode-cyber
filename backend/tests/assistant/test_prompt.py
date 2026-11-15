@@ -8,7 +8,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     services = FakeServices([[tool_chunk()], [text_chunk('Found one useful post.')]])
     turn, _ = asyncio.run(services.run(TurnLimits(tool_calls=1)))
-    assert PROMPT_VERSION == 'cyber-assistant-v11' and turn.status == 'limit_reached'
+    assert PROMPT_VERSION == 'cyber-assistant-v12' and turn.status == 'limit_reached'
     assert services.model_requests[0]['messages'][0]['content'] == SYSTEM_PROMPT
     final_messages = services.model_requests[-1]['messages']
     assert final_messages[0]['content'] == SYSTEM_PROMPT
@@ -29,6 +29,6 @@ def test_answer_contract_reaches_normal_generation_and_budget_finalizer():
     assert 'budget stop does not show' in FINALIZER_PROMPT
     assert 'not evidence of\nmissing coverage' in SYSTEM_PROMPT
 
-    assert hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest() == "1e230d2eefcb2490aed5e0a91687ac088f7ed4dc865766ae493e86c3c8633e11"
+    assert hashlib.sha256(SYSTEM_PROMPT.encode()).hexdigest() == "d76264c4696450b90037b2d5c252bb5f0baf34ac11296113949c12617c128d00"
 
     assert hashlib.sha256(FINALIZER_PROMPT.encode()).hexdigest() == "ffb1545d08455b7fe3d8bcabbd531c5f86ac91312a1abfd9cd7d9973856aec37"

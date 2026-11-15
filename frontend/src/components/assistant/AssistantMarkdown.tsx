@@ -1,7 +1,7 @@
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Link } from "react-router-dom";
-import { allowedLink, chatUrlTransform, withholdPartialCitation } from "./markdown";
+import { allowedLink, chatUrlTransform, linkBareCatalogPaths, withholdPartialCitation } from "./markdown";
 import { assistantEvent } from "@/lib/catalogAnalytics";
 import { AssistantIcon } from "./icons";
 import type { AssistantSurface } from "@/lib/api/assistant";
@@ -22,5 +22,5 @@ export function AssistantMarkdown({ text, streaming, evidence, surface = "panel"
           {children}<AssistantIcon name="external" size={11} /><span className="sr-only"> (opens in a new tab)</span>
         </a>;
       },
-    }}>{streaming ? withholdPartialCitation(text) : text}</ReactMarkdown></div>;
+    }}>{linkBareCatalogPaths(streaming ? withholdPartialCitation(text) : text)}</ReactMarkdown></div>;
 }
