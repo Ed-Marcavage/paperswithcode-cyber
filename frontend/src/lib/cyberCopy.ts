@@ -1,8 +1,8 @@
 // Keep these descriptions aligned with backend/services/cyber_page_service.py.
 export const cyberHomeTitle = "AI Pentesting Tools & Security Agent Harnesses: Papers & Posts | Papers With Code Cyber";
 export const cyberHomeDescription = "Explore AI pentesting tools, security agent harnesses, industry posts, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering.";
-/** Shown after the home description on Trending, above the industry block. */
-export const cyberTrendingIndustryNote = "The block at the top shows hand-picked industry engineering posts.";
+/** Shown after the home description on Trending: pinned posts lead the posts feed. */
+export const cyberTrendingIndustryNote = "The posts list starts with the editor's picks, then ranks other posts about AI agents.";
 /** Trending's feed descriptions; Posts is the default view (`?kind=paper` shows papers). */
 export const cyberTrendingPostsDescription = "Industry posts · featured posts about AI agents, ranked by review scores (technical depth plus originality, plus 1 for agent-harness engineering), halved for every 7 days since publication.";
 export const cyberTrendingPapersDescription = "Research papers · GitHub star growth, then total stars. Newly tracked repositories start with total-star ordering until enough observations exist. Stars describe the entire repository, not paper quality.";

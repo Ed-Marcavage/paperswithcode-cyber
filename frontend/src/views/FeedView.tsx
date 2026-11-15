@@ -13,7 +13,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { PaperFeedList, type PaperFeedCard } from "@/components/PaperFeed";
 import { McpShowcase } from "@/components/McpShowcase";
-import { TrendingIndustry } from "@/components/TrendingIndustry";
 import { trendingPosts } from "@/lib/api/discovery";
 import { PaperDateFilter } from "@/components/PaperDateFilter";
 import { ArrowUpIcon } from "@/components/chat/icons";
@@ -337,9 +336,9 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   // Following defaults to its 30-day match window and trending on X to a month;
   // the trending tab defaults to a week.
-  // The local catalog's Trending also shows reviewed industry posts: a block
-  // above the feed, and a papers/posts switch for the feed itself. Posts is the
-  // default; `?kind=paper` shows papers (`?kind=post` still selects posts).
+  // The local catalog's Trending also shows reviewed industry posts, through a
+  // papers/posts switch; the posts feed starts with the editor's pinned picks.
+  // Posts is the default; `?kind=paper` shows papers (`?kind=post` still selects posts).
   const localCatalog = isDiscoveryCatalog() && mode === "trending";
   const showPosts = localCatalog && searchParams.get("kind") !== "paper";
   const dateRange = localCatalog
@@ -603,7 +602,6 @@ export const HomeFeed: React.FC<{ mode: FeedMode }> = ({ mode }) => {
           )}
 
           <div className="feed-content">
-            {localCatalog && <TrendingIndustry />}
             <div className="sort-bar home-feed-sort-bar">
               <div className="paper-feed-toolbar-controls">
                 <div className="sort-options">
