@@ -1,6 +1,6 @@
 // Keep these descriptions aligned with backend/services/cyber_page_service.py.
-export const cyberHomeTitle = "AI Pentesting Tools & Security Agent Harnesses: Papers & Posts | Papers With Code Cyber";
-export const cyberHomeDescription = "Explore AI pentesting tools, security agent harnesses, industry posts, papers, code and benchmarks for vulnerability discovery, code audit, fuzzing and reverse engineering.";
+export const cyberHomeTitle = "AI Pentesting Tools & Agent Harnesses | Papers With Code Cyber";
+export const cyberHomeDescription = "Explore AI pentesting tools and security agent harnesses: industry posts, papers, code and benchmarks for vulnerability discovery, code audit and fuzzing.";
 /** Shown after the home description on Trending, above the Editor's picks block. */
 export const cyberTrendingIndustryNote = "Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers.";
 /** Trending's feed descriptions; Posts is the default view (`?kind=paper` shows papers). */

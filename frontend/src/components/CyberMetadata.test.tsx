@@ -37,7 +37,9 @@ it("indexes the home page for every Trending tab and names posts and papers", ()
   render(<MemoryRouter initialEntries={["/?kind=paper"]}><CyberMetadata /><Link to="/?kind=post">Posts</Link><Link to="/?start_date=2026-11-01">Window</Link></MemoryRouter>);
   const robots = () => document.querySelector('meta[name="robots"]')?.getAttribute("content");
   expect(document.title).toBe(cyberHomeTitle);
-  expect(document.title).toContain("Papers & Posts");
+  expect(document.title.length).toBeLessThanOrEqual(62);
+  expect(cyberHomeDescription.length).toBeLessThanOrEqual(155);
+  expect(cyberHomeDescription).toContain("industry posts, papers");
   expect(document.querySelector('meta[name="description"]')).toHaveAttribute("content", cyberHomeDescription);
   expect(canonical()).toBe("https://paperswithcode-cyber.com/");
   expect(robots()).toBe("index,follow");
