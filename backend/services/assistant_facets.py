@@ -3,7 +3,7 @@
 import json
 
 FACETS = ("topic", "target", "contribution", "kind", "year")
-FACET_TOOLS = {"browse_catalog", "list_developers"}
+FACET_TOOLS = {"browse_catalog", "list_developers", "find_posts"}
 
 
 def normalize_facets(name, arguments):
@@ -52,8 +52,9 @@ def invalid_facet(arguments, choices):
 def describe_facets(tool, choices):
     if tool["function"]["name"] not in FACET_TOOLS:
         return tool
+    axes = {"find_posts": ("topic",), "list_developers": FACETS[:3]}.get(tool["function"]["name"], FACETS[:4])
     tool["function"]["description"] += " Facets accept one slug each (not arrays). " + " ".join(
-        f"{axis}: {', '.join(choices[axis])}." for axis in FACETS[:4] if axis in choices)
+        f"{axis}: {', '.join(choices[axis])}." for axis in axes if axis in choices)
     return tool
 
 

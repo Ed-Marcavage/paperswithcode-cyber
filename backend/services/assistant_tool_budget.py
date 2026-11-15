@@ -7,7 +7,7 @@ from backend.services.assistant_facets import normalize_facets
 MAX_ITEMS = 10
 SUMMARY_CHARS = 600
 LIST_TOOLS = {"search_papers", "browse_catalog", "list_developers", "list_recent_papers",
-              "list_trending_papers", "get_related_papers"}
+              "list_trending_papers", "get_related_papers", "find_posts"}
 COUNT_TOOLS = {"browse_catalog", "list_developers"}
 SIZE_ARGUMENTS = {"limit", "page_size", "per_page", "max_results", "repo_limit"}
 DESCRIPTION = " Assistant limits: at most 10 items per list; larger sizes are clamped. Results are compact projections."
@@ -29,6 +29,9 @@ def bounded_arguments(name, arguments):
     else:
         result.pop("counts_only", None)
         result.pop("include_facet_counts", None)
+    if name == "find_posts" and isinstance(result.get("topic", ""), str):
+        from backend.models.assistant_tools import FindPostsArguments
+        result = FindPostsArguments.model_validate(result).model_dump(mode="json")
     return result
 
 

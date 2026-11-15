@@ -15,12 +15,15 @@ from backend.services.assistant_catalog_links import add_catalog_urls
 from backend.services.assistant_facets import FACET_TOOLS, describe_facets, explain_empty, invalid_facet, vocabulary
 from backend.services.assistant_tool_budget import bounded_arguments, bounded_tool, compact_result
 from backend.services.assistant_post_metadata import enrich_posts, lookup_post_metadata
+from backend.models.assistant_tools import FindPostsArguments
+from backend.services.assistant_posts import DESCRIPTION as POSTS_DESCRIPTION, find_posts
 
-TOOL_NAMES = frozenset({
+MCP_TOOL_NAMES = frozenset({
     "search_papers", "browse_catalog", "catalog_filters", "get_paper_info",
     "list_developers", "get_developer", "list_organizations", "get_organization",
     "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper",
 })
+TOOL_NAMES = MCP_TOOL_NAMES | {"find_posts"}
 MAX_RESPONSE_BYTES = 1024 * 1024
 MAX_RESULT_BYTES = 16 * 1024
 READ_PAPER_BYTES = 8 * 1024
@@ -69,10 +72,11 @@ def cap_payload(payload, *, limit, is_json, is_error):
 
 
 class CatalogMcp:
-    def __init__(self, client: httpx.AsyncClient, endpoint: str, *, lookup=lookup_post_metadata):
+    def __init__(self, client: httpx.AsyncClient, endpoint: str, *, lookup=lookup_post_metadata, sessions=None):
         self.client = client
         self.endpoint = endpoint
         self.lookup = lookup
+        self.sessions = sessions
 
     async def _request(self, method: str, params: dict) -> dict:
         request_id = str(uuid.uuid4())
@@ -118,11 +122,13 @@ class CatalogMcp:
         tools = result.get("tools")
         if not isinstance(tools, list) or any(not isinstance(t, dict) for t in tools):
             raise AssistantMcpError("The catalog tool list is invalid.")
-        selected = [t for t in tools if t.get("name") in TOOL_NAMES]
-        if len(selected) != len(TOOL_NAMES) or {t["name"] for t in selected} != TOOL_NAMES:
+        selected = [t for t in tools if t.get("name") in MCP_TOOL_NAMES]
+        if len(selected) != len(MCP_TOOL_NAMES) or {t["name"] for t in selected} != MCP_TOOL_NAMES:
             raise AssistantMcpError("The catalog tool list is incomplete.")
         if any(not isinstance(t.get("inputSchema"), dict) for t in selected):
             raise AssistantMcpError("The catalog tool schemas are invalid.")
+        selected.append({"name": "find_posts", "description": POSTS_DESCRIPTION,
+                         "inputSchema": FindPostsArguments.model_json_schema()})
         choices = vocabulary(await self.filters())
         return [describe_facets(bounded_tool(tool), choices) for tool in selected]
 
@@ -137,6 +143,9 @@ class CatalogMcp:
             invalid = invalid_facet(arguments, vocabulary(await self.filters()))
             if invalid:
                 return cap_payload(invalid, limit=MAX_RESULT_BYTES, is_json=True, is_error=True)
+        if name == "find_posts":
+            payload, is_error = await find_posts(arguments, self.sessions)
+            return cap_payload(payload, limit=MAX_RESULT_BYTES, is_json=True, is_error=is_error)
         upstream_arguments = {k: v for k, v in arguments.items() if k != "counts_only"}
         result = await self._request("tools/call", {"name": name, "arguments": upstream_arguments})
         payload, is_json = result_payload(result)

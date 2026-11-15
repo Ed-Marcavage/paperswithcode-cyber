@@ -23,7 +23,7 @@ from backend.tests.assistant.test_loop import FakeServices, text_chunk, tool_chu
 def fake_services(monkeypatch, replies):
     services = FakeServices(replies)
     mcp_http = httpx.AsyncClient(transport=httpx.MockTransport(services.mcp))
-    monkeypatch.setattr(assistant, "CatalogMcp", lambda http, endpoint: CatalogMcp(mcp_http, endpoint))
+    monkeypatch.setattr(assistant, "CatalogMcp", lambda http, endpoint, *, sessions: CatalogMcp(mcp_http, endpoint, sessions=sessions))
     monkeypatch.setattr(assistant, "model_client", lambda settings: AsyncOpenAI(
         api_key="fake", base_url="http://model.test/v1", max_retries=0,
         http_client=httpx.AsyncClient(transport=httpx.MockTransport(services.model))))

@@ -27,8 +27,9 @@ def text_chunk(text="An answer"):
 
 
 class FakeServices:
-    def __init__(self, replies):
+    def __init__(self, replies, *, sessions=None):
         self.replies = iter(replies)
+        self.sessions = sessions
         self.model_requests = []
         self.tool_requests = []
 
@@ -60,7 +61,7 @@ class FakeServices:
                                        http_client=model_http) as model:
                     turn = Turn()
                     events = [event async for event in run_turn(
-                        model, CatalogMcp(mcp_http, "http://catalog.test/mcp"), "fake",
+                        model, CatalogMcp(mcp_http, "http://catalog.test/mcp", sessions=self.sessions), "fake",
                         [{"role": "user", "content": "Find security papers"}], turn, limits=limits)]
                     return turn, events
 

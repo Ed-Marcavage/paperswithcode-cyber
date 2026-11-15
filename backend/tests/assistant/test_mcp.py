@@ -6,7 +6,7 @@ import pytest
 
 from backend.services.assistant_mcp import (
     AssistantMcpError, CatalogMcp, MAX_RESPONSE_BYTES, MAX_RESULT_BYTES,
-    READ_PAPER_BYTES, TOOL_NAMES,
+    READ_PAPER_BYTES, TOOL_NAMES, MCP_TOOL_NAMES,
 )
 
 
@@ -34,11 +34,11 @@ def test_allowlist_is_exact_and_discovery_excludes_other_tools():
     assert TOOL_NAMES == {
         "search_papers", "browse_catalog", "catalog_filters", "get_paper_info",
         "list_developers", "get_developer", "list_organizations", "get_organization",
-        "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper",
+        "list_recent_papers", "list_trending_papers", "get_related_papers", "read_paper", "find_posts",
     }
     tools = run(lambda m: m.tools(), lambda r: response(r, {"tools": [
         {"name": name, "inputSchema": {"type": "object"}}
-        for name in [*TOOL_NAMES, "delete_paper"]
+        for name in [*MCP_TOOL_NAMES, "find_posts", "delete_paper"]
     ]}))
     assert {t["function"]["name"] for t in tools} == TOOL_NAMES
 
