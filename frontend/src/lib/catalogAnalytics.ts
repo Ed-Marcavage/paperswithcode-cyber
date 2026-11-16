@@ -175,7 +175,7 @@ export function catalogNavigation(to: string) {
   if (to === "/catalog" || to === "/mcp" || to === "/personal-agents") capture("catalog_navigation", {surface: "top_nav", destination: to.slice(1)});
 }
 /** The site's own off-site links (its GitHub repository, issue tracker, CLI and Discord), which otherwise leave no trace. */
-export function outboundNavigation(surface: "footer" | "sidebar" | "mcp_page", destination: "github" | "feedback" | "pwc_cli" | "discord") {
+export function outboundNavigation(surface: "footer" | "sidebar" | "mcp_page" | "header", destination: "github" | "feedback" | "pwc_cli" | "discord") {
   capture("catalog_navigation", {surface, destination});
 }
 export function taxonomySelected(axis: Axis | "domain", value: string | undefined, surface: "catalog_filter" | "top_domains" | "paper_tag") {

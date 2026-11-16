@@ -1,4 +1,4 @@
-import { catalogNavigation } from "@/lib/catalogAnalytics";
+import { catalogNavigation, outboundNavigation } from "@/lib/catalogAnalytics";
 import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Link, NavLink, useLocation } from "react-router-dom";
@@ -16,6 +16,7 @@ import { useAuth } from "@/lib/authContext";
 import { isAssistantEnabled } from "@/lib/apiUrl";
 import { AssistantAskButton } from "@/components/assistant/AssistantPanel";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { DISCORD_INVITE_URL, DiscordIcon } from "@/components/DiscordIcon";
 
 type HeaderIconName = "search" | "bookmark" | "menu" | "close" | "github";
 
@@ -238,6 +239,12 @@ const Header: React.FC<HeaderProps> = ({ onOpenSearch }) => {
           >
             <HeaderIcon name="search" size={14} />
           </button>
+          {isDiscoveryCatalog() && (
+            <a className="icon-btn header-discord-btn" href={DISCORD_INVITE_URL} target="_blank" rel="noopener"
+              aria-label="Join the Discord" title="Join the Discord" onClick={() => outboundNavigation("header", "discord")}>
+              <DiscordIcon size={15} />
+            </a>
+          )}
           <ThemeToggle />
           {!authDisabled && (
             <NavLink
