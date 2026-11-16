@@ -7,6 +7,8 @@ import { formatPageTitle } from "@/lib/latexPlainText";
 import { useDocumentTitle } from "@/hooks/useDocumentTitle";
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { mcpEndpoint, mcpHealthQueryOptions } from "@/lib/mcp";
+import { outboundNavigation } from "@/lib/catalogAnalytics";
+import { DISCORD_INVITE_URL, DiscordIcon } from "@/components/DiscordIcon";
 
 import "@/views/McpView.css";
 
@@ -291,6 +293,12 @@ const McpView: React.FC = () => {
             <a href="/mcp/schema" target="_blank" rel="noreferrer">MCP tool schema <ExternalLink size={13} /></a>
             <a href="/llms.txt" target="_blank" rel="noreferrer">llms.txt <ExternalLink size={13} /></a>
           </nav>
+          <p className="mcp-discord">
+            Questions or ideas?{" "}
+            <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener" onClick={() => outboundNavigation("mcp_page", "discord")}>
+              <DiscordIcon size={13} />Join the Discord
+            </a>.
+          </p>
         </div>
       </section>
     </article>

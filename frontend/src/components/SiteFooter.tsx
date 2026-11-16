@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 
+import { DISCORD_INVITE_URL, DiscordIcon } from "@/components/DiscordIcon";
 import { isDiscoveryCatalog } from "@/lib/apiUrl";
 import { outboundNavigation } from "@/lib/catalogAnalytics";
 
@@ -18,6 +19,7 @@ const SiteFooter = () => {
         {isDiscoveryCatalog() && <>
           <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber" target="_blank" rel="noreferrer" onClick={() => outboundNavigation("footer", "github")}>GitHub</a>
           <a href="https://github.com/Ed-Marcavage/paperswithcode-cyber/issues" target="_blank" rel="noreferrer" onClick={() => outboundNavigation("footer", "feedback")}>Feedback</a>
+          <a href={DISCORD_INVITE_URL} target="_blank" rel="noopener" onClick={() => outboundNavigation("footer", "discord")}><DiscordIcon size={12} />Discord</a>
         </>}
         {!isDiscoveryCatalog() && <>
         <a

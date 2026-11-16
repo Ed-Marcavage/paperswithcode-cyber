@@ -125,8 +125,10 @@ it("records Trending's kind switch, index sorts, the filter sheet and the screen
     resourceClicked("5294", "source", "paper", "screenshot");
     assistantEvent("link_clicked", "panel", { link: "site" });
     outboundNavigation("sidebar", "pwc_cli");
+    outboundNavigation("mcp_page", "discord");
     expect(spy.mock.calls.map(call => call[0])).toEqual(["catalog_kind_selected", "catalog_sort_selected", "catalog_filters_opened",
-      "paper_resource_clicked", "assistant_link_clicked", "catalog_navigation"]);
+      "paper_resource_clicked", "assistant_link_clicked", "catalog_navigation", "catalog_navigation"]);
+    expect(spy).toHaveBeenCalledWith("catalog_navigation", expect.objectContaining({ surface: "mcp_page", destination: "discord" }));
     expect(spy).toHaveBeenCalledWith("catalog_sort_selected", expect.objectContaining({ page: "developers", value: "stars" }));
     expect(spy).toHaveBeenCalledWith("paper_resource_clicked", expect.objectContaining({ link_part: "screenshot", resource: "source" }));
     for (const [event, properties] of spy.mock.calls) {

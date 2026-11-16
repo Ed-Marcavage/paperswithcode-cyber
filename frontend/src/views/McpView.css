@@ -52,6 +52,9 @@
 .mcp-links { display: flex; flex-wrap: wrap; gap: 14px 22px; margin-top: 22px; }
 .mcp-links a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-text); font-size: 12px; font-weight: 600; }
 .mcp-links a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.mcp-discord { margin-top: 18px; font-size: 13px; }
+.mcp-discord a { display: inline-flex; align-items: center; gap: 5px; color: var(--accent-text); font-weight: 600; vertical-align: bottom; }
+.mcp-discord a:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 @media (max-width: 880px) {
   .mcp-hero { grid-template-columns: 1fr; gap: 24px; }

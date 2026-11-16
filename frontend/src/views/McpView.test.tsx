@@ -139,5 +139,9 @@ describe("McpView", () => {
       "href",
       "/mcp/schema",
     );
+    const discord = screen.getByRole("link", { name: /Join the Discord/ });
+    expect(discord).toHaveAttribute("href", "https://discord.gg/73FvhSy8vb");
+    expect(discord).toHaveAttribute("target", "_blank");
+    expect(discord).toHaveAttribute("rel", "noopener");
   });
 });
