@@ -47,9 +47,7 @@ export const PaperFeedToolbar: React.FC<{
       )}
       <PaperFeedFilters
         hasCode={feed.hasCode}
-        hasHfArtifacts={feed.hasHfArtifacts}
         onHasCodeChange={feed.setHasCode}
-        onHasHfArtifactsChange={feed.setHasHfArtifacts}
         showDivider={!!sorts}
         showHasCode={showHasCode}
       />

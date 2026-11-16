@@ -2,21 +2,6 @@ import React from "react";
 
 import { Icon } from "@/components/Icon";
 
-const HfMonochromeLogo = () => (
-  <span className="hf-resource-logo">
-    <img
-      className="hf-resource-logo-black"
-      src="/hf-logo-monochrome-black.svg?v=20260729"
-      alt=""
-    />
-    <img
-      className="hf-resource-logo-white"
-      src="/hf-logo-monochrome-white.svg?v=20260729"
-      alt=""
-    />
-  </span>
-);
-
 const FeedFilterToggle: React.FC<{
   checked: boolean;
   icon: React.ReactNode;
@@ -43,21 +28,18 @@ const FeedFilterToggle: React.FC<{
   </button>
 );
 
+/** The catalog has no Hugging Face artifacts, so "Has code" is the only resource filter. */
 export const PaperFeedFilters: React.FC<{
   hasCode: boolean;
-  hasHfArtifacts: boolean;
   onHasCodeChange: (checked: boolean) => void;
-  onHasHfArtifactsChange: (checked: boolean) => void;
   showDivider?: boolean;
   showHasCode?: boolean;
 }> = ({
   hasCode,
-  hasHfArtifacts,
   onHasCodeChange,
-  onHasHfArtifactsChange,
   showDivider = true,
   showHasCode = true,
-}) => (
+}) => showHasCode ? (
   <div
     className="paper-feed-resource-controls"
     role="group"
@@ -67,20 +49,12 @@ export const PaperFeedFilters: React.FC<{
       <span className="paper-feed-resource-divider" aria-hidden="true" />
     )}
     <div className="paper-feed-filter-options">
-      {showHasCode && (
-        <FeedFilterToggle
-          checked={hasCode}
-          icon={<Icon name="github" size={14} />}
-          label="Has code"
-          onChange={onHasCodeChange}
-        />
-      )}
       <FeedFilterToggle
-        checked={hasHfArtifacts}
-        icon={<HfMonochromeLogo />}
-        label="Has artifacts"
-        onChange={onHasHfArtifactsChange}
+        checked={hasCode}
+        icon={<Icon name="github" size={14} />}
+        label="Has code"
+        onChange={onHasCodeChange}
       />
     </div>
   </div>
-);
+) : null;

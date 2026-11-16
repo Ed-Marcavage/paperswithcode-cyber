@@ -5,51 +5,32 @@ import { describe, expect, it, vi } from "vitest";
 import { PaperFeedFilters } from "@/components/PaperFeedFilters";
 
 describe("PaperFeedFilters", () => {
-  it("renders independent code and Hugging Face artifact toggles", async () => {
+  it("renders the code toggle and no Hugging Face artifact toggle", async () => {
     const onHasCodeChange = vi.fn();
-    const onHasHfArtifactsChange = vi.fn();
     const user = userEvent.setup();
 
-    render(
-      <PaperFeedFilters
-        hasCode={false}
-        hasHfArtifacts
-        onHasCodeChange={onHasCodeChange}
-        onHasHfArtifactsChange={onHasHfArtifactsChange}
-      />,
-    );
+    render(<PaperFeedFilters hasCode={false} onHasCodeChange={onHasCodeChange} />);
 
     const hasCode = screen.getByRole("button", { name: "Has code" });
-    const hasHfArtifacts = screen.getByRole("button", {
-      name: "Has artifacts",
-    });
-
     expect(hasCode).toHaveAttribute("aria-pressed", "false");
-    expect(hasHfArtifacts).toHaveAttribute("aria-pressed", "true");
     expect(hasCode.querySelector(".paper-feed-filter-check")).toBeNull();
-    expect(
-      hasHfArtifacts.querySelector(".paper-feed-filter-check"),
-    ).toHaveTextContent("✓");
+    expect(screen.queryByRole("button", { name: "Has artifacts" })).toBeNull();
 
     await user.click(hasCode);
-    await user.click(hasHfArtifacts);
-
     expect(onHasCodeChange).toHaveBeenCalledWith(true);
-    expect(onHasHfArtifactsChange).toHaveBeenCalledWith(false);
   });
 
-  it("can omit the code toggle without removing artifact filtering", () => {
-    render(
-      <PaperFeedFilters
-        hasCode={false}
-        hasHfArtifacts={false}
-        onHasCodeChange={vi.fn()}
-        onHasHfArtifactsChange={vi.fn()}
-        showHasCode={false}
-      />,
-    );
+  it("shows a check on an active code filter", () => {
+    render(<PaperFeedFilters hasCode onHasCodeChange={vi.fn()} />);
+    const hasCode = screen.getByRole("button", { name: "Has code" });
+    expect(hasCode).toHaveAttribute("aria-pressed", "true");
+    expect(hasCode.querySelector(".paper-feed-filter-check")).toHaveTextContent("✓");
+  });
 
-    expect(screen.queryByRole("button", { name: "Has code" })).toBeNull();
-    expect(screen.getByRole("button", { name: "Has artifacts" })).toBeInTheDocument();
+  it("renders nothing when the code toggle is omitted", () => {
+    const { container } = render(
+      <PaperFeedFilters hasCode={false} onHasCodeChange={vi.fn()} showHasCode={false} />,
+    );
+    expect(container).toBeEmptyDOMElement();
   });
 });
