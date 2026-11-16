@@ -383,7 +383,21 @@ const PaperDetailView: React.FC = () => {
           <div className="detail-hero">
             <div className="detail-hero-main">
           <h1 className="detail-title">
-            <LatexTitle title={paper.title} />
+            {paper.catalog_kind === "post" && safeAbstractUrl ? (
+              <a
+                className="detail-title-source"
+                href={safeAbstractUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Read the original post"
+                onClick={() => resourceClicked(paper.id, externalResource(safeAbstractUrl, "source"), "paper", "title")}
+              >
+                <LatexTitle title={paper.title} />
+                <span className="detail-title-source-arrow" aria-hidden="true">↗</span>
+              </a>
+            ) : (
+              <LatexTitle title={paper.title} />
+            )}
             {organizations.slice(0, -1).map(renderTitleOrg)}
             {/* Keep the pencil on the last org's line so it stays pinned to that logo. */}
             <span className="detail-title-tail">

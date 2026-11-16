@@ -180,7 +180,7 @@ export function taxonomySelected(axis: Axis | "domain", value: string | undefine
 export function paperOpened(paper: DiscoveryWork) {
   capture("paper_opened", { paper_id: paper.paper_id, paper_title: paper.title, ...paper.facets });
 }
-export function resourceClicked(paperId: string, resource: Resource, surface: "feed" | "paper" | "reader" = "paper", part?: "screenshot") {
+export function resourceClicked(paperId: string, resource: Resource, surface: "feed" | "paper" | "reader" = "paper", part?: "screenshot" | "title") {
   capture("paper_resource_clicked", {paper_id: paperId, resource, surface, ...(part ? {link_part: part} : {})});
 }
 
