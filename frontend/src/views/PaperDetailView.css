@@ -14,13 +14,6 @@
   text-decoration-thickness: 1px;
   text-underline-offset: 0.12em;
 }
-.detail-title-source-arrow {
-  margin-left: 0.18em;
-  font-size: 0.55em;
-  vertical-align: 0.6em;
-  color: var(--ink-muted);
-}
-.detail-title-source:hover .detail-title-source-arrow { color: var(--ink); }
 .detail-original-title {
   margin: -4px 0 12px;
   font-family: var(--mono);

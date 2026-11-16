@@ -393,7 +393,6 @@ const PaperDetailView: React.FC = () => {
                 onClick={() => resourceClicked(paper.id, externalResource(safeAbstractUrl, "source"), "paper", "title")}
               >
                 <LatexTitle title={paper.title} />
-                <span className="detail-title-source-arrow" aria-hidden="true">↗</span>
               </a>
             ) : (
               <LatexTitle title={paper.title} />

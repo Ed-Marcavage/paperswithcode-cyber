@@ -355,6 +355,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   color: var(--ink);
 }
 .app-header .header-feedback-link { padding: 0 10px; }
+/* The one tinted header icon: a soft Discord blurple so the community link reads at a glance. */
+.app-header .header-discord-btn { color: #5865F2; }
+.dark .app-header .header-discord-btn { color: #8E97F7; }
+.app-header .header-discord-btn:hover { color: #5865F2; }
+.dark .app-header .header-discord-btn:hover { color: #A5ACFA; }
 
 .hf-signin-btn {
   display: inline-flex;
