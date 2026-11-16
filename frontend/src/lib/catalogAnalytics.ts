@@ -11,7 +11,11 @@ type AssistantSurface = "landing" | "panel" | "chat_page";
 type CatalogEvent = "catalog_kind_selected" | "catalog_sort_selected" | "catalog_filters_opened";
 type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | CatalogEvent | `assistant_${AssistantAction}`;
 const assistantEvents = new Set(assistantActions.map(action => `assistant_${action}`));
-const assistantFields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version", "catalog_environment", "surface"]);
+// Coarse browser, OS and device type, plus the user agent they are parsed from: PostHog's traffic
+// classification ($virt_is_bot / $virt_traffic_type) reads the user agent, and without it every visit
+// is labelled Automation. No browser version, screen size, URL, referrer or location goes with them.
+const deviceFields = ["$browser", "$os", "$device_type", "$raw_user_agent"];
+const assistantFields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version", "catalog_environment", "surface", ...deviceFields]);
 // A topic slug is a fixed catalog identifier, never chat text; only assistant_topic_chosen carries one.
 const topicSlug = /^[a-z0-9][a-z0-9-]{0,63}$/;
 /**
@@ -36,7 +40,7 @@ function allowedExtra(action: string, key: string, value: unknown) {
 const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$lib", "$lib_version",
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
   "topic", "target", "contribution", "kind", "year", "catalog_environment",
-  "referral_source", "referral_campaign", "referral_link", "referral_domain"]);
+  "referral_source", "referral_campaign", "referral_link", "referral_domain", ...deviceFields]);
 const events = new Set<Event>(["$pageview", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked",
   "catalog_kind_selected", "catalog_sort_selected", "catalog_filters_opened"]);
 // Session replay batches: the recorder's own fields only.

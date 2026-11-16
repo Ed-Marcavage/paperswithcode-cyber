@@ -12,6 +12,18 @@ it("retains the paper measurements while dropping SDK URL, search, referrer, pro
   expect(catalogOptions.before_send({ ...event, event: "$autocapture" })).toBeNull();
   expect(catalogOptions.before_send({ ...event, properties: {} })).toBeNull();
 });
+it("keeps browser, OS, device type and user agent, but not browser version, screen size or location", () => {
+  const device = { $browser: "Chrome", $os: "Mac OS X", $device_type: "Desktop",
+    $raw_user_agent: "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36" };
+  const extra = { $browser_version: 142, $os_version: "10.15.7", $screen_height: 900, $screen_width: 1440,
+    $viewport_width: 1440, $timezone: "America/New_York", $browser_language: "en-US", $ip: "203.0.113.1" };
+  for (const [event, labels] of [["$pageview", { page: "trending" }], ["assistant_opened", { surface: "panel", via: "ask_button" }]] as const) {
+    const sent = catalogOptions.before_send({ uuid: "test", event, properties: {
+      distinct_id: "anonymous", catalog_environment: "preview", ...labels, ...device, ...extra } });
+    expect(sent?.properties).toEqual({ distinct_id: "anonymous", catalog_environment: "preview", ...labels, ...device,
+      $geoip_disable: true, $process_person_profile: false });
+  }
+});
 it("lets replay batches through with only the recorder's fields", () => {
   const sent = catalogOptions.before_send({ uuid: "test", event: "$snapshot", properties: {
     token: "phc_test", distinct_id: "anonymous", $session_id: "s", $window_id: "w", $snapshot_bytes: 10,

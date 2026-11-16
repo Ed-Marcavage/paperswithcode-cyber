@@ -38,6 +38,8 @@ describe("PrivacyView catalog analytics", () => {
       expect(screen.getByText(/Do Not Track or Global Privacy Control/)).toHaveTextContent(
         /no analytics, no session recording and no referring domain/);
       expect(screen.queryByText(/do not send .*session recordings/i)).not.toBeInTheDocument();
+      expect(screen.getByText(/uses PostHog to count visits/)).toHaveTextContent(
+        /browser, operating system and device type \(for example “Chrome on macOS, desktop”\)/);
     } finally {
       vi.unstubAllEnvs();
     }
