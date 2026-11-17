@@ -24,8 +24,17 @@ export interface DiscoveryWork {
   publisher?: string | null;
   /** Preview image address (the post's screenshot or the paper's thumbnail); sent by the Editor's picks. */
   thumbnail_url?: string | null;
+  /** The editor's pin number, for any kind of work (a paper or an unreviewed post has no `post`). */
+  curated_pin?: number | null;
+  /** Editor's picks only: catalog kind (`post`, `paper`, ...). */
+  kind?: string | null;
+  /** Editor's picks only: author names in order; papers show them where posts show the publisher. */
+  authors?: string[];
+  /** Editor's picks only: the review's one-sentence summary, else the paper's abstract. */
+  summary?: string | null;
 }
-/** Trending's Editor's picks block (backend `trending_posts.industry_block`): the first pins, in pin order. */
+/** Trending's Editor's picks block (backend `trending_posts.industry_block`): the first pins, in pin order.
+ * A pick is any catalog work: a reviewed post, a post without a review, or a research paper. */
 export interface IndustryHighlights {
   /** Newest reviewed post's date. */
   anchor_date: string | null;

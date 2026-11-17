@@ -7,7 +7,7 @@ import { industryHighlightsQuery, type DiscoveryWork } from "@/lib/api/discovery
 import { assetUrl } from "@/lib/apiUrl";
 import { paperLinkHandlers } from "@/lib/catalogAnalytics";
 import {
-  ALL_INDUSTRY_POSTS_HREF, postTypeLabel, publisherHost, TRENDING_INDUSTRY_SURFACE,
+  ALL_INDUSTRY_POSTS_HREF, authorsLabel, postTypeLabel, publisherHost, TRENDING_INDUSTRY_SURFACE,
 } from "@/lib/industryPost";
 
 function shortDate(iso: string | null | undefined): string | null {
@@ -31,11 +31,18 @@ function PickPreview({ src }: { src: string | null }) {
   );
 }
 
+/** A pick is any catalog work. A reviewed post shows its publisher, post type and summary; a paper
+ * shows its authors and abstract; a post without a review shows its publisher and stored summary. */
 function IndustryPostCard({ work }: { work: DiscoveryWork }) {
   const post = work.post;
-  const company = work.publisher || post?.curated_company || publisherHost(work.source_url);
+  const isPost = (work.kind ?? work.facets.kind?.[0] ?? "post") === "post";
+  const source = isPost
+    ? work.publisher || post?.curated_company || publisherHost(work.source_url)
+    : authorsLabel(work.authors);
+  const type = post ? postTypeLabel(post.post_type) : isPost ? "Post" : "Paper";
   const title = post?.curated_title || work.title;
-  const meta = [company, post && postTypeLabel(post.post_type), shortDate(work.date_published)].filter(Boolean);
+  const summary = post?.tldr || work.summary;
+  const meta = [source, type, shortDate(work.date_published)].filter(Boolean);
   const href = "/paper/" + encodeURIComponent(work.reference);
   return (
     <article className="industry-card">
@@ -48,15 +55,15 @@ function IndustryPostCard({ work }: { work: DiscoveryWork }) {
             {title}
           </Link>
         </h3>
-        {post?.tldr && <p className="industry-card-tldr">{post.tldr}</p>}
+        {summary && <p className="industry-card-tldr">{summary}</p>}
       </div>
     </article>
   );
 }
 
 /**
- * Editor's picks above the Trending feed: one row of the editor's three most important posts
- * (the first pins, in pin order). The feed below leaves them out. Renders nothing until loaded.
+ * Editor's picks above the Trending feed: one row of the editor's three most important posts and
+ * papers (the first pins, in pin order). The feeds below leave them out. Renders nothing until loaded.
  */
 export function TrendingIndustry() {
   const highlights = useQuery(industryHighlightsQuery);

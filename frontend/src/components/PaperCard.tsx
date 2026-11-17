@@ -145,7 +145,7 @@ export const PaperCard: React.FC<PaperCardComponentProps> = ({
   const visibleMethods = visibleFeedMethods(paper);
   const post = paper.catalogPost;
   const featured = post?.tier === "featured";
-  const curated = isEditorsPick(post);
+  const curated = isEditorsPick(post, paper.catalogPin);
   return (
     <article className="paper-card">
       {(!isDiscoveryCatalog() || paper.thumbnailUrl) && <Link

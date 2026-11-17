@@ -69,6 +69,36 @@ it("links each card to the post page with the editor's title, company and the po
     "trending_industry", { kind: ["post"] });
 });
 
+it("shows a research paper and a post without a review as picks, with authors or publisher and a summary", async () => {
+  vi.spyOn(request, "apiRequest").mockResolvedValue({ ...picks(), results: [
+    { paper_id: "235", reference: "2609.18120", title: "PentestChain: A Cost-Aware Framework",
+      source_url: "https://arxiv.org/abs/2609.18120v2", artifact_url: null, has_text: true, date_published: "2026-09-16",
+      facets: { kind: ["paper"] }, kind: "paper", publisher: null, post: null, curated_pin: 1,
+      authors: ["Rushabh Vipulkumar Patel", "Dipo Dunsin"], summary: "The paper's abstract.",
+      thumbnail_url: "/api/v1/catalog/papers/235/preview/abc.jpg" },
+    { paper_id: "323", reference: "323", title: "Booz Allen Cyber Weapon Index",
+      source_url: "https://www.boozallen.com/insights/cyber/cyber-weapon-index.html", artifact_url: null, has_text: false,
+      date_published: "2026-09-01", facets: { kind: ["post"] }, kind: "post", publisher: "Booz Allen Hamilton", post: null,
+      curated_pin: 2, authors: [], summary: "Booz Allen evaluates autonomous cyber operations.", thumbnail_url: null },
+    { paper_id: "9", reference: "9", title: "A paper without authors, date or abstract", source_url: "https://example.org/p",
+      artifact_url: null, has_text: false, date_published: null, facets: { kind: ["paper"] }, kind: "paper",
+      publisher: null, post: null, curated_pin: 3, authors: [], summary: null, thumbnail_url: null },
+  ] });
+  renderBlock();
+  const paper = (await screen.findByRole("link", { name: "PentestChain: A Cost-Aware Framework" }));
+  expect(paper).toHaveAttribute("href", "/paper/2609.18120");
+  const paperCard = paper.closest("article")!;
+  expect(within(paperCard).getByText("Patel et al. · Paper · Sep 16, 2026")).toBeInTheDocument();
+  expect(within(paperCard).getByText("The paper's abstract.")).toBeInTheDocument();
+  const unreviewed = screen.getByRole("link", { name: "Booz Allen Cyber Weapon Index" }).closest("article")!;
+  expect(within(unreviewed).getByText("Booz Allen Hamilton · Post · Sep 1, 2026")).toBeInTheDocument();
+  expect(within(unreviewed).getByText("Booz Allen evaluates autonomous cyber operations.")).toBeInTheDocument();
+  // Missing fields leave no blank pieces: the meta line is just the type and there is no summary paragraph.
+  const bare = screen.getByRole("link", { name: /without authors/ }).closest("article")!;
+  expect(within(bare).getByText("Paper")).toBeInTheDocument();
+  expect(bare.querySelector(".industry-card-tldr")).toBeNull();
+});
+
 it("shows a post's preview image, and no image box when it has none or the image fails", async () => {
   vi.spyOn(request, "apiRequest").mockResolvedValue(picks());
   const { container } = renderBlock();

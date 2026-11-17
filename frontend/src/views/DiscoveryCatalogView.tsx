@@ -136,7 +136,7 @@ export default function DiscoveryCatalogView() {
         <ul className="discovery-list">{papers.data.results.map(p => <li key={p.paper_id}>
           <Link to={"/paper/" + encodeURIComponent(p.reference)} {...paperLinkHandlers(p.paper_id, p.title, "title", "catalog", p.facets)}>{p.title}</Link>
           {p.facets.kind?.[0] === "post" ? <PostSummary work={p} details={[...(p.facets.year || []), ...(p.facets.contribution || []).map(slug => terms.data?.contribution?.[slug] || slug)]} />
-            : <small>{[...(p.facets.year || []), ...(p.facets.contribution || []).map(slug => terms.data?.contribution?.[slug] || slug)].join(" · ")}</small>}
+            : <small>{isEditorsPick(null, p.curated_pin) && <><EditorsPickChip />{" "}</>}{[...(p.facets.year || []), ...(p.facets.contribution || []).map(slug => terms.data?.contribution?.[slug] || slug)].join(" · ")}</small>}
         </li>)}</ul>
         {papers.data.results.length === 0 && <p className="discovery-empty">Nothing in the catalog matches these filters.</p>}
         <nav className="discovery-pager" aria-label="Catalog pages">
@@ -154,7 +154,7 @@ function PostSummary({ work, details }: { work: DiscoveryWork; details: string[]
   return <>
     <span className="discovery-post-meta">
       {post?.tier === "featured" && <FeaturedChip />}
-      {isEditorsPick(post) && <EditorsPickChip />}
+      {isEditorsPick(post, work.curated_pin) && <EditorsPickChip />}
       <small>{meta.join(" · ")}</small>
     </span>
     {post?.tldr && <p className="discovery-tldr">{post.tldr}</p>}

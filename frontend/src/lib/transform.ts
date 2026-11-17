@@ -32,6 +32,8 @@ export interface PaperCardProps {
   catalogKind?: string | null;
   /** Reviewed industry-post fields; set only for catalog posts. */
   catalogPost?: CatalogPost | null;
+  /** The editor's pin number, for any catalog kind. */
+  catalogPin?: number | null;
   /** Publisher host for catalog posts, e.g. "wiz.io". */
   publisherHost?: string | null;
   isBenchmark?: boolean;
@@ -198,6 +200,7 @@ export function transformPaperForCard(paper: Paper): PaperCardProps {
     tags,
     catalogKind: paper.catalog_kind,
     catalogPost: paper.catalog_kind === "post" ? paper.catalog_post ?? null : null,
+    catalogPin: paper.catalog_pin ?? null,
     publisherHost: paper.catalog_kind === "post" ? paper.publisher || publisherHost(paper.source_url) : null,
     isBenchmark: paper.catalog_contributions?.includes("benchmark"),
     methods,

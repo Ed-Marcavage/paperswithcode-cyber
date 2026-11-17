@@ -196,6 +196,12 @@ describe("PaperCard industry posts", () => {
     expect(screen.queryByText("Editor's pick")).not.toBeInTheDocument();
   });
 
+  it("marks a pinned paper as Editor's pick", () => {
+    renderWith({ ...paper, catalogKind: "paper", catalogPin: 1 });
+    expect(screen.getByText("Editor's pick")).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Featured" })).not.toBeInTheDocument();
+  });
+
   it("leaves papers unchanged", () => {
     renderWith({ ...paper, abstract: "Long abstract" });
     expect(screen.getByText("Long abstract")).toBeInTheDocument();

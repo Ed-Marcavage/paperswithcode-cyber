@@ -60,7 +60,7 @@ it("shows the Editor's picks block above the feed, lists posts by default and sw
   renderFeed("/");
 
   const picks = await screen.findByRole("heading", { name: "Editor's picks" });
-  expect(screen.getByText(/Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers\./)).toBeInTheDocument();
+  expect(screen.getByText(/Editor's picks are three hand-picked posts and papers; the feed below ranks other industry posts and research papers\./)).toBeInTheDocument();
   // The block sits above the feed's controls.
   expect(picks.compareDocumentPosition(screen.getByRole("button", { name: "posts" })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Trending Research");

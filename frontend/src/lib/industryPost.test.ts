@@ -44,3 +44,13 @@ describe("post repository links", () => {
     expect(repositoryReferencesHref("rapid7", "metasploit-framework")).toBe("/repos/rapid7/metasploit-framework");
   });
 });
+
+describe("authorsLabel", () => {
+  it("names a paper by its first author's last name, or the only author in full", async () => {
+    const { authorsLabel } = await import("./industryPost");
+    expect(authorsLabel(["Rushabh Vipulkumar Patel", "Dipo Dunsin"])).toBe("Patel et al.");
+    expect(authorsLabel(["Dipo Dunsin"])).toBe("Dipo Dunsin");
+    expect(authorsLabel([])).toBeNull();
+    expect(authorsLabel(undefined)).toBeNull();
+  });
+});

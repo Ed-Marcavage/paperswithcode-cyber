@@ -53,7 +53,7 @@ export function FeaturedChip() {
   );
 }
 
-/** Marks an industry post the catalog editor pinned (`pinned` in local-dev/curated_posts.json); see isEditorsPick. */
+/** Marks a post or paper the catalog editor pinned (`pinned` in local-dev/curated_posts.json); see isEditorsPick. */
 export function EditorsPickChip() {
   const colors = chipColors(160);
   return (

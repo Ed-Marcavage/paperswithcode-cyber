@@ -195,6 +195,8 @@ export interface Paper {
   catalog_contributions?: string[] | null;
   /** Reviewed industry-post fields; null for papers and repositories. */
   catalog_post?: CatalogPost | null;
+  /** The editor's pin number, for any kind of work; pinned works carry the "Editor's pick" badge. */
+  catalog_pin?: number | null;
   /** Industry posts: the publisher organization's name, else the post's host. */
   publisher?: string | null;
   methods?: Method[];

@@ -627,7 +627,7 @@ const PaperDetailView: React.FC = () => {
           </div>
 
           {paper.catalog_kind === "post" && paper.catalog_post?.tier === "featured" && <FeaturedChip />}
-          {paper.catalog_kind === "post" && isEditorsPick(paper.catalog_post) && <EditorsPickChip />}
+          {isEditorsPick(paper.catalog_kind === "post" ? paper.catalog_post : null, paper.catalog_pin) && <EditorsPickChip />}
           {paper.catalog_contributions?.includes("benchmark") && <BenchmarkChip />}
           {paper.leaderboard_ranks && paper.leaderboard_ranks.length > 0 && (
             <SotaBadges
