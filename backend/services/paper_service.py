@@ -79,6 +79,7 @@ from backend.services.paper_citation_refresh_service import PaperCitationRefresh
 from backend.services.paper_seo_service import build_paper_seo_document
 from backend.services.paper_relation_loader import PaperRelationLoader, PaperRelations
 from backend.services.publishers import publisher_name
+from backend.services import trending_posts
 from backend.services.paper_retrieval_service import PaperRetrievalService
 from backend.services.paper_version_refresh_service import (
     ArxivPaperRefreshResult,
@@ -381,6 +382,7 @@ class PaperService:
             "x_threads": x_threads,
             "tasks": tasks,
             "catalog_kind": relations.catalog_kinds.get(db_paper.id),
+            "catalog_pin": relations.catalog_pins.get(db_paper.id),
             "catalog_contributions": relations.catalog_contributions.get(db_paper.id),
             "catalog_post": relations.catalog_posts.get(db_paper.id),
             "publisher": (
@@ -1376,7 +1378,8 @@ class PaperService:
                 "FROM papers p",
                 """FROM papers p
                 JOIN discovery_works feed_work ON feed_work.paper_id = p.id
-                    AND feed_work.facets @> '{"kind":["paper"]}'::jsonb""",
+                    AND feed_work.facets @> '{"kind":["paper"]}'::jsonb
+                    AND NOT (p.id = ANY(CAST(:pick_ids AS bigint[])))""",
                 1,
             ))
         params = {
@@ -1391,6 +1394,8 @@ class PaperService:
             "limit": page_size,
             "offset": (page - 1) * page_size,
         }
+        if self.settings.discovery_catalog:
+            params["pick_ids"] = trending_posts.pick_paper_ids(self.db)
         return sql, params
 
     def _get_trending_papers(

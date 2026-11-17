@@ -1,17 +1,17 @@
-"""Industry posts on the Trending page.
+"""Catalog picks and reviewed industry posts on the Trending page.
 
-Two views over reviewed industry posts (discovery_works.post_details):
+Two views over discovery_works:
 
 - ``industry_block``: "Editor's picks", one row of the ``PICKS_LIMIT`` most
-  important picks above the Trending feed: the first pinned posts in pin order
-  (``curated_pin`` in post_details, from the curated manifest's ``pinned``
-  list), whatever their date, tier or agent relevance.
-- ``posts_feed``: the Trending feed's "Posts" view. Featured posts with agent
+  important picks above the Trending feed: the first pinned catalog works in
+  ``discovery_works.curated_pin`` order, whatever their kind, review or date.
+- ``posts_feed``: the Trending feed's "Posts" view. Reviewed, dated posts only:
+  featured posts with agent
   relevance of at least ``MIN_AGENT_RELEVANCE``, and the other pinned posts
   (pins after the block's), ranked together by ``post_score`` halved for every
   ``DECAY_HALF_LIFE_DAYS`` since publication. Pinned posts get no special
   position in the feed; their cards keep the "Editor's pick" badge. The block's
-  posts are left out, so nothing is listed twice.
+  picks are left out of both feeds, so nothing is listed twice.
 
 Everything else stays in the catalog and search; it is just not on Trending.
 
@@ -41,11 +41,18 @@ PICKS_HEADING = "Editor's picks"
 MIN_AGENT_RELEVANCE = 3
 DECAY_HALF_LIFE_DAYS = 7
 
-_POSTS = """
+_WORKS = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
            p.title, p.date_published, p.thumbnail_url, w.facets, w.source_url, w.post_details AS post,
+           w.curated_pin, w.facets -> 'kind' ->> 0 AS kind,
+           coalesce(w.post_details ->> 'tldr', p.abstract) AS summary,
+           ARRAY(SELECT a.name FROM paper_authors pa JOIN authors a ON a.id = pa.author_id
+                  WHERE pa.paper_id = p.id ORDER BY pa.author_order) AS authors,
            """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
+"""
+
+_POSTS = _WORKS + """
      WHERE w.facets -> 'kind' ? 'post' AND w.post_details IS NOT NULL
        AND p.date_published IS NOT NULL
 """
@@ -71,21 +78,20 @@ def agent_related(post: dict, min_agent_relevance: int = MIN_AGENT_RELEVANCE) ->
     return (post.get("agent_relevance") or 0) >= min_agent_relevance
 
 
-def _published_on(row: dict) -> date:
+def _published_on(row: dict) -> Optional[date]:
     value = row["date_published"]
     return value.date() if hasattr(value, "date") else value
 
 
-def pin(post: dict) -> Optional[int]:
-    """The owner's pin number (1 is the most important), or None for a post that is not pinned."""
-    value = (post or {}).get("curated_pin")
-    return value if type(value) is int and value > 0 else None
+def pin(row: dict) -> Optional[int]:
+    """The catalog work's pin number, or None when it is not pinned."""
+    return row.get("curated_pin")
 
 
 def select_picks(rows: list[dict], limit: int = PICKS_LIMIT) -> list[dict]:
-    """The block's posts: the first ``limit`` pinned rows in pin order."""
-    pinned = sorted((row for row in rows if pin(row["post"]) is not None),
-                    key=lambda row: (pin(row["post"]), row["paper_id"]))
+    """The block's works: the first ``limit`` pinned rows in pin order."""
+    pinned = sorted((row for row in rows if pin(row) is not None),
+                    key=lambda row: (pin(row), int(row["paper_id"])))
     return pinned[:limit]
 
 
@@ -103,19 +109,27 @@ def order_feed(rows: list[dict], anchor: date, picks: set[str]) -> list[dict]:
     """The Posts view in order: featured agent-related posts and pinned posts, ranked together,
     without the block's picks."""
     return rank_feed([row for row in rows if row["paper_id"] not in picks and (
-        pin(row["post"]) is not None
+        pin(row) is not None
         or (row["post"].get("tier") == "featured" and agent_related(row["post"])))], anchor)
 
 
 def _serialize(row: dict) -> dict:
     row = dict(row)
     organization = row.pop("publisher_organization", None)
-    return {**row, "date_published": _published_on(row).isoformat(),
-            "publisher": publisher_name(row["source_url"], row["post"].get("curated_company"), organization)}
+    published = _published_on(row)
+    post = row["post"] or {}
+    return {**row, "date_published": published.isoformat() if published else None,
+            "publisher": publisher_name(row["source_url"], post.get("curated_company"), organization)
+            if row["kind"] == "post" else None}
 
 
 def _pinned_rows(db: Session) -> list[dict]:
-    return [dict(row) for row in db.execute(text(_POSTS + " AND w.post_details ? 'curated_pin'")).mappings()]
+    return [dict(row) for row in db.execute(text(_WORKS + " WHERE w.curated_pin IS NOT NULL")).mappings()]
+
+
+def pick_paper_ids(db: Session) -> list[int]:
+    """Paper IDs of the block's picks, for exclusion from other Trending feeds."""
+    return [int(row["paper_id"]) for row in select_picks(_pinned_rows(db))]
 
 
 def industry_block(db: Session, limit: int = PICKS_LIMIT) -> dict:
@@ -145,12 +159,12 @@ def posts_feed(db: Session, page: int, page_size: int, start_date: Optional[date
     if anchor is None:
         return [], 0
     rows = [dict(row) for row in db.execute(text(_POSTS + """
-        AND (w.post_details ->> 'tier' = 'featured' OR w.post_details ? 'curated_pin')
+        AND (w.post_details ->> 'tier' = 'featured' OR w.curated_pin IS NOT NULL)
         AND (CAST(:start AS date) IS NULL OR p.date_published >= :start)
         AND (CAST(:end AS date) IS NULL OR p.date_published <= :end)
     """), {"start": start_date, "end": end_date}).mappings()]
     # The block ignores the date window, so its picks are found among all pins.
-    picks = {row["paper_id"] for row in select_picks(_pinned_rows(db))}
+    picks = {str(paper_id) for paper_id in pick_paper_ids(db)}
     ordered = order_feed(rows, anchor, picks)
     return [_serialize(row) for row in ordered[(page - 1) * page_size: page * page_size]], len(ordered)
 

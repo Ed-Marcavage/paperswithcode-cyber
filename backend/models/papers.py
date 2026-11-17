@@ -80,7 +80,7 @@ class CatalogPost(BaseModel):
     curated: bool = Field(False, description="Hand-picked by the catalog editor")
     curated_pin: Optional[int] = Field(
         None, description="The editor's pin number: the first three pins are Trending's Editor's "
-                                "picks block, in this order; every pinned post carries the Editor's pick badge")
+                                "picks block across all catalog kinds, in this order; mirrored from catalog_pin")
     curated_company: Optional[str] = Field(None, description="Company name the editor gives for a curated post")
     curated_title: Optional[str] = Field(None, description="Short display title the editor gives for a curated post")
 
@@ -315,6 +315,7 @@ class Paper(BaseModel):
         ),
     )
     catalog_kind: Optional[str] = Field(None, description="Reviewed catalog source type")
+    catalog_pin: Optional[int] = Field(None, description="Editor's pick order for any catalog work")
     catalog_contributions: Optional[List[str]] = Field(None, description="Reviewed discovery catalog contributions")
     catalog_post: Optional[CatalogPost] = Field(None, description="Reviewed industry-post fields")
     publisher: Optional[str] = Field(

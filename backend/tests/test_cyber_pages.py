@@ -43,20 +43,21 @@ BLOCK = {
     "heading": "Editor's picks",
     "results": [
         {"reference": "2115", "title": "ARTEX and Beyond: AI-Enabled Penetration Testing Platforms",
-         "date_published": "2026-11-13", "publisher": "Cisco Talos",
+         "date_published": "2026-11-13", "publisher": "Cisco Talos", "kind": "post", "curated_pin": 1,
          "post": {"curated_title": "ARTEX and Beyond, AI-Enabled Penetration Testing Platforms", "curated_pin": 1}},
         {"reference": "2114", "title": "Threat actors running ARTEX agents", "date_published": "2026-11-13",
-         "publisher": "AWS", "post": {"curated_pin": 2}},
+         "publisher": "AWS", "kind": "post", "curated_pin": 2, "post": {"curated_pin": 2}},
         {"reference": "2116", "title": "Cyber Chaos Monkey", "date_published": "2026-11-12",
-         "publisher": "Shopify", "post": {"curated_pin": 3}},
+         "publisher": "Shopify", "kind": "post", "curated_pin": 3, "post": {"curated_pin": 3}},
     ],
 }
 
 FEED = [
     {"reference": "301", "title": "Agent harness for code audit", "date_published": "2026-11-10",
-     "publisher": "Endor Labs", "post": {"agent_relevance": 4}},
+     "publisher": "Endor Labs", "kind": "post", "curated_pin": None, "post": {"agent_relevance": 4}},
     {"reference": "302", "title": "Raw title", "date_published": "2026-11-09",
-     "publisher": "Wiz", "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3, "curated_pin": 5}},
+     "publisher": "Wiz", "kind": "post", "curated_pin": 5,
+     "post": {"curated_title": "Evaluating security agents", "agent_relevance": 3, "curated_pin": 5}},
 ]
 
 
@@ -338,11 +339,43 @@ def test_homepage_lists_the_editors_picks_in_html_and_markdown(client):
                      ("/paper/2114", "Threat actors running ARTEX agents"), ("/paper/2116", "Cyber Chaos Monkey")]
     # The block's heading says what it is, so its rows carry no badge.
     assert "Cisco Talos · 2026-11-13" in section.text and "Editor's pick ·" not in section.text
-    assert "Editor's picks are three hand-picked industry posts" in html.select_one("#root main header").text
+    assert "Editor's picks are three hand-picked posts and papers" in html.select_one("#root main header").text
     markdown = client.get("/index.md").text
     assert "## Editor's picks\n" in markdown
     assert f"- [Cyber Chaos Monkey]({ORIGIN}/paper/2116) — Shopify · 2026-11-12" in markdown
     assert markdown.index("## Editor's picks") < markdown.index("## Trending research papers")
+
+
+def test_homepage_lists_paper_and_unreviewed_post_picks(client, monkeypatch):
+    block = {"heading": "Editor's picks", "results": [
+        {"reference": "2609.18120", "title": "Pinned research paper", "kind": "paper", "post": None,
+         "authors": ["A. Researcher", "B. Researcher"], "publisher": None, "date_published": None,
+         "curated_pin": 1},
+        {"reference": "200", "title": "Cyber Weapon Index", "kind": "post", "post": None,
+         "authors": [], "publisher": "Booz Allen", "date_published": None, "curated_pin": 2},
+        BLOCK["results"][0],
+    ]}
+    monkeypatch.setattr(trending_posts, "industry_block", lambda db: block)
+    response = client.get("/")
+    assert response.status_code == 200
+    html = BeautifulSoup(response.text, "html.parser")
+    section = html.select_one('#root main section[aria-labelledby="highlights-heading"]')
+    assert [(a["href"], a.text) for a in section.select("a")][:2] == [
+        ("/paper/2609.18120", "Pinned research paper"), ("/paper/200", "Cyber Weapon Index")]
+    assert "A. Researcher et al." in section.text and "Booz Allen" in section.text
+    markdown = client.get("/index.md")
+    assert markdown.status_code == 200
+    assert f"- [Pinned research paper]({ORIGIN}/paper/2609.18120) — A\\. Researcher et al\\.\n" in markdown.text
+    assert f"- [Cyber Weapon Index]({ORIGIN}/paper/200) — Booz Allen\n" in markdown.text
+    assert pages.INDUSTRY_NOTE in html.select_one("#root main header").text
+    assert pages.INDUSTRY_NOTE in markdown.text.replace("\\", "")
+
+
+@pytest.mark.parametrize("authors,label", [([], ""), (["Solo Author"], "Solo Author")])
+def test_paper_pick_author_labels(authors, label):
+    link = pages._post_link({"reference": "1", "title": "Paper", "kind": "paper", "post": None,
+                             "date_published": None, "authors": authors})
+    assert link.context_label == label and link.published is None
 
 
 def test_homepage_lists_posts_then_papers_for_every_kind(client):

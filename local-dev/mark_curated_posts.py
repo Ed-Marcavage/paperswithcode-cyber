@@ -1,14 +1,14 @@
-"""Mark hand-picked industry posts as curated ("Editor's pick").
+"""Pin catalog works and curate reviewed industry-post display fields.
 
 Input: local-dev/curated_posts.json, edited by hand: {"pinned": [url, ...],
 "posts": [{url, company, title}, ...]} (a bare list of posts is also accepted).
-Each URL is matched to a reviewed post (one with post_details) after normalising
-scheme, `www.`, fragment and trailing slash. Matched posts get `curated: true`,
-`curated_company` and `curated_title` in post_details; a post listed in
-`pinned` also gets `curated_pin` (1 for the first URL): the first three pins
-are Trending's Editor's picks block in that order, and every pinned post carries
-the "Editor's pick" badge. Every pinned URL must also be in `posts`. Posts
-no longer listed lose those keys. A rerun with the same file changes nothing.
+URLs are normalised for scheme, `www.`, fragment, trailing slash and arXiv
+versions. `pinned` matches any catalog work and sets its curated_pin column
+(1 for the first URL). The first three pins are Trending's Editor's picks.
+`posts` matches only reviewed posts and sets `curated: true`, `curated_company`
+and `curated_title` in post_details. Pins are also mirrored into existing
+post reviews, even when absent from `posts`; NULL post_details stays NULL.
+Works no longer listed lose their curated fields and pins. A rerun changes nothing.
 import_post_details.py keeps these keys when it rewrites post_details.
 Preview rolls back; pass --execute to commit.
 """
@@ -25,11 +25,12 @@ MANIFEST = Path(__file__).resolve().with_name("curated_posts.json")
 
 
 def normalize_url(url: str) -> str:
-    """Compare URLs without scheme, `www.`, fragment, case or trailing slash."""
+    """Compare URLs without scheme, `www.`, fragment, case, slash or arXiv version."""
     value = url.strip().split("#", 1)[0].lower()
     value = re.sub(r"^https?://", "", value)
     value = re.sub(r"^www\.", "", value)
-    return value.rstrip("/")
+    value = value.rstrip("/")
+    return re.sub(r"^(arxiv\.org/abs/.+?)v\d+$", r"\1", value)
 
 
 def manifest_posts(data) -> list:
@@ -59,22 +60,21 @@ def load_manifest(data) -> dict[str, dict]:
         entries[key] = {"curated": True, "curated_company": entry["company"].strip(),
                         "curated_title": entry["title"].strip()}
     for position, url in enumerate(pinned, start=1):
+        if not re.match(r"^https?://", url.strip()):
+            raise ValueError(f"Pinned url must start with http:// or https://: {url}")
         key = normalize_url(url)
-        if key not in entries:
-            raise ValueError(f"Pinned url is not in posts: {url}")
-        if "curated_pin" in entries[key]:
+        fields = entries.setdefault(key, {})
+        if "curated_pin" in fields:
             raise ValueError(f"Duplicate pinned url: {url}")
-        entries[key]["curated_pin"] = position
+        fields["curated_pin"] = position
     return entries
 
 
 def match(entries: dict[str, dict], posts: list[tuple[str, str]]) -> tuple[dict[str, dict], list[str]]:
     """Map catalog IDs to curated fields; return them and the manifest URLs left unmatched."""
-    by_url = {}
-    for catalog_id, source_url in posts:
-        by_url.setdefault(normalize_url(source_url), catalog_id)
-    matched = {by_url[url]: fields for url, fields in entries.items() if url in by_url}
-    return matched, sorted(url for url in entries if url not in by_url)
+    urls = {catalog_id: normalize_url(source_url) for catalog_id, source_url in posts}
+    matched = {catalog_id: entries[url] for catalog_id, url in urls.items() if url in entries}
+    return matched, sorted(entries.keys() - set(urls.values()))
 
 
 def main():
@@ -87,12 +87,32 @@ def main():
     data = json.loads(args.manifest.read_text())
     entries = load_manifest(data)
     original_urls = {normalize_url(entry["url"]): entry["url"] for entry in manifest_posts(data)}
+    pinned_urls = {normalize_url(url): url for url in data.get("pinned", [])} if isinstance(data, dict) else {}
     db_manager.engine.echo = False
     with db_manager.session_local() as db:
         database, user = db.execute(text("SELECT current_database(), current_user")).one()
         if (database, user) != ("pwc_local", "pwc_local"):
             raise RuntimeError("Refusing any database/user except isolated pwc_local")
         db.execute(text("SELECT pg_advisory_xact_lock(27451504)"))
+        migration = Path(__file__).resolve().parents[1] / "backend/database/migrations/add_discovery_catalog.sql"
+        for statement in migration.read_text().split(";"):
+            if statement.strip():
+                db.execute(text(statement))
+        works = db.execute(text("SELECT catalog_id, source_url FROM discovery_works ORDER BY catalog_id")).all()
+        pinned, unmatched_pins = match(
+            {url: fields for url, fields in entries.items() if "curated_pin" in fields},
+            [tuple(row) for row in works],
+        )
+        pins_updated = 0
+        for catalog_id, fields in sorted(pinned.items()):
+            pins_updated += db.execute(text("""
+                UPDATE discovery_works SET curated_pin = :pin
+                 WHERE catalog_id = :id AND curated_pin IS DISTINCT FROM :pin
+            """), {"id": catalog_id, "pin": fields["curated_pin"]}).rowcount
+        pins_cleared = db.execute(text("""
+            UPDATE discovery_works SET curated_pin = NULL
+             WHERE curated_pin IS NOT NULL AND NOT (catalog_id = ANY(:ids))
+        """), {"ids": sorted(pinned)}).rowcount
         posts = db.execute(text("""
             SELECT catalog_id, source_url FROM discovery_works
              WHERE facets -> 'kind' ? 'post' AND post_details IS NOT NULL ORDER BY catalog_id
@@ -104,6 +124,7 @@ def main():
                 UPDATE discovery_works
                    SET post_details = (post_details - CAST(:keys AS text[])) || CAST(:fields AS jsonb)
                  WHERE catalog_id = :id
+                   AND post_details IS NOT NULL
                    AND post_details IS DISTINCT FROM (post_details - CAST(:keys AS text[])) || CAST(:fields AS jsonb)
             """), {"id": catalog_id, "keys": list(CURATED_KEYS),
                    "fields": json.dumps(fields, ensure_ascii=False)}).rowcount
@@ -116,8 +137,11 @@ def main():
         else:
             db.rollback()
     print(json.dumps({
-        "executed": args.execute, "manifest_entries": len(entries), "matched": len(matched),
-        "updated": updated, "cleared": cleared, "unmatched_urls": [original_urls[url] for url in unmatched],
+        "executed": args.execute, "manifest_entries": len(original_urls), "matched": len(matched),
+        "updated": updated, "cleared": cleared,
+        "unmatched_urls": [original_urls[url] for url in unmatched if url in original_urls],
+        "pins_updated": pins_updated, "pins_cleared": pins_cleared,
+        "unmatched_pinned_urls": [pinned_urls[url] for url in unmatched_pins],
     }, indent=2))
 
 

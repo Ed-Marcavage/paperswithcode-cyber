@@ -1,5 +1,8 @@
 {
   "pinned": [
+    "https://arxiv.org/abs/2609.18120",
+    "https://www.boozallen.com/insights/cyber/cyber-weapon-index.html",
+    "https://blog.trailofbits.com/2026/10/21/your-ai-agent-fixed-the-bug-but-what-else-did-it-change/",
     "https://blog.talosintelligence.com/artex-and-beyond/",
     "https://aws.amazon.com/blogs/security/amazon-threat-intelligence-observes-threat-actors-running-cybercrime-campaigns-with-artex-ai-agents/",
     "https://shopify.engineering/cyber-chaos-monkey",
@@ -107,6 +110,11 @@
       "url": "https://xlab.tencent.com/en/2026/07/02/xuanwu-atuin-cybergym/",
       "company": "Tencent Xuanwu Lab",
       "title": "Tencent Xuanwu Atuin AI on CyberGym"
+    },
+    {
+      "url": "https://blog.trailofbits.com/2026/10/21/your-ai-agent-fixed-the-bug-but-what-else-did-it-change/",
+      "company": "Trail of Bits",
+      "title": "Your AI Agent Fixed the Bug, but What Else Did It Change?"
     },
     {
       "url": "https://www.wiz.io/blog/cyber-model-arena-ai-benchmark",

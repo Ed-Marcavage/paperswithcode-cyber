@@ -18,7 +18,7 @@ def terms(db: Session) -> dict:
 
 SELECT_WORK = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
-           p.title, w.facets, w.source_url, w.artifact_url,
+           p.title, w.facets, w.source_url, w.artifact_url, w.curated_pin,
            w.document_text IS NOT NULL AS has_text, w.post_details AS post,
            """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id

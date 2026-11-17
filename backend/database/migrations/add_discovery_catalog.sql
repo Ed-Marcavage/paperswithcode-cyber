@@ -24,3 +24,6 @@ CREATE TABLE IF NOT EXISTS discovery_previews (
 -- NULL for papers and repositories. Loaded by local-dev/import_post_details.py.
 -- Statements are split on semicolons, so keep them out of comments.
 ALTER TABLE discovery_works ADD COLUMN IF NOT EXISTS post_details jsonb;
+
+-- Pin order for any catalog work, independent of whether it has a review.
+ALTER TABLE discovery_works ADD COLUMN IF NOT EXISTS curated_pin integer;

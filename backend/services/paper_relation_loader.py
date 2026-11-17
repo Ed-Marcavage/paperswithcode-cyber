@@ -82,6 +82,7 @@ class PaperRelations:
     author_links: dict[int, list[AuthorLink]] = field(default_factory=dict)
     tasks: dict[int, list[TaskSummary]] = field(default_factory=dict)
     catalog_kinds: dict[int, str] = field(default_factory=dict)
+    catalog_pins: dict[int, int] = field(default_factory=dict)
     catalog_contributions: dict[int, list[str]] = field(default_factory=dict)
     catalog_posts: dict[int, dict] = field(default_factory=dict)
     catalog_publishers: dict[int, str] = field(default_factory=dict)
@@ -506,13 +507,15 @@ class PaperRelationLoader:
     ) -> None:
         if get_settings().discovery_catalog:
             rows = self.db.execute(text(
-                "SELECT w.paper_id, w.facets->'contribution', w.facets->'kind'->>0, w.post_details, "
+                "SELECT w.paper_id, w.facets->'contribution', w.facets->'kind'->>0, w.curated_pin, w.post_details, "
                 + PUBLISHER_ORGANIZATION_SQL.format(paper_id="w.paper_id")
                 + " FROM discovery_works w WHERE w.paper_id = ANY(:ids)"
             ), {"ids": paper_ids})
-            for paper_id, contributions, kind, post, publisher in rows:
+            for paper_id, contributions, kind, pin, post, publisher in rows:
                 relations.catalog_contributions[paper_id] = contributions or []
                 relations.catalog_kinds[paper_id] = kind
+                if pin is not None:
+                    relations.catalog_pins[paper_id] = pin
                 if post is not None and kind == "post":
                     relations.catalog_posts[paper_id] = post
                 if publisher is not None and kind == "post":

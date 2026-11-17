@@ -1,12 +1,17 @@
-"""Industry posts on Trending: Editor's picks, Posts ranking and routes."""
+"""Catalog picks on Trending, reviewed Posts ranking and routes."""
 from datetime import date, timedelta
+from unittest.mock import MagicMock
 
+import pytest
 from fastapi.testclient import TestClient
 
 from backend.config import get_settings
 from backend.database.connection import get_database_session
 from backend.main import create_app
-from backend.services import trending_posts
+from backend.models.database import Paper as DBPaper
+from backend.services import discovery_catalog, trending_posts
+from backend.services.paper_relation_loader import PaperRelationLoader
+from backend.services.paper_service import PaperService
 from backend.services.publishers import publisher_name
 from backend.services.trending_posts import (
     MIN_AGENT_RELEVANCE, agent_related, decayed_score, order_feed, post_score, rank_feed, select_picks,
@@ -24,6 +29,7 @@ def row(paper_id, days_old, tier="featured", depth=2, originality=2, relevance=3
     if pin:
         post["curated_pin"] = pin
     return {"paper_id": str(paper_id), "date_published": ANCHOR - timedelta(days=days_old), "post": post,
+            "curated_pin": pin, "kind": "post", "facets": {"kind": ["post"]}, "authors": [], "summary": None,
             "source_url": f"https://example.com/{paper_id}"}
 
 
@@ -71,7 +77,7 @@ def test_posts_view_halves_score_every_seven_days():
 
 
 class FakeSession:
-    """Answers anchor_date's scalar and the Posts view's row query."""
+    """Apply the SQL population filters without a database."""
 
     def __init__(self, rows):
         self.rows = rows
@@ -80,7 +86,105 @@ class FakeSession:
         return ANCHOR
 
     def execute(self, statement, params=None):
-        return type("Result", (), {"mappings": lambda _: iter(self.rows)})()
+        sql = str(statement)
+        rows = self.rows
+        if "WHERE w.facets -> 'kind' ? 'post'" in sql:
+            assert "w.post_details IS NOT NULL" in sql
+            assert "p.date_published IS NOT NULL" in sql
+            assert "OR w.curated_pin IS NOT NULL" in sql
+            rows = [r for r in rows if r["kind"] == "post" and r["post"] is not None
+                    and r["date_published"] is not None
+                    and (not params["start"] or r["date_published"] >= params["start"])
+                    and (not params["end"] or r["date_published"] <= params["end"])]
+        else:
+            assert "WHERE w.curated_pin IS NOT NULL" in sql
+            assert "post_details IS NOT NULL" not in sql
+            assert "date_published IS NOT NULL" not in sql
+            rows = [r for r in rows if r["curated_pin"] is not None]
+        assert "ORDER BY pa.author_order" in sql
+        assert "coalesce(w.post_details ->> 'tldr', p.abstract) AS summary" in sql
+        return type("Result", (), {"mappings": lambda _: iter(rows)})()
+
+
+def mixed_picks():
+    return [
+        dict(row(20, 0, pin=2), post=None, date_published=None, title="Cyber Weapon Index", reference="20",
+             publisher_organization="Booz Allen"),
+        dict(row(10, 0, pin=1), kind="paper", facets={"kind": ["paper"]}, post=None,
+             authors=["A. Researcher", "B. Researcher"], summary="Paper abstract.",
+             title="Security research", reference="2609.18120", publisher_organization="Not a publisher"),
+        dict(row(30, 0, pin=3), title="Reviewed post", reference="30", summary="Review summary."),
+    ]
+
+
+def test_mixed_picks_are_serialized_by_the_highlights_api(monkeypatch):
+    rows = mixed_picks()
+    rows[2]["post"].update(tldr="Review summary.", curated_company="Trail of Bits")
+    db = FakeSession(rows)
+    client = make_client(monkeypatch)
+    client.app.dependency_overrides[get_database_session] = lambda: db
+    response = client.get("/api/v1/catalog/trending-posts/highlights")
+    assert response.status_code == 200
+    paper, post, reviewed = response.json()["results"]
+    assert [r["curated_pin"] for r in (paper, post, reviewed)] == [1, 2, 3]
+    assert paper["kind"] == "paper" and paper["post"] is None and paper["publisher"] is None
+    assert paper["authors"] == ["A. Researcher", "B. Researcher"]
+    assert paper["summary"] == "Paper abstract."
+    assert post["kind"] == "post" and post["post"] is None and post["publisher"] == "Booz Allen"
+    assert post["date_published"] is None and post["authors"] == [] and post["summary"] is None
+    assert reviewed["publisher"] == "Trail of Bits" and reviewed["summary"] == "Review summary."
+    assert trending_posts.pick_paper_ids(db) == [10, 20, 30]
+
+
+def test_posts_view_excludes_mixed_picks_and_later_unreviewed_pins():
+    rows = mixed_picks() + [
+        row(40, 20, pin=4, depth=4, originality=4),
+        row(50, 1, pin=5, tier="catalog", relevance=0, depth=4, originality=4),
+        dict(row(60, 0, pin=6), kind="paper", post=None),
+        dict(row(70, 0, pin=7), post=None),
+        row(80, 0, depth=3, originality=3),
+    ]
+    page, total = trending_posts.posts_feed(FakeSession(rows), page=1, page_size=10)
+    assert ids(page) == ["50", "80", "40"] and total == 3
+    page, total = trending_posts.posts_feed(
+        FakeSession(rows), page=1, page_size=10, start_date=ANCHOR - timedelta(days=1), end_date=ANCHOR)
+    assert ids(page) == ["50", "80"] and total == 2
+
+
+def test_pick_order_uses_the_column_and_numeric_id_ties():
+    stale = row(1, 0)
+    stale["post"]["curated_pin"] = 1
+    assert ids(select_picks([row(10, 0, pin=2), row(2, 0, pin=2), stale])) == ["2", "10"]
+
+
+@pytest.mark.parametrize("kind", ["paper", "post"])
+def test_paper_api_loads_pin_without_a_review(monkeypatch, kind):
+    monkeypatch.setattr(get_settings(), "discovery_catalog", True)
+    db = MagicMock()
+    db.execute.return_value = [(10, [], kind, 1, None, None)]
+    query = db.query.return_value
+    for method in ("join", "filter", "order_by", "group_by", "select_from"):
+        getattr(query, method).return_value = query
+    query.all.return_value = []
+    relations = PaperRelationLoader(db).load_cards([10])
+    assert "w.curated_pin" in str(db.execute.call_args.args[0])
+    paper = DBPaper(id=10, title="Pinned work", source="external", source_url="https://example.com/work",
+                    version="v1", is_latest_version=True, urls_extracted=False, citation_count=0)
+    service = PaperService(db)
+    monkeypatch.setattr(service, "_resolve_thumbnail_url", lambda paper: None)
+    result = service._to_api_paper(paper, relations).model_dump()
+    assert result["catalog_pin"] == 1 and result["catalog_kind"] == kind
+    assert result["catalog_post"] is None
+
+
+def test_catalog_browse_preserves_pin_without_a_review():
+    db = MagicMock()
+    db.scalar.return_value = 2
+    db.execute.return_value.mappings.return_value = mixed_picks()[:2]
+    result = discovery_catalog.browse(db, {}, 25, 0)
+    assert "w.curated_pin" in str(db.execute.call_args.args[0])
+    assert [r["curated_pin"] for r in result["results"]] == [2, 1]
+    assert all(r["post"] is None for r in result["results"])
 
 
 def test_threshold_is_three():

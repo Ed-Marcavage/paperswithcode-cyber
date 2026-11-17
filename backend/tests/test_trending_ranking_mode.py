@@ -5,7 +5,10 @@ ranking (default + rollback path) vs the composite paper score, and that an
 unset/invalid value safely falls back to GitHub.
 """
 
+import pytest
+
 from backend.models.papers import Papers
+from backend.services import trending_posts
 from backend.services.paper_service import PaperService
 
 
@@ -79,6 +82,32 @@ def test_unknown_mode_falls_back_to_github():
     for bad in ("", "GITHUB", "hf", "anything-else", None):
         sql, _ = svc._build_trending_query(bad, None, None, None, None, True, 1, 10)
         assert str(sql) == str(github_sql)
+
+
+@pytest.mark.parametrize("mode", ["github", "composite"])
+@pytest.mark.parametrize("pick_ids", [[10, 20, 30], []])
+def test_catalog_trending_excludes_block_picks_before_pagination(monkeypatch, mode, pick_ids):
+    svc = _service()
+    monkeypatch.setattr(svc.settings, "discovery_catalog", True)
+    calls = []
+    monkeypatch.setattr(trending_posts, "pick_paper_ids", lambda db: calls.append(db) or pick_ids)
+    sql, params = svc._build_trending_query(mode, None, None, None, None, True, 1, 10)
+    assert "AND NOT (p.id = ANY(CAST(:pick_ids AS bigint[])))" in str(sql)
+    assert str(sql).index(":pick_ids") < str(sql).index("LIMIT")
+    assert params["pick_ids"] == pick_ids and calls == [svc.db]
+
+
+@pytest.mark.parametrize("mode", ["github", "composite"])
+def test_upstream_trending_does_not_query_or_exclude_catalog_picks(monkeypatch, mode):
+    svc = _service()
+    monkeypatch.setattr(svc.settings, "discovery_catalog", False)
+
+    def unexpected_call(db):
+        raise AssertionError("Upstream has no catalog table")
+
+    monkeypatch.setattr(trending_posts, "pick_paper_ids", unexpected_call)
+    sql, params = svc._build_trending_query(mode, None, None, None, None, True, 1, 10)
+    assert "discovery_works" not in str(sql) and "pick_ids" not in params
 
 
 def test_get_trending_papers_respects_composite_setting(monkeypatch):

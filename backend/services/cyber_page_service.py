@@ -27,7 +27,7 @@ CATALOG_TITLE = "AI Pentesting Tools & Cybersecurity Research"
 CATALOG_DESCRIPTION = "Find AI pentesting tools, security agent harnesses, papers and benchmarks. Filter cybersecurity research by topic, target and contribution."
 # Keep aligned with frontend/src/lib/cyberCopy.ts (cyberTrendingIndustryNote,
 # cyberTrendingPostsDescription, cyberTrendingPapersDescription).
-INDUSTRY_NOTE = "Editor's picks are three hand-picked industry posts; the feed below ranks other industry posts and research papers."
+INDUSTRY_NOTE = "Editor's picks are three hand-picked posts and papers; the feed below ranks other industry posts and research papers."
 # React's Trending opens with the Editor's picks block, then the feed's switch on posts
 # (?kind=paper shows papers); the server page lists the picks, then both feeds, posts
 # first, so crawlers keep the paper links. Pinned posts in the posts list are labelled
@@ -40,15 +40,19 @@ PAPERS_FEED_DESCRIPTION = "Research papers · GitHub star growth, then total sta
 
 
 def _post_link(row: dict, badge: bool = False) -> DiscoveryPaperLink:
-    """A Trending industry post as a page link; with ``badge``, a pinned post is marked
+    """A Trending catalog work as a page link; with ``badge``, a pinned work is marked
     as an editor's pick (feed rows; the picks block has its own heading)."""
-    publisher = row.get("publisher") or ""
+    post = row["post"] or {}
+    authors = row.get("authors") or []
+    publisher = (row.get("publisher") or "") if row["kind"] == "post" else (
+        authors[0] + (" et al." if len(authors) > 1 else "") if authors else ""
+    )
     label = " · ".join(value for value in (
-        EDITORS_PICK if badge and trending_posts.pin(row["post"]) is not None else "", publisher) if value)
+        EDITORS_PICK if badge and trending_posts.pin(row) is not None else "", publisher) if value)
     return DiscoveryPaperLink(
         quote(row["reference"], safe=""),
-        row["post"].get("curated_title") or row["title"],
-        date.fromisoformat(row["date_published"]),
+        post.get("curated_title") or row["title"],
+        date.fromisoformat(row["date_published"]) if row["date_published"] else None,
         label,
     )
 

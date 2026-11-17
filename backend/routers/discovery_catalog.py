@@ -39,11 +39,11 @@ def papers(topic: str = "", target: str = "", contribution: str = "", kind: str 
                                     min_agent_relevance=min_agent_relevance)
 
 
-@router.get("/trending-posts/highlights", summary="Industry posts for the top of Trending")
+@router.get("/trending-posts/highlights", summary="Editor's picks for the top of Trending")
 def trending_post_highlights(limit: int = Query(trending_posts.PICKS_LIMIT, ge=1, le=12),
                              db: Session = Depends(get_database_session)):
-    """Editor's picks: the owner's first pinned posts in pin order (three by default, as the
-    block above Trending shows), with each post's preview image address (`thumbnail_url`)."""
+    """Editor's picks: the owner's first pinned catalog works in pin order (three by default,
+    as the block above Trending shows), with each work's preview image address (`thumbnail_url`)."""
     return trending_posts.industry_block(db, limit)
 
 
@@ -52,7 +52,7 @@ def trending_posts_feed(page: int = Query(1, ge=1), page_size: int = Query(30, g
                         include_resources: bool = False,
                         date_range: PaperDateRange = Depends(get_paper_date_range),
                         db: Session = Depends(get_database_session)):
-    """Featured posts whose agent relevance meets Trending's threshold, and pinned posts after
+    """Reviewed posts whose featured tier and agent relevance meet Trending's threshold, and reviewed pins after
     the Editor's picks block, ranked by review score halved for every 7 days since publication.
     The block's picks are left out."""
     ids, total = trending_posts.posts_feed_ids(db, page, page_size, date_range.start_date, date_range.end_date)
