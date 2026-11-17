@@ -240,3 +240,120 @@ it("captures primary and middle activation once with the public title, not hover
     vi.unstubAllEnvs();
   }
 });
+
+/**
+ * jsdom marks every dispatched event untrusted (as a page script's would be) and the flag cannot be
+ * redefined, so a visitor's own input is delivered straight to the listeners the module registered.
+ */
+const gestureListeners = new Map<string, (event: { isTrusted: boolean }) => void>();
+function trusted(type: string) {
+  return { type, isTrusted: true };
+}
+function gesture(event: { type: string; isTrusted: boolean }) {
+  gestureListeners.get(event.type)?.(event);
+}
+async function engagedVisitHarness(session = "session-1") {
+  const { vi } = await import("vitest");
+  vi.resetModules();
+  window.sessionStorage.clear(); window.localStorage.clear();
+  vi.useFakeTimers({ now: new Date("2026-11-17T00:00:00Z") });
+  vi.stubEnv("VITE_LOCAL_CATALOG", "true");
+  vi.stubEnv("VITE_POSTHOG_PROJECT_TOKEN", "phc_test");
+  const analytics = await import("./catalogAnalytics");
+  const posthog = (await import("posthog-js")).default;
+  const spy = vi.spyOn(posthog, "capture").mockReturnValue(undefined);
+  const id = vi.spyOn(posthog, "get_session_id").mockReturnValue(session);
+  gestureListeners.clear();
+  const add = window.addEventListener.bind(window);
+  vi.spyOn(window, "addEventListener").mockImplementation((type: string, listener: unknown, options?: unknown) => {
+    gestureListeners.set(type, listener as (event: { isTrusted: boolean }) => void);
+    add(type, listener as EventListener, options as AddEventListenerOptions);
+  });
+  const engaged = () => spy.mock.calls.filter(([name]) => name === "visit_engaged");
+  const done = () => { vi.useRealTimers(); vi.restoreAllMocks(); vi.unstubAllEnvs(); vi.unstubAllGlobals(); window.sessionStorage.clear(); window.localStorage.clear(); };
+  return { vi, analytics, engaged, id, done };
+}
+it("sends no engaged visit before 15 seconds, nor after them without a gesture or a second page", async () => {
+  const { vi, analytics, engaged, done } = await engagedVisitHarness();
+  try {
+    analytics.catalogPageview("/");
+    gesture(trusted("wheel"));
+    vi.advanceTimersByTime(14_000);
+    expect(engaged()).toHaveLength(0);
+  } finally { done(); }
+  const second = await engagedVisitHarness();
+  try {
+    second.analytics.catalogPageview("/");
+    second.vi.advanceTimersByTime(120_000);
+    // Scripted events and scrolling the browser does by itself (restoring a position) are not gestures.
+    window.dispatchEvent(new Event("click")); window.dispatchEvent(new Event("wheel")); gesture(trusted("scroll"));
+    expect(second.engaged()).toHaveLength(0);
+  } finally { second.done(); }
+});
+it("sends one engaged visit once 15 seconds and a gesture are both there, with the landing labels", async () => {
+  const { vi, analytics, engaged, done } = await engagedVisitHarness();
+  const priorUrl = window.location.href;
+  try {
+    window.history.replaceState({}, "", "/mcp?utm_source=github&utm_medium=readme&utm_campaign=awesome-security-agent-harnesses&utm_content=mcp");
+    analytics.catalogPageview("/mcp");
+    vi.advanceTimersByTime(5_000);
+    gesture(trusted("wheel"));
+    gesture(trusted("click"));
+    expect(engaged()).toHaveLength(0);
+    vi.advanceTimersByTime(10_000);  // the gesture came first: sent as soon as the 15 seconds are up
+    expect(engaged()).toEqual([["visit_engaged", { page: "mcp", referral_source: "github",
+      referral_campaign: "awesome-security-agent-harnesses", referral_link: "mcp", seconds_to_engage: 15, trigger: "scroll",
+      catalog_environment: "preview" }]]);
+    // Nothing more in this session: more gestures, more pages, a reload, or another tab.
+    gesture(trusted("keydown"));
+    analytics.catalogPageview("/catalog");
+    vi.advanceTimersByTime(60_000);
+    expect(engaged()).toHaveLength(1);
+    vi.resetModules();
+    const reloaded = await import("./catalogAnalytics");
+    reloaded.catalogPageview("/catalog");
+    gesture(trusted("keydown"));
+    vi.advanceTimersByTime(60_000);
+    expect(engaged()).toHaveLength(1);
+  } finally { window.history.replaceState({}, "", priorUrl); done(); }
+});
+it("sends the engaged visit on the gesture when the time passed first, or on a second page", async () => {
+  const { vi, analytics, engaged, done } = await engagedVisitHarness();
+  try {
+    analytics.catalogPageview("/");
+    vi.advanceTimersByTime(42_400);
+    gesture(trusted("keydown"));
+    expect(engaged()).toEqual([["visit_engaged", expect.objectContaining({ page: "trending", seconds_to_engage: 42, trigger: "key" })]]);
+  } finally { done(); }
+  const second = await engagedVisitHarness("session-2");
+  try {
+    second.analytics.catalogPageview("/");
+    second.vi.advanceTimersByTime(20_000);
+    second.analytics.catalogPageview("/paper/1");
+    expect(second.engaged()).toEqual([["visit_engaged", expect.objectContaining({ page: "trending", seconds_to_engage: 20, trigger: "second_page" })]]);
+  } finally { second.done(); }
+});
+it("sends no engaged visit under Do Not Track, and the allowlist keeps only its fixed labels", async () => {
+  const { vi, analytics, engaged, done } = await engagedVisitHarness();
+  try {
+    vi.stubGlobal("navigator", { doNotTrack: "1" });
+    analytics.catalogPageview("/");
+    vi.advanceTimersByTime(20_000);
+    gesture(trusted("click"));
+    expect(engaged()).toHaveLength(0);
+    const sent = analytics.catalogOptions.before_send({ uuid: "test", event: "visit_engaged", properties: {
+      distinct_id: "anonymous", $session_id: "s", catalog_environment: "preview", page: "trending", referral_domain: "news.ycombinator.com",
+      seconds_to_engage: 17, trigger: "scroll", $browser: "Chrome", $os: "Mac OS X", $device_type: "Desktop",
+      $current_url: "https://example.org/?q=private", $referrer: "private", $pathname: "/paper/1" } });
+    expect(sent?.properties).toEqual({ distinct_id: "anonymous", $session_id: "s", catalog_environment: "preview", page: "trending",
+      referral_domain: "news.ycombinator.com", seconds_to_engage: 17, trigger: "scroll", $browser: "Chrome", $os: "Mac OS X",
+      $device_type: "Desktop", $geoip_disable: true, $process_person_profile: false });
+    const odd = analytics.catalogOptions.before_send({ uuid: "test", event: "visit_engaged", properties: {
+      catalog_environment: "preview", seconds_to_engage: "soon", trigger: "typed some text" } });
+    expect(sent && odd?.properties).toEqual({ catalog_environment: "preview", $geoip_disable: true, $process_person_profile: false });
+    // The two labels belong to this event only.
+    const pageview = analytics.catalogOptions.before_send({ uuid: "test", event: "$pageview", properties: {
+      catalog_environment: "preview", page: "trending", seconds_to_engage: 17, trigger: "scroll" } });
+    expect(pageview?.properties).not.toHaveProperty("trigger");
+  } finally { done(); }
+});

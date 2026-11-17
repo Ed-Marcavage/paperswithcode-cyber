@@ -9,7 +9,7 @@ const assistantActions = ["opened", "closed", "asked_from_landing", "message_sen
 type AssistantAction = typeof assistantActions[number];
 type AssistantSurface = "landing" | "panel" | "chat_page";
 type CatalogEvent = "catalog_kind_selected" | "catalog_sort_selected" | "catalog_filters_opened";
-type Event = "$pageview" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | CatalogEvent | `assistant_${AssistantAction}`;
+type Event = "$pageview" | "visit_engaged" | "catalog_navigation" | "taxonomy_selected" | "paper_opened" | "paper_link_clicked" | "paper_resource_clicked" | CatalogEvent | `assistant_${AssistantAction}`;
 const assistantEvents = new Set(assistantActions.map(action => `assistant_${action}`));
 // Coarse browser, OS and device type, plus the user agent they are parsed from: PostHog's traffic
 // classification ($virt_is_bot / $virt_traffic_type) reads the user agent, and without it every visit
@@ -41,7 +41,14 @@ const fields = new Set(["token", "distinct_id", "$device_id", "$session_id", "$l
   "page", "destination", "surface", "axis", "value", "paper_id", "paper_title", "resource", "link_part",
   "topic", "target", "contribution", "kind", "year", "catalog_environment",
   "referral_source", "referral_campaign", "referral_link", "referral_domain", ...deviceFields]);
-const events = new Set<Event>(["$pageview", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked",
+// visit_engaged only: whole seconds from the landing pageview, and which fixed signal completed it.
+const engagedTriggers = ["scroll", "click", "key", "second_page"] as const;
+type EngagedTrigger = typeof engagedTriggers[number];
+function allowedEngagedExtra(key: string, value: unknown) {
+  if (key === "trigger") return engagedTriggers.includes(value as EngagedTrigger);
+  return key === "seconds_to_engage" && Number.isInteger(value) && (value as number) >= 0;
+}
+const events = new Set<Event>(["$pageview", "visit_engaged", "catalog_navigation", "taxonomy_selected", "paper_opened", "paper_link_clicked", "paper_resource_clicked",
   "catalog_kind_selected", "catalog_sort_selected", "catalog_filters_opened"]);
 // Session replay batches: the recorder's own fields only.
 const snapshotFields = new Set(["token", "distinct_id", "$session_id", "$window_id", "$snapshot_bytes",
@@ -73,7 +80,8 @@ export const catalogOptions = {
     // The SDK otherwise adds raw URLs, referrers, search strings and initial person properties.
     const action = event.event.slice("assistant_".length);
     const properties = Object.fromEntries(Object.entries(event.properties).filter(([key, value]) => (assistant ? assistantFields : fields).has(key)
-      || (assistant && allowedExtra(action, key, value))));
+      || (assistant && allowedExtra(action, key, value))
+      || (event.event === "visit_engaged" && allowedEngagedExtra(key, value))));
     return { uuid: event.uuid, timestamp: event.timestamp, event: event.event,
       properties: { ...properties, $geoip_disable: true, $process_person_profile: false } };
   },
@@ -99,8 +107,11 @@ export function catalogPage(path: string) {
 export function catalogPageKey(path: string) {
   return path === "/chat" || path.startsWith("/chat/") ? "/chat" : path;
 }
+function captureEnabled() {
+  return isDiscoveryCatalog() && Boolean(import.meta.env.VITE_POSTHOG_PROJECT_TOKEN) && !catalogPrivacySignal();
+}
 function capture(event: Event, properties: Record<string, unknown>) {
-  if (!isDiscoveryCatalog() || !import.meta.env.VITE_POSTHOG_PROJECT_TOKEN || catalogPrivacySignal()) return;
+  if (!captureEnabled()) return;
   posthog.capture(event, { ...properties, catalog_environment: import.meta.env.VITE_CATALOG_ANALYTICS_ENV || "preview" });
 }
 /**
@@ -149,13 +160,97 @@ export function catalogReferrerDomain(referrer: string, ownHost: string): string
   if (!domain || domain === ownHost.toLowerCase().replace(/^www\./, "")) return undefined;
   return domain;
 }
+/**
+ * "Engaged visit": one `visit_engaged` event per PostHog session, sent once the visitor has stayed
+ * ENGAGED_AFTER_MS since the session's first pageview in this tab AND has scrolled, clicked, pressed
+ * a key (the visitor's own input only, never scripted events) or opened a second page. It carries the landing pageview's
+ * labels (page type and referral labels), the seconds it took and which signal completed it:
+ * never an address, a search term or page text.
+ *
+ * The landing labels and start time are kept in sessionStorage so a reload continues the same
+ * visit; the session that already sent the event is remembered in localStorage (where PostHog
+ * keeps the session id itself), so a reload or a second tab in that session does not send it again.
+ */
+export const ENGAGED_AFTER_MS = 15_000;
+const ENGAGED_VISIT_KEY = "pwc_catalog_visit";
+const ENGAGED_SENT_KEY = "pwc_catalog_visit_engaged";
+type Visit = { session: string | null; startedAt: number; landing: Record<string, unknown> };
+let visit: Visit | undefined;
+let engagedTrigger: EngagedTrigger | undefined;
+let engagedSent = false;
+let engagedTimer: ReturnType<typeof setTimeout> | undefined;
+function stored(storage: "sessionStorage" | "localStorage", key: string): string | null {
+  try { return window[storage].getItem(key); } catch { return null; }
+}
+function store(storage: "sessionStorage" | "localStorage", key: string, value: string) {
+  try { window[storage].setItem(key, value); } catch { /* private window or blocked storage: memory only */ }
+}
+function sessionId(): string | null {
+  try { return posthog.get_session_id() || null; } catch { return null; }
+}
+function sendEngagedWhenReady() {
+  if (!visit || !engagedTrigger || engagedSent) return;
+  const elapsed = Date.now() - visit.startedAt;
+  if (elapsed < ENGAGED_AFTER_MS) {
+    if (engagedTimer === undefined) engagedTimer = setTimeout(() => { engagedTimer = undefined; sendEngagedWhenReady(); }, ENGAGED_AFTER_MS - elapsed);
+    return;
+  }
+  engagedSent = true;
+  stopEngagedListeners();
+  const session = sessionId();
+  // Another tab, or this tab before a reload, already sent it for this session.
+  if (session && stored("localStorage", ENGAGED_SENT_KEY) === session) return;
+  if (!captureEnabled()) return;
+  if (session) store("localStorage", ENGAGED_SENT_KEY, session);
+  capture("visit_engaged", { ...visit.landing, seconds_to_engage: Math.round(elapsed / 1000), trigger: engagedTrigger });
+}
+function engagedSignal(trigger: EngagedTrigger) {
+  engagedTrigger ??= trigger;
+  sendEngagedWhenReady();
+}
+// The browser also raises `scroll` when a script or a reload's scroll restoration moves the page, so
+// scrolling counts through what the visitor does: the wheel or trackpad, a touch drag, or a scroll
+// while the pointer was pressed shortly before (dragging a scrollbar).
+const SCROLLBAR_DRAG_MS = 10_000;
+let pointerPressedAt = -Infinity;
+type BrowserEvent = globalThis.Event;
+const engagedListeners: Array<[keyof WindowEventMap, (event: BrowserEvent) => void]> = [
+  ["wheel", event => { if (event.isTrusted) engagedSignal("scroll"); }],
+  ["touchmove", event => { if (event.isTrusted) engagedSignal("scroll"); }],
+  ["pointerdown", event => { if (event.isTrusted) pointerPressedAt = Date.now(); }],
+  ["scroll", event => { if (event.isTrusted && Date.now() - pointerPressedAt < SCROLLBAR_DRAG_MS) engagedSignal("scroll"); }],
+  ["click", event => { if (event.isTrusted) engagedSignal("click"); }],
+  ["keydown", event => { if (event.isTrusted) engagedSignal("key"); }],
+];
+function stopEngagedListeners() {
+  for (const [name, listener] of engagedListeners) window.removeEventListener(name, listener, true);
+}
+/** Called with every pageview; `landing` is the labels that pageview carries. */
+function trackEngagedVisit(landing: Record<string, unknown>) {
+  if (engagedSent || !captureEnabled()) return;
+  if (visit) return engagedSignal("second_page");
+  const session = sessionId();
+  try {
+    // A reload inside the same session continues the visit it started.
+    const saved = JSON.parse(stored("sessionStorage", ENGAGED_VISIT_KEY) || "null") as Visit | null;
+    if (saved && session && saved.session === session && typeof saved.startedAt === "number") visit = saved;
+  } catch { /* unreadable: start a new visit */ }
+  if (!visit) {
+    visit = { session, startedAt: Date.now(), landing };
+    store("sessionStorage", ENGAGED_VISIT_KEY, JSON.stringify(visit));
+  }
+  // Capture phase: a scroll inside any scrolling panel counts, and scroll events do not bubble.
+  for (const [name, listener] of engagedListeners) window.addEventListener(name, listener, { capture: true, passive: true });
+}
 // document.referrer stays the same across client-side navigations: send it with the landing pageview only.
 let landed = false;
 export function catalogPageview(path: string) {
   const domain = landed ? undefined : catalogReferrerDomain(document.referrer, window.location.hostname);
   landed = true;
-  capture("$pageview", {page: catalogPage(path), ...catalogReferral(window.location.search),
-    ...(domain ? {referral_domain: domain} : {})});
+  const properties = {page: catalogPage(path), ...catalogReferral(window.location.search),
+    ...(domain ? {referral_domain: domain} : {})};
+  capture("$pageview", properties);
+  trackEngagedVisit(properties);
 }
 
 type PosthogExtensions = { __PosthogExtensions__?: { rrwebPlugins?: Record<string, unknown> } };
