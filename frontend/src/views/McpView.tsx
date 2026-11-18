@@ -36,6 +36,20 @@ const TOOLS = [
   ["get_benchmark", "Read one benchmark, metrics, datasets, and leading results."],
 ] as const;
 
+// The Cyber catalog's server lists these first: they are where a new agent should begin.
+const CATALOG_START_TOOLS = [
+  ["find_posts", "Search reviewed industry posts by keyword, topic, post type, publisher, agent relevance, or date. Start here for engineering practice, agent harnesses, and benchmark findings."],
+  ["browse_catalog", "Filter papers, repositories, and posts by topic, target, contribution, kind, and year, plus post tier, post type, and minimum agent relevance."],
+  ["search_papers", "Search paper and repository titles by keyword."],
+  ["catalog_filters", "Look up the topic, target, contribution, kind, and year values the filters accept."],
+  ["get_paper_info", "Read one work's metadata, links, code, and catalog review."],
+  ["read_paper", "Read stored paper text with safe continuation for long papers."],
+  ["list_developers", "Find developers by GitHub username, repository, or catalog filters, ordered by most agent-related work, repos, or stars."],
+  ["get_developer", "Look up a GitHub ID to see which tracked repos the account owns or contributed to."],
+  ["list_organizations", "Page through publishers and research organizations with their catalog counts."],
+  ["get_organization", "Inspect one publisher or research organization."],
+] as const;
+
 const RESOURCES = [
   "pwc://papers/{paper}",
   "pwc://papers/{paper}/markdown",
@@ -120,12 +134,15 @@ const CopyControl = ({ value, label }: { value: string; label: string }) => {
 
 const McpView: React.FC = () => {
   const endpoint = mcpEndpoint();
-  const tools = isDiscoveryCatalog() ? [...TOOLS,
-    ["catalog_filters", "Look up the topic, target, and contribution labels used by the catalog."],
-    ["browse_catalog", "Find matching works and count available filter choices."],
-    ["list_developers", "Find developers by GitHub username, repository, or catalog filters. See matching repo and developer counts."],
-    ["get_developer", "Look up a GitHub ID to see which tracked repos the account owns or contributed to."],
-  ] : TOOLS;
+  const catalog = isDiscoveryCatalog();
+  const startNames = new Set<string>(CATALOG_START_TOOLS.map(([name]) => name));
+  const toolGroups: ReadonlyArray<{ heading?: string; note?: string; tools: ReadonlyArray<readonly [string, string]> }> = catalog
+    ? [
+        { heading: "Start here", note: "Every result links to its catalog page. Posts carry their publisher, a short summary, and an agent relevance score from 0 to 4; 3 and above suits people building security agents.", tools: CATALOG_START_TOOLS },
+        { heading: "Also available", note: "Inherited from the base server. Tasks, methods, benchmarks, conferences, and frameworks are sparse in this catalog.", tools: TOOLS.filter(([name]) => !startNames.has(name)) },
+      ]
+    : [{ tools: TOOLS }];
+  const toolCount = toolGroups.reduce((count, group) => count + group.tools.length, 0);
   const health = useQuery(mcpHealthQueryOptions());
   const [client, setClient] = React.useState<ClientKey>("chatgpt");
   const selected = CLIENTS.find((item) => item.key === client) ?? CLIENTS[0];
@@ -228,16 +245,22 @@ const McpView: React.FC = () => {
       <section className="mcp-section" aria-labelledby="mcp-tools">
         <div className="mcp-section-heading">
           <p className="sidebar-label">Catalogue</p>
-          <h2 id="mcp-tools">{tools.length} read-only tools</h2>
+          <h2 id="mcp-tools">{toolCount} read-only tools</h2>
         </div>
-        <div className="mcp-tool-grid">
-          {tools.map(([name, description]) => (
-            <div className="mcp-tool" key={name}>
-              <code>{name}</code>
-              <p>{description}</p>
+        {toolGroups.map((group) => (
+          <React.Fragment key={group.heading ?? "tools"}>
+            {group.heading ? <h3 className="mcp-subheading mcp-tool-group">{group.heading}</h3> : null}
+            {group.note ? <p className="mcp-tool-note">{group.note}</p> : null}
+            <div className="mcp-tool-grid">
+              {group.tools.map(([name, description]) => (
+                <div className="mcp-tool" key={name}>
+                  <code>{name}</code>
+                  <p>{description}</p>
+                </div>
+              ))}
             </div>
-          ))}
-        </div>
+          </React.Fragment>
+        ))}
         <h3 className="mcp-subheading">Resource templates</h3>
         <div className="mcp-resource-list">
           {RESOURCES.map((resource) => <code key={resource}>{resource}</code>)}
@@ -250,7 +273,8 @@ const McpView: React.FC = () => {
           <h2 id="mcp-prompts">Prompts that start useful research</h2>
         </div>
         <div className="mcp-prompt-list">
-          {(isDiscoveryCatalog() ? [
+          {(catalog ? [
+            "Find the strongest industry posts on agent harness engineering for vulnerability triage. Group them by publisher and link each catalog page.",
             "Find three developers who worked on penetration-testing benchmarks for hosts and networks. For each, link a matching repo and check whether they own it or contributed to it.",
             "Find SEC-bench Pro in the native-binary exploit benchmarks. Read its evaluation setup and explain what an agent has to do for an attempt to count as a success. Cite the paper and link its code.",
           ] : EXAMPLES).map((prompt) => (
@@ -267,16 +291,28 @@ const McpView: React.FC = () => {
           <p className="sidebar-label mcp-kicker">Limits &amp; privacy</p>
           <h2 id="mcp-limits">Public by design</h2>
           <p>
-            {isDiscoveryCatalog() ? "No account or API key is needed. Tools are read-only. Search uses indexed keywords; paper text comes from the catalog." : <>No account, API key, or write access. Fair-use limits are 60 total requests
+            {catalog ? "No account or API key is needed. Tools are read-only. Search uses indexed keywords; paper text comes from the catalog. Lists return at most 25 items per call, and post search at most 10." : <>No account, API key, or write access. Fair-use limits are 60 total requests
             per minute, 10 semantic searches per minute, four concurrent requests per
             client, and 25 list results per call.</>}
           </p>
-          <p>
-            MCP telemetry retains tool name, status, latency, response size, protocol,
-            and server version—not prompts, paper IDs, cursors, resource URIs, raw IPs,
-            authorization values, or bodies. Catalogue infrastructure has its own
-            operational logging policy.
-          </p>
+          {catalog ? (
+            <p>
+              MCP telemetry retains tool name, status, latency, response size, protocol,
+              and server version. It also notes when a client connects or lists the tools,
+              with the name and version the connecting software reports about itself and
+              the product name and version at the start of its User-Agent header—not
+              prompts, tool arguments, results, paper IDs, cursors, resource URIs, raw IPs,
+              authorization values, or bodies. Catalogue infrastructure has its own
+              operational logging policy.
+            </p>
+          ) : (
+            <p>
+              MCP telemetry retains tool name, status, latency, response size, protocol,
+              and server version—not prompts, paper IDs, cursors, resource URIs, raw IPs,
+              authorization values, or bodies. Catalogue infrastructure has its own
+              operational logging policy.
+            </p>
+          )}
         </div>
         <div>
           <p className="sidebar-label mcp-kicker">Protocol &amp; troubleshooting</p>

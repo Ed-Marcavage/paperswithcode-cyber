@@ -43,6 +43,8 @@
 .mcp-tool code, .mcp-resource-list code { overflow-wrap: anywhere; min-width: 0; color: var(--accent-text); font: 500 12px/1.5 var(--mono); }
 .mcp-tool p { margin-top: 0; }
 .mcp-subheading { margin-top: 34px; font: 500 22px/1.2 var(--serif); }
+.mcp-tool-group:first-of-type { margin-top: 0; }
+.mcp-tool-note { max-width: 720px; margin: 10px 0 18px; color: var(--ink-soft); line-height: 1.65; }
 .mcp-resource-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .mcp-resource-list code { padding: 8px 10px; border: 1px solid var(--hairline); border-radius: 5px; background: var(--bg-elevated); }
 .mcp-prompt-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }

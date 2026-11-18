@@ -113,7 +113,15 @@ describe("McpView", () => {
 
     expect(screen.getByText("browse_catalog")).toBeInTheDocument();
     expect(screen.getByText(/No account or API key is needed/)).toBeInTheDocument();
-    for (const tool of ["list_developers", "get_developer"]) expect(screen.getByText(tool)).toBeInTheDocument();
+    for (const tool of ["find_posts", "catalog_filters", "search_papers", "list_developers", "get_developer", "list_organizations", "get_benchmark"]) {
+      expect(screen.getAllByText(tool)).toHaveLength(1);
+    }
+    expect(screen.getByRole("heading", { name: "26 read-only tools" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Start here" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Also available" })).toBeInTheDocument();
+    expect(screen.getByText(/at most 25 items per call, and post search at most 10/)).toBeInTheDocument();
+    expect(screen.getByText(/name and version the connecting software reports about itself/)).toBeInTheDocument();
+    expect(screen.getByText(/Find the strongest industry posts/)).toBeInTheDocument();
     expect(screen.getByText(/Find three developers/)).toBeInTheDocument();
     expect(screen.getByText(/Find SEC-bench Pro/)).toBeInTheDocument();
   });
