@@ -64,6 +64,14 @@
     "works": []
   },
   {
+    "slug": "crowdstrike",
+    "name": "CrowdStrike",
+    "website_url": "https://www.crowdstrike.com",
+    "github_url": "https://github.com/CrowdStrike",
+    "github_account_id": 2446477,
+    "works": []
+  },
+  {
     "slug": "databricks",
     "name": "Databricks",
     "website_url": "https://www.databricks.com",
@@ -189,6 +197,14 @@
     "website_url": "https://mistral.ai",
     "github_url": "https://github.com/mistralai",
     "github_account_id": 132372032,
+    "works": []
+  },
+  {
+    "slug": "ncc-group",
+    "name": "NCC Group",
+    "website_url": "https://www.nccgroup.com",
+    "github_url": "https://github.com/nccgroup",
+    "github_account_id": 4067082,
     "works": []
   },
   {
