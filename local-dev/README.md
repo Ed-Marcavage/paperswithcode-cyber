@@ -134,7 +134,12 @@ Each projected result sends one compact JSON document in text content, without
 duplicating it in `structuredContent`; the assistant parses this text. Work rows
 use `id` (pass to `get_paper_info`/`read_paper`), `published` (YYYY-MM-DD),
 `summary`, `source_url` and absolute `catalog_url`. Posts also include `publisher`,
-`agent_relevance`, `post_type` and `tier`. Nulls, duplicate identifiers/dates,
+`agent_relevance`, `post_type` and `tier`. Catalog works retain `facets` (topic,
+target, contribution, kind, year), `artifact_url` for code, `has_text` for document
+availability and `arxiv_id` for citations wherever the API/metadata supplies them.
+The numeric `id` remains the tool reference; `facets.kind` replaces the redundant
+top-level `kind`. `find_posts` retains its existing posts-route fields.
+Nulls, duplicate identifiers/dates,
 raw review objects and site-internal fields are omitted from list rows. Long
 list text is capped at 600 characters plus an ellipsis. The assistant still adds
 its own `tldr` from the database.

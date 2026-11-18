@@ -26,7 +26,7 @@ PROFILE_BOUND_TOOLS = PROFILE_TOOLS | {"list_organizations", "list_conferences",
 WORK_FIELDS = {"id", "title", "published", "summary", "publisher", "agent_relevance", "post_type", "tier", "kind",
                "catalog_url", "source_url", "technical_depth", "originality", "harness_engineering", "caveat",
                "subtopics", "citation_count", "has_official_implementation", "code_repository_count",
-               "repository", "repositories"}
+               "repository", "repositories", "facets", "artifact_url", "has_text", "arxiv_id"}
 ORG_FIELDS = {"id", "name", "slug", "website_url", "github_url", "paper_count", "post_count", "agent_post_count",
               "repository_count", "owned_repository_count", "catalog_stars", "catalog_url", "top_trending_paper"}
 AXES = {"browse_catalog": ("topic", "target", "contribution", "kind", "year"),
@@ -130,12 +130,16 @@ def project(value, metadata, *, entity="", list_row=False):
             item["published"] = item["published"][:10]
         item["summary"] = short(item.get("summary") or item.get("tldr") or item.get("abstract"))
         item["source_url"] = item.get("source_url") or item.get("url_abs") or item.get("url")
-        kinds = (item.get("facets") or {}).get("kind", [])
-        if kinds:
-            item["kind"] = kinds[0]
+        if (item.get("facets") or {}).get("kind"):
+            item.pop("kind", None)
         elif item.get("post_type"):
             item["kind"] = "post"
-        for key in ("paper_id", "reference", "arxiv_id", "date_published", "tldr"):
+        # Browse/metadata expose arXiv IDs as reference rather than arxiv_id.
+        reference = item.get("reference")
+        if not item.get("arxiv_id") and isinstance(reference, str) and re.fullmatch(
+                r"(?:[0-9]{4}\.[0-9]{4,5}|[a-z-]+(?:\.[A-Z]{2})?/[0-9]{7})(?:v[0-9]+)?", reference):
+            item["arxiv_id"] = reference
+        for key in ("paper_id", "reference", "date_published", "tldr"):
             item.pop(key, None)
         if list_row:
             item = {key: child for key, child in item.items() if key in WORK_FIELDS}
@@ -155,7 +159,7 @@ def project(value, metadata, *, entity="", list_row=False):
     # Keep API ids, counts and evidence, but omit bulky ancillary objects in lists.
     if list_row:
         for key in ("created_at", "updated_at", "logo_url", "hf_url", "original_title", "entities",
-                    "curated_pin", "display_order", "hf_slug", "has_text"):
+                    "curated_pin", "display_order", "hf_slug"):
             item.pop(key, None)
     for key, child in list(item.items()):
         if isinstance(child, list) and len(child) > MAX_ROWS:

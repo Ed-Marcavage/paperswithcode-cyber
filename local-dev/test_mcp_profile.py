@@ -274,7 +274,7 @@ def test_paper_detail_and_organization_nested_posts_have_links_and_metadata():
     assert payload(result)['data']['catalog_url'] == SITE_URL + '/orgs/example'
     top = payload(result)['data']['top_trending_paper']
     assert top['agent_relevance'] == 4
-    assert not ({'paper_id', 'reference', 'tldr', 'date_published', 'facets'} & top.keys())
+    assert not ({'paper_id', 'reference', 'tldr', 'date_published'} & top.keys())
 
 
 def test_lineage_paginates_and_enriches_every_returned_work():
@@ -333,8 +333,8 @@ def test_work_rows_have_one_id_summary_date_and_no_internal_fields(name, args):
     row = data.get('results', data.get('items'))[0]
     assert row['id'] == '42' and row['published'] == '2026-11-01'
     assert row['summary'] and row['source_url'] == POST['source_url']
-    assert not ({'paper_id', 'reference', 'arxiv_id', 'tldr', 'date_published', 'post', 'facets',
-                 'curated_pin', 'has_text', 'artifact_url', 'display_order'} & row.keys())
+    assert not ({'paper_id', 'reference', 'arxiv_id', 'tldr', 'date_published', 'post',
+                 'curated_pin', 'artifact_url', 'display_order'} & row.keys())
     assert all(value is not None for value in row.values())
 
 
@@ -344,14 +344,73 @@ def test_find_posts_skips_metadata_and_keeps_search_publisher():
     result, _ = call('find_posts', catalog=cat)
     assert payload(result)['results'][0]['publisher'] == 'Search publisher'
     assert [path for path, _ in cat.calls] == ['posts']
+    assert not ({'facets', 'artifact_url', 'has_text', 'arxiv_id'} & payload(result)['results'][0].keys())
+    assert payload(result)['results'][0]['kind'] == 'post'
 
 
 def test_nested_list_works_are_compact():
     result, _ = call('get_paper_lineage', {'paper': '42', 'limit': 2})
     for row in payload(result)['predecessors']:
         assert row['id'] and row['published'] and row['summary']
-        assert not ({'paper_id', 'reference', 'tldr', 'date_published', 'facets'} & row.keys())
+        assert not ({'paper_id', 'reference', 'tldr', 'date_published'} & row.keys())
         assert all(value is not None for value in row.values())
+
+
+@pytest.mark.parametrize('name,args,path', [
+    ('browse_catalog', {}, ('results', 0)),
+    ('search_papers', {'query': 'harness'}, ('items', 0)),
+    ('list_recent_papers', {}, ('items', 0)),
+    ('list_trending_papers', {}, ('items', 0)),
+    ('list_papers', {}, ('items', 0)),
+    ('get_related_papers', {'paper': '42'}, ('items', 0)),
+    ('get_paper_lineage', {'paper': '42', 'limit': 2}, ('predecessors', 0)),
+    ('get_organization', {'organization': 'example'}, ('data', 'top_trending_paper')),
+])
+@pytest.mark.parametrize('has_text', [False, True])
+def test_catalog_work_fields_survive_inline_and_metadata_projection(name, args, path, has_text):
+    work = {'paper_id': '42', 'reference': '2610.12345', 'title': 'Harness',
+            'date_published': '2026-11-01', 'source_url': 'https://arxiv.org/abs/2610.12345',
+            'facets': {'topic': ['fuzzing'], 'target': ['binaries'], 'contribution': ['system'],
+                       'kind': ['paper'], 'year': ['2026']},
+            'kind': 'paper', 'artifact_url': 'https://github.com/org/repo', 'has_text': has_text,
+            'post': None, 'curated_pin': 3, 'display_order': 7}
+    class WorkCatalog(Catalog):
+        def __init__(self):
+            super().__init__()
+            self.rows = [deepcopy(work)]
+
+        def discovery(self, endpoint, params=None):
+            if endpoint == 'metadata':
+                self.calls.append((endpoint, params))
+                return {'results': [{**deepcopy(work), 'paper_id': ref}
+                                    for ref in params['references'].split(',')]}
+            return super().discovery(endpoint, params)
+    result, cat = call(name, args, WorkCatalog())
+    row = payload(result)
+    for key in path:
+        row = row[key]
+    assert row['id'].isdigit() and row['arxiv_id'] == '2610.12345'
+    assert row['facets'] == work['facets'] and row['artifact_url'] == work['artifact_url']
+    assert row['has_text'] is has_text and row['published'] == '2026-11-01'
+    assert not ({'kind', 'reference', 'paper_id', 'date_published', 'tldr', 'post', 'curated_pin', 'display_order'} & row.keys())
+    assert all(value is not None for value in row.values())
+    assert any(endpoint == 'metadata' for endpoint, _ in cat.calls) is (name != 'browse_catalog')
+
+
+@pytest.mark.parametrize('fields,expected', [
+    ({'arxiv_id': '2610.12345v2', 'reference': '42'}, '2610.12345v2'),
+    ({'reference': 'cs/0501001'}, 'cs/0501001'),
+    ({'reference': 'math.OC/0501001'}, 'math.OC/0501001'),
+    ({'arxiv_id': None, 'reference': '42'}, None),
+])
+def test_arxiv_identifier_preserved_or_recovered_only_when_available(fields, expected):
+    cat = Catalog()
+    cat.rows[0].update(fields)
+    result, _ = call('browse_catalog', catalog=cat)
+    row = payload(result)['results'][0]
+    assert row['id'] == '42' and row.get('arxiv_id') == expected
+    if expected is None:
+        assert 'arxiv_id' not in row
 
 
 def test_list_tools_order_description_polish_and_no_accumulation():
