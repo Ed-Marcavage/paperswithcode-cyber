@@ -48,6 +48,14 @@
     "works": []
   },
   {
+    "slug": "chainguard",
+    "name": "Chainguard",
+    "website_url": "https://www.chainguard.dev",
+    "github_url": "https://github.com/chainguard-dev",
+    "github_account_id": 87436699,
+    "works": []
+  },
+  {
     "slug": "cisco",
     "name": "Cisco",
     "website_url": "https://www.cisco.com",

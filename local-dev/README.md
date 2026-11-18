@@ -321,7 +321,7 @@ linked from a post's GitHub card, repository entries and developer profiles.
 
 Publisher organizations the mapping creates start bare. Their GitHub
 organization and avatar logo come from the reviewed profile manifest
-`seeds/publisher-organizations/organizations.json` (44 of the 60 mapped publishers; each login was
+`seeds/publisher-organizations/organizations.json` (45 of the 61 mapped publishers; each login was
 checked against the GitHub profile's name and website), applied like the
 other organization seeds:
 

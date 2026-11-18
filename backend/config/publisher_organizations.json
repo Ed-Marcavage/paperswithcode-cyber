@@ -10,6 +10,7 @@
     {"name": "Bishop Fox", "website_url": "https://bishopfox.com", "hosts": ["bishopfox.com"]},
     {"name": "Booz Allen Hamilton", "website_url": "https://www.boozallen.com", "hosts": ["boozallen.com"]},
     {"name": "CertiK", "website_url": "https://www.certik.com", "hosts": ["certik.com"]},
+    {"name": "Chainguard", "website_url": "https://www.chainguard.dev", "hosts": ["chainguard.dev"]},
     {"name": "Cisco", "website_url": "https://www.cisco.com", "hosts": ["cisco.com", "talosintelligence.com"], "note": "Talos (blog.talosintelligence.com) and blogs.cisco.com."},
     {"name": "Cloudflare", "website_url": "https://www.cloudflare.com", "hosts": ["cloudflare.com"]},
     {"name": "Cohere", "website_url": "https://cohere.com", "hosts": ["cohere.com"]},
