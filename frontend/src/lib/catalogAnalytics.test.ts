@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { assistantEvent, catalogFiltersOpened, catalogKindSelected, catalogOptions, catalogPage, catalogPageKey, catalogReferral, catalogReferrerDomain, catalogSortSelected, externalResource, outboundNavigation, resourceClicked } from "./catalogAnalytics";
+import { assistantEvent, catalogFiltersOpened, catalogKindSelected, catalogOptedOut, catalogOptions, catalogPage, catalogPageKey, catalogReferral, catalogReferrerDomain, catalogSortSelected, externalResource, outboundNavigation, resourceClicked } from "./catalogAnalytics";
 it("retains the paper measurements while dropping SDK URL, search, referrer, profile and location properties", () => {
   const event = { uuid: "test", event: "paper_opened", properties: {
     distinct_id: "anonymous", $current_url: "https://example.org/?q=private", $referrer: "private",
@@ -356,4 +356,15 @@ it("sends no engaged visit under Do Not Track, and the allowlist keeps only its 
       catalog_environment: "preview", page: "trending", seconds_to_engage: 17, trigger: "scroll" } });
     expect(pageview?.properties).not.toHaveProperty("trigger");
   } finally { done(); }
+});
+
+it("opts a browser out by address and remembers it until told otherwise", () => {
+  window.localStorage.clear();
+  expect(catalogOptedOut("")).toBe(false);
+  expect(catalogOptedOut("?internal=1")).toBe(true);
+  expect(catalogOptedOut("")).toBe(true);
+  expect(catalogOptedOut("?utm_source=github")).toBe(true);
+  expect(catalogOptedOut("?internal=0")).toBe(false);
+  expect(catalogOptedOut("")).toBe(false);
+  expect(catalogOptedOut("?internal=yes")).toBe(false);
 });

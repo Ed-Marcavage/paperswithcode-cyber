@@ -87,8 +87,21 @@ export const catalogOptions = {
   },
 } satisfies Partial<PostHogConfig>;
 
+/**
+ * Opt-out by address: opening any page with `?internal=1` remembers this browser as opted out
+ * (localStorage), and `?internal=0` forgets it. An opted-out browser is treated exactly like one
+ * sending Do Not Track: PostHog is never started, so no events and no session recording.
+ */
+const OPT_OUT_KEY = "pwc_catalog_internal";
+export function catalogOptedOut(search: string = window.location.search) {
+  const flag = new URLSearchParams(search).get("internal");
+  if (flag === "1") store("localStorage", OPT_OUT_KEY, "1");
+  else if (flag === "0") { try { window.localStorage.removeItem(OPT_OUT_KEY); } catch { /* blocked storage */ } }
+  // The address itself counts, so a browser with blocked storage is still opted out on that page.
+  return flag === "1" || (flag !== "0" && stored("localStorage", OPT_OUT_KEY) === "1");
+}
 export function catalogPrivacySignal() {
-  return navigator.doNotTrack === "1" || Boolean((navigator as Navigator & {globalPrivacyControl?: boolean}).globalPrivacyControl);
+  return catalogOptedOut() || navigator.doNotTrack === "1" || Boolean((navigator as Navigator & {globalPrivacyControl?: boolean}).globalPrivacyControl);
 }
 export function catalogPage(path: string) {
   const [, section, detail] = path.split("/");
