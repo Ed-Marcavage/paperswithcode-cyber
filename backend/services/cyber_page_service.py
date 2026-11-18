@@ -15,6 +15,21 @@ from backend.services.discovery_page_service import (
 from backend.services.paper_service import PaperService
 from backend.utils.urls import get_paper_route_identifier
 
+MCP_GUIDE = """Use find_posts for industry engineering practice, agent harnesses, benchmark findings,
+defender reports and vulnerability triage; browse_catalog/search_papers for papers and
+repositories; list_developers/get_developer for people; list_organizations/get_organization
+for publishers; catalog_filters for the current vocabulary. Each facet accepts one slug,
+never an array. Lists have a maximum page size of 25 (find_posts: 10). Posts include
+publisher, summary, reviewed agent relevance, type, tier and publication date when known;
+all catalog entities include absolute catalog_url links. Relevance 3+ usually suits security
+agent builders; use 0 for general vulnerability, malware or threat reporting. Empty narrow
+searches do not establish missing coverage: follow the filter-loosening hint.
+Work rows use id (pass to get_paper_info/read_paper), published, summary and source_url.
+Taxonomy, benchmark, conference and framework tools are inherited and sparse here.
+REST reviewed-post search: /api/v1/catalog/posts; reviewed types: /api/v1/catalog/post-types.
+The pinned CLI repository is the base server; the website repository owns this Cyber profile.
+"""
+
 PAGE_SIZE = 25
 SITEMAP_SIZE = 1000
 AXES = ("topic", "target", "contribution", "kind", "year")

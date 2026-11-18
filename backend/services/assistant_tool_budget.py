@@ -60,7 +60,7 @@ ORG_FIELDS = {"id", "name", "slug", "paper_count", "post_count", "repository_cou
 WORK_FIELDS = {"id", "paper_id", "arxiv_id", "reference", "title", "abstract", "published", "date_published",
                "source_url", "url_abs", "url", "catalog_url", "facets", "repository", "repositories",
                "publisher", "post_type", "tier", "agent_relevance", "tldr"}
-DEV_FIELDS = {"github_id", "login", "repository_count", "featured_repo", "owned_stars", "catalog_url"}
+DEV_FIELDS = {"agent_work_count", "github_id", "login", "repository_count", "featured_repo", "owned_stars", "catalog_url"}
 
 
 def compact_nested(item):
@@ -72,7 +72,7 @@ def compact_nested(item):
             result[key] = result[key][:SUMMARY_CHARS] + "…"
     for key in ("repositories", "papers"):
         if isinstance(result.get(key), list):
-            result[key + "_total"] = len(result[key])
+            result.setdefault(key + "_total", len(result[key]))
             result[key] = result[key][:MAX_ITEMS]
     return result
 
@@ -103,6 +103,8 @@ def compact_result(name, payload, arguments):
                         result[key] = container[key]
         return result
     if isinstance(payload, dict):
+        if name == "get_developer" and "total" in payload:
+            payload = {**payload, "repositories_total": payload["total"]}
         result = compact_nested(payload)
         for key in ("data", "paper", "discovery"):
             if isinstance(result.get(key), dict):

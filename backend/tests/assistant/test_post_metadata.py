@@ -138,3 +138,20 @@ def test_prompt_focuses_agent_harness_posts_without_overclaiming_rankings():
     for phrase in ("AI agent harnesses", "agent_relevance of 3", "vulnerabilities, malware or threats",
                    "tldr", "Group by publisher", "limited search samples"):
         assert phrase in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize('structured', [False, True])
+def test_public_mcp_absolute_links_still_use_existing_assistant_enrichment(structured):
+    calls = []
+    def lookup(ids):
+        calls.append(ids)
+        return ROWS
+    raw = {'schema_version': 'v1', 'total': 15, 'items': [
+        {'id': '1', 'title': 'Harness', 'publisher': 'MCP publisher', 'summary': 'MCP summary',
+         'catalog_url': 'https://paperswithcode-cyber.com/paper/1'}]}
+    data = json.loads(adapted('search_papers', raw, lookup, structured=structured).text)
+    assert calls == [[1]]
+    assert data['total'] == 15
+    assert data['results'][0]['catalog_url'] == '/paper/1'
+    assert data['results'][0]['publisher'] == 'Curated publisher'
+    assert data['results'][0]['tldr'] == ROWS[1]['post_details']['tldr']

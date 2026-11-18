@@ -149,7 +149,7 @@ def paper_sitemap(page: str, db: Session = Depends(get_database_session)) -> Res
 @router.api_route("/llms.txt", methods=["GET", "HEAD"], include_in_schema=False)
 def llms() -> Response:
     return PlainTextResponse(
-        (Path(__file__).resolve().parents[2] / "frontend/public/llms.txt").read_text(),
+        (Path(__file__).resolve().parents[2] / "frontend/public/llms.txt").read_text() + "\n" + pages.MCP_GUIDE,
         headers={"Cache-Control": "public, max-age=300"},
     )
 

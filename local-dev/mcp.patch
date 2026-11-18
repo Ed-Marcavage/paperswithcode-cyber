@@ -1,26 +1,25 @@
 diff --git a/mcp_server/src/pwc_mcp/app.py b/mcp_server/src/pwc_mcp/app.py
-index d51f4d9..5469589 100644
 --- a/mcp_server/src/pwc_mcp/app.py
 +++ b/mcp_server/src/pwc_mcp/app.py
-@@ -1,5 +1,8 @@
+@@ -1,4 +1,8 @@
  from __future__ import annotations
- 
-+from pwc_cli.transport import SITE_URL
-+from pwc_mcp.mcp_analytics import capture_tool
 +
++from pwc_cli.transport import SITE_URL
++from pwc_mcp.mcp_analytics import capture_request, observe_request
++from pwc_mcp.mcp_profile import PROFILE_TOOLS
+ 
  import asyncio
  import hashlib
- import ipaddress
-@@ -35,7 +38,7 @@ PROTOCOL_VERSION = "2025-11-25"
+@@ -35,7 +39,7 @@
  EXPERIMENTAL_PROTOCOL_VERSION = "2026-07-28"
  MAX_REQUEST_BODY_SIZE = 2 * 1024 * 1024
  MAX_RESPONSE_BODY_SIZE = 2 * 1024 * 1024
 -KNOWN_TOOLS = frozenset(TOOL_COMMANDS)
-+KNOWN_TOOLS = frozenset(TOOL_COMMANDS) | {"catalog_filters", "browse_catalog", "list_developers", "get_developer"}
++KNOWN_TOOLS = frozenset(TOOL_COMMANDS) | PROFILE_TOOLS
  KNOWN_PROTOCOLS = {
      PROTOCOL_VERSION,
      EXPERIMENTAL_PROTOCOL_VERSION,
-@@ -53,8 +56,8 @@ async def well_known_mcp(_request: Request) -> JSONResponse:
+@@ -53,15 +57,15 @@
              "transport": {"type": "streamable-http", "url": "/mcp"},
              "protocol_version": PROTOCOL_VERSION,
              "supported_protocol_versions": sorted(KNOWN_PROTOCOLS, reverse=True),
@@ -31,59 +30,93 @@ index d51f4d9..5469589 100644
          }
      )
  
-@@ -310,7 +313,7 @@ async def _body_and_replay(
-     return b"".join(chunks), replay
  
+-def _docs_schema(server) -> dict:
++async def _docs_schema(server) -> dict:
+     return {
+-        "name": "Papers With Code MCP",
++        "name": "Papers With Code Cyber MCP",
+         "version": __version__,
+         "protocol_version": PROTOCOL_VERSION,
+         "endpoint": "/mcp",
+@@ -69,10 +73,10 @@
+             {
+                 "name": tool.name,
+                 "description": tool.description,
+-                "inputSchema": tool.parameters,
++                "inputSchema": tool.input_schema,
+                 "outputSchema": tool.output_schema,
+             }
+-            for tool in server._tool_manager.list_tools()
++            for tool in await server.list_tools()
+         ],
+     }
  
--def _tool_and_semantic(headers: Headers, body: bytes) -> tuple[str | None, bool]:
-+def _tool_and_semantic(headers: Headers, body: bytes, state: dict | None = None) -> tuple[str | None, bool]:
-     header_tool = headers.get("mcp-name")
-     body_tool = None
-     mode = DEFAULT_SEARCH_MODE
-@@ -330,6 +333,9 @@ def _tool_and_semantic(headers: Headers, body: bytes) -> tuple[str | None, bool]
-         arguments = params.get("arguments") if isinstance(params, dict) else None
-         if isinstance(arguments, dict):
-             mode = arguments.get("mode", DEFAULT_SEARCH_MODE)
-+    if (state is not None and isinstance(payload, dict) and payload.get("jsonrpc") == "2.0"
-+            and payload.get("method") == "tools/call" and body_tool in KNOWN_TOOLS):
-+        state["catalog_tool"] = body_tool
-     tool = body_tool or header_tool
-     tool = tool if tool in KNOWN_TOOLS else None
-     # Hybrid retrieval also runs the dense embedding search upstream.
-@@ -415,7 +421,7 @@ class RateLimitMiddleware:
-             response = JSONResponse({"error": "request_too_large"}, status_code=413)
-             await response(scope, receive, send)
+@@ -417,11 +421,10 @@
              return
--        tool, semantic = _tool_and_semantic(headers, body)
-+        tool, semantic = _tool_and_semantic(headers, body, scope.setdefault("state", {}))
+         tool, semantic = _tool_and_semantic(headers, body)
          scope.setdefault("state", {})["pwc_tool_name"] = tool
-         identity = self._identity(
-             _client_address(
-@@ -508,6 +514,8 @@ class OperationalTelemetryMiddleware:
+-        identity = self._identity(
+-            _client_address(
+-                scope, headers, self.trust_proxy_headers, self.trusted_proxies
+-            )
+-        )
++        address = _client_address(scope, headers, self.trust_proxy_headers, self.trusted_proxies)
++        observe_request(scope.setdefault("state", {}), body, headers, KNOWN_TOOLS,
++                        first_party=not headers.get("x-forwarded-for") and address.startswith("client:assistant-"))
++        identity = self._identity(address)
+         now = time.monotonic()
+         limited = False
+         saturated = False
+@@ -508,6 +511,7 @@
              tool = scope.get("state", {}).get("pwc_tool_name")
              if tool not in KNOWN_TOOLS:
                  tool = "unknown"
-+            if called := scope.get("state", {}).get("catalog_tool"):
-+                capture_tool(called, status)
++            capture_request(scope.get("state", {}), status, _protocol_label(headers))
              LOGGER.info(
                  "mcp_request tool=%s status=%s latency_ms=%s bytes=%s protocol=%s version=%s",
                  tool or "unknown",
+@@ -577,10 +581,9 @@
+         ),
+     )
+     app.routes.insert(0, Route("/health", health, methods=["GET"]))
+-    schema = _docs_schema(server)
+ 
+     async def docs(_request: Request) -> JSONResponse:
+-        return JSONResponse(schema)
++        return JSONResponse(await _docs_schema(server))
+ 
+     app.routes.insert(1, Route("/docs", docs, methods=["GET"]))
+     app.routes.insert(2, Route("/.well-known/mcp", well_known_mcp, methods=["GET"]))
 diff --git a/mcp_server/src/pwc_mcp/catalog.py b/mcp_server/src/pwc_mcp/catalog.py
-index 7da20f0..e69a411 100644
 --- a/mcp_server/src/pwc_mcp/catalog.py
 +++ b/mcp_server/src/pwc_mcp/catalog.py
-@@ -1,5 +1,7 @@
+@@ -1,4 +1,6 @@
  from __future__ import annotations
- 
-+from pwc_cli.transport import SITE_URL
 +
++from pwc_cli.transport import SITE_URL
+ 
  import re
  import threading
- from difflib import SequenceMatcher
-@@ -228,6 +230,15 @@ class CatalogClient:
+@@ -227,6 +229,29 @@
+         if not isinstance(payload, dict):
              raise ResponseError("API returned an unexpected response shape")
          return payload
- 
++
++    def profile_vocabulary(self) -> dict[str, list[str]]:
++        # A separate short-timeout client avoids changing the shared query transport.
++        if not isinstance(self.transport, Client):
++            return {}
++        client = Client(base_url=self.transport.base_url, timeout=1)
++        for attempt in range(2):
++            try:
++                data = client.get("catalog/filters").json()
++                return {key: sorted(values) for key, values in data.items() if isinstance(values, dict)}
++            except (ResponseError, TransportError):
++                if attempt == 0:
++                    time.sleep(0.1)
++        return {}
++
 +    def discovery(self, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
 +        return self._json(f"catalog/{path}", params, ttl=60)
 +
@@ -92,11 +125,10 @@ index 7da20f0..e69a411 100644
 +
 +    def developer(self, github_id: int) -> dict[str, Any]:
 +        return self._json(f"developers/{github_id}", ttl=60)
-+
+ 
      def check_readiness(self) -> bool:
          response = self.transport.get("tasks/", {"page": 1, "page_size": 1})
-         payload = response.json()
-@@ -283,6 +294,7 @@ class CatalogClient:
+@@ -283,6 +308,7 @@
              in {
                  "paperswithcode.co",
                  "www.paperswithcode.co",
@@ -104,7 +136,7 @@ index 7da20f0..e69a411 100644
              }
              and len(parts) >= 2
              and parts[0] == "paper"
-@@ -305,6 +317,7 @@ class CatalogClient:
+@@ -305,6 +331,7 @@
              if parsed.netloc.casefold() in {
                  "paperswithcode.co",
                  "www.paperswithcode.co",
@@ -113,18 +145,16 @@ index 7da20f0..e69a411 100644
                  slug_from_url = candidate.casefold()
          elif urlparse(candidate).scheme in {"http", "https"}:
 diff --git a/mcp_server/src/pwc_mcp/models.py b/mcp_server/src/pwc_mcp/models.py
-index 4c8ea95..60be3c0 100644
 --- a/mcp_server/src/pwc_mcp/models.py
 +++ b/mcp_server/src/pwc_mcp/models.py
-@@ -1,5 +1,7 @@
+@@ -1,4 +1,6 @@
  from __future__ import annotations
- 
-+from pwc_cli.transport import SITE_URL
 +
++from pwc_cli.transport import SITE_URL
+ 
  import re
  from typing import Any, Literal
- 
-@@ -14,7 +16,7 @@ def _absolute_url(value: object) -> str | None:
+@@ -14,7 +16,7 @@
      if not value:
          return None
      url = str(value)
@@ -133,7 +163,7 @@ index 4c8ea95..60be3c0 100644
  
  
  class QueryResult(OutputModel):
-@@ -119,6 +121,7 @@ class PaperEvaluation(OutputModel):
+@@ -119,6 +121,7 @@
  
  
  class PaperInfoResult(QueryResult):
@@ -142,19 +172,26 @@ index 4c8ea95..60be3c0 100644
      evaluation_count: int | None = None
      evaluations: list[PaperEvaluation] | None = None
 diff --git a/mcp_server/src/pwc_mcp/server.py b/mcp_server/src/pwc_mcp/server.py
-index fa0e182..475c7b3 100644
 --- a/mcp_server/src/pwc_mcp/server.py
 +++ b/mcp_server/src/pwc_mcp/server.py
-@@ -9,6 +9,8 @@ checks against the CLI parser.
+@@ -8,6 +8,8 @@
+ """
  
  from __future__ import annotations
- 
-+from pwc_cli.transport import SITE_URL
 +
++from pwc_cli.transport import SITE_URL
+ 
  import logging
  import os
- import time
-@@ -77,7 +79,7 @@ READ_ONLY = ToolAnnotations(
+@@ -19,6 +21,7 @@
+ 
+ from mcp.server.caching import CacheHint
+ from mcp.server.mcpserver import MCPServer
++from pwc_mcp.mcp_profile import CyberServer, INSTRUCTIONS, register_profile
+ from mcp.server.mcpserver.exceptions import ToolError
+ from mcp.types import CallToolResult, TextContent, ToolAnnotations
+ from pwc_cli import queries
+@@ -77,7 +80,7 @@
  # Hosted ceiling on rows per response (SPEC.md); the CLI allows up to 100.
  MAX_ROWS = 25
  # Matches `pwc search --mode`; app.py counts omitted modes with this value.
@@ -163,7 +200,7 @@ index fa0e182..475c7b3 100644
  # CLI lookup failures the caller can act on (an unknown or ambiguous name, an
  # unconfirmed filter). Transport, HTTP, and response-shape failures stay generic.
  CLIENT_FACING_ERRORS = (
-@@ -431,6 +433,12 @@ def _grouped_benchmarks(areas: list[dict[str, Any]]) -> list[dict[str, Any]]:
+@@ -431,6 +434,12 @@
  
  
  class Catalog(Protocol):
@@ -176,26 +213,36 @@ index fa0e182..475c7b3 100644
      def resolve_paper(self, paper: str) -> str: ...
  
      def read_paper_chunk(
-@@ -466,7 +474,8 @@ def build_server(
-             "frameworks, and benchmarks; every pwc CLI research command and flag."
-         ),
-         instructions=(
+@@ -458,23 +467,13 @@
+         os.environ.get("PWC_MCP_CURSOR_KEY_CURRENT", ""),
+         previous_secret=os.environ.get("PWC_MCP_CURSOR_KEY_PREVIOUS") or None,
+     )
+-    server = MCPServer(
++    server = CyberServer(
+         "pwc",
+-        title="Papers With Code",
+-        description=(
+-            "Read-only access to papers, tasks, methods, conferences, organizations, "
+-            "frameworks, and benchmarks; every pwc CLI research command and flag."
+-        ),
+-        instructions=(
 -            "Use search_papers for relevance and list tools for deterministic filters. "
-+            "Use search_papers for keyword search, catalog_filters for vocabulary and browse_catalog for intersecting facets. "
-+            "Use list_developers for GitHub accounts behind tracked repos and get_developer for ownership and contribution evidence. "
-             "Pass slugs or numeric IDs returned by list tools to exact lookup tools. "
-             "Dates use YYYY-MM-DD. Structured data is in structuredContent; text is a "
-             "short Markdown summary. Official implementation means catalog-designated "
-@@ -474,7 +483,7 @@ def build_server(
-             "cataloged implementation and may be null when unknown."
-         ),
+-            "Pass slugs or numeric IDs returned by list tools to exact lookup tools. "
+-            "Dates use YYYY-MM-DD. Structured data is in structuredContent; text is a "
+-            "short Markdown summary. Official implementation means catalog-designated "
+-            "official code, not an independent audit. Evaluation is_open describes the "
+-            "cataloged implementation and may be null when unknown."
+-        ),
++        title="Papers With Code Cyber",
++        description="Read-only security catalog: industry posts, research papers, repositories and developers.",
++        instructions=INSTRUCTIONS,
          version=__version__,
 -        website_url="https://paperswithcode.co",
-+        website_url=os.environ["PWC_SITE_URL"],
++        website_url=SITE_URL,
          cache_hints={
              "server/discover": CacheHint(ttl_ms=3_600_000, scope="public"),
              "tools/list": CacheHint(ttl_ms=3_600_000, scope="public"),
-@@ -525,6 +534,8 @@ def build_server(
+@@ -525,6 +524,8 @@
  
      def public_paper(reference: str, missing: ToolError) -> dict[str, Any]:
          """Public metadata for a catalog miss, or the original error."""
@@ -204,43 +251,7 @@ index fa0e182..475c7b3 100644
          record = catalog.public_paper(reference)
          if isinstance(record, PublicPaperMiss):
              message, _, closest = str(missing).partition(CLOSEST_CATALOG_PAPERS)
-@@ -580,17 +591,50 @@ def build_server(
-             raise missing
-         return None
- 
-+    @server.tool(annotations=READ_ONLY, structured_output=True)
-+    def catalog_filters() -> dict[str, Any]:
-+        """List topic, target, contribution, year and source type filter values."""
-+        return catalog.discovery("filters")
-+
-+    @server.tool(annotations=READ_ONLY, structured_output=True)
-+    def browse_catalog(topic: str = "", target: str = "", contribution: str = "",
-+                       year: str = "", kind: str = "", limit: Limit = 10,
-+                       offset: Annotated[int, Field(ge=0)] = 0, include_facet_counts: bool = False) -> dict[str, Any]:
-+        """Find works matching all catalog filters. Request facet counts to see which choices still have results."""
-+        params = dict(topic=topic, target=target, contribution=contribution, year=year,
-+                      kind=kind, limit=limit, offset=offset, include_facet_counts=include_facet_counts)
-+        return catalog.discovery("papers", params)
-+
-+    @server.tool(annotations=READ_ONLY, structured_output=True)
-+    def list_developers(q: Annotated[str, Field(max_length=100)] = "", topic: str = "", target: str = "",
-+                        contribution: str = "", repository: Annotated[str, Field(max_length=250)] = "",
-+                        sort: Literal["repos", "stars"] = "repos", include_facet_counts: bool = False,
-+                        limit: Limit = 10, offset: Annotated[int, Field(ge=0)] = 0) -> dict[str, Any]:
-+        """Find GitHub users by username, exact owner/repo, or work facets from catalog_filters.
-+        All selected facets must match one linked work. Counts refer to distinct developers;
-+        request facet counts for available alternatives. Stars count only matching repos the user owns.
-+        Pass a result's github_id to get_developer."""
-+        return catalog.developers(dict(q=q, topic=topic, target=target, contribution=contribution,
-+                                       repository=repository, sort=sort, include_facet_counts=include_facet_counts,
-+                                       limit=limit, offset=offset))
-+
-+    @server.tool(annotations=READ_ONLY, structured_output=True)
-+    def get_developer(github_id: Annotated[int, Field(gt=0, le=9223372036854775807)]) -> dict[str, Any]:
-+        """Get a developer's tracked GitHub repos, ownership and GitHub-reported commit totals.
-+        Repo contributions do not establish paper authorship."""
-+        return catalog.developer(github_id)
-+
+@@ -583,14 +584,14 @@
      @server.tool(annotations=READ_ONLY, structured_output=True)
      def search_papers(
          query: Query,
@@ -253,11 +264,11 @@ index fa0e182..475c7b3 100644
          has_official_implementation: bool = False,
      ) -> PaperPage:
 -        """Search papers by title, topic, author, or arXiv ID (`pwc search`). Broad discovery only: for best, top, or state-of-the-art model questions start with get_task, list_benchmarks, and get_benchmark, which return leaderboard evidence that search cannot. Mode defaults to hybrid like `pwc search`; use keyword for exact terminology or to stay under the semantic search rate limit."""
-+        """Search papers by title, topic, author, or arXiv ID (`pwc search`). Broad discovery only: for best, top, or state-of-the-art model questions start with get_task, list_benchmarks, and get_benchmark, which return leaderboard evidence that search cannot. This catalog searches indexed terms without model calls."""
++        """Search indexed paper/repository titles (keyword only, no model calls); use browse_catalog for facets and find_posts for industry posts. Returns compact works with catalog_url; empty narrow queries do not establish missing coverage. Use shorter keywords first."""
          _validate_date_range(published_after, published_before)
          result = _paper_page(
              run(
-@@ -617,7 +661,7 @@ def build_server(
+@@ -617,7 +618,7 @@
          repo_limit: ResourceLimit = 5,
          include_evaluations: bool = False,
      ) -> PaperInfoResult:
@@ -266,7 +277,7 @@ index fa0e182..475c7b3 100644
          options = {
              # Fetch once so the compact default can retain official code while
              # omitting hundreds of community repositories from the response.
-@@ -644,6 +688,7 @@ def build_server(
+@@ -644,6 +645,7 @@
              raise TypeError("paper response did not contain a paper")
          evaluations = data.get("evaluations")
          result = PaperInfoResult(
@@ -274,7 +285,7 @@ index fa0e182..475c7b3 100644
              paper=paper_detail(
                  data, include_resources=include_resources, repo_limit=repo_limit
              ),
-@@ -699,7 +744,7 @@ def build_server(
+@@ -699,7 +701,7 @@
              ),
          ] = None,
      ) -> PaperReadResult:
@@ -283,7 +294,30 @@ index fa0e182..475c7b3 100644
          if cursor is not None and cursor.strip().casefold() in PLACEHOLDER_CURSORS:
              # Not a token: nothing was saved to continue from.
              cursor = None
-@@ -1045,7 +1090,7 @@ def build_server(
+@@ -928,8 +930,9 @@
+         return _tool_result(result, result.note)
+ 
+     @server.tool(annotations=READ_ONLY, structured_output=True)
+-    def get_paper_lineage(paper: Reference) -> PaperLineageResult:
+-        """Get explicit predecessor and successor papers (`pwc paper lineage list`)."""
++    def get_paper_lineage(paper: Reference, limit: Limit = 10,
++                          offset: Annotated[int, Field(ge=0, le=2500)] = 0) -> PaperLineageResult:
++        """Get explicit predecessor and successor papers with a separate total and the same limit/offset for each direction."""
+         data = run("get_paper_lineage", paper=paper)
+         current = data.get("paper") if isinstance(data, dict) else None
+         if not isinstance(current, dict):
+@@ -1008,8 +1011,8 @@
+                 group_by_area=group_by_area,
+                 order_by=order_by,
+                 order_direction=order_direction,
+-                page=page,
+-                limit=limit if limit is not None or group_by_area else MAX_ROWS,
++                page=1 if group_by_area else page,
++                limit=None if group_by_area else (limit if limit is not None else MAX_ROWS),
+             )
+         )
+ 
+@@ -1045,7 +1048,7 @@
                      else None
                  ),
                  source_url=(
@@ -292,7 +326,12 @@ index fa0e182..475c7b3 100644
                      if str(item.get("source_url") or "").startswith("/")
                      else str(item["source_url"])
                      if item.get("source_url")
-@@ -1104,9 +1149,9 @@ def build_server(
+@@ -1100,13 +1103,13 @@
+ 
+     @server.tool(annotations=READ_ONLY, structured_output=True)
+     def get_organization(organization: Entity) -> QueryResult:
+-        """Get one exact research organization by name, slug, or ID (`pwc organization --name`)."""
++        """Get a publisher/organization by exact name, slug or ID from list_organizations; includes catalog counts and catalog_url."""
          return QueryResult(data=run("get_organization", organization=organization))
  
      @server.tool(annotations=READ_ONLY, structured_output=True)
@@ -304,20 +343,25 @@ index fa0e182..475c7b3 100644
  
      @server.tool(annotations=READ_ONLY, structured_output=True)
      def get_framework(framework: Entity) -> QueryResult:
+@@ -1331,4 +1334,5 @@
+             get_benchmark(benchmark), BenchmarkResult
+         ).model_dump_json()
+ 
++    register_profile(server, catalog, run, READ_ONLY)
+     return server
 diff --git a/standalone_cli/src/pwc_cli/cli.py b/standalone_cli/src/pwc_cli/cli.py
-index 4380d38..11bf055 100644
 --- a/standalone_cli/src/pwc_cli/cli.py
 +++ b/standalone_cli/src/pwc_cli/cli.py
-@@ -2,6 +2,8 @@
+@@ -1,6 +1,8 @@
+ """Explicit read-only parser and deterministic compact output."""
  
  from __future__ import annotations
- 
-+from pwc_cli.transport import SITE_URL
 +
++from pwc_cli.transport import SITE_URL
+ 
  import argparse
  import difflib
- import json
-@@ -660,7 +662,7 @@ def _paper_info_lineage_markdown(item: dict[str, Any]) -> str:
+@@ -660,7 +662,7 @@
      published = f" ({item['published']})" if item.get("published") else ""
      if not reference:
          return f"- {title}{published}"
@@ -326,7 +370,7 @@ index 4380d38..11bf055 100644
      return f"- [{title}]({url}){published}"
  
  
-@@ -915,7 +917,7 @@ def _lineage_markdown(item: dict[str, Any]) -> str:
+@@ -915,7 +917,7 @@
      )
      if not reference:
          return f"- {title}"
@@ -335,7 +379,7 @@ index 4380d38..11bf055 100644
      return f"- [{title}]({url}) (`{_clean(reference)}`)"
  
  
-@@ -1125,7 +1127,7 @@ def _task_match(name: str, items: list[dict[str, Any]]) -> dict[str, Any] | None
+@@ -1125,7 +1127,7 @@
  def _task_reference(item: dict[str, Any], *, markdown: bool) -> str:
      name = str(item.get("name") or item.get("slug") or item.get("id") or "Task")
      slug = item.get("slug") or item.get("id")
@@ -344,7 +388,7 @@ index 4380d38..11bf055 100644
      return f"[{_markdown_text(name)}]({url})" if markdown else f"{name} [{slug}]"
  
  
-@@ -1133,7 +1135,7 @@ def _task_paper_reference(item: dict[str, Any], *, markdown: bool) -> str:
+@@ -1133,7 +1135,7 @@
      title = str(item.get("title") or item.get("arxiv_id") or item.get("id") or "Paper")
      reference = item.get("arxiv_id") or item.get("id")
      url = item.get("url_abs") or (
@@ -353,7 +397,7 @@ index 4380d38..11bf055 100644
          if reference
          else None
      )
-@@ -1282,7 +1284,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1282,7 +1284,7 @@
          description = str(task["description"]).replace("\r", " ").replace("\n", " ")
          print(f"\n{_markdown_text(description) if markdown else description}")
      task_slug = task.get("slug") or task.get("id")
@@ -362,7 +406,7 @@ index 4380d38..11bf055 100644
      task_link = f"[View task]({task_url})" if markdown else f"View task: {task_url}"
      print(f"\n{task_link}")
  
-@@ -1334,7 +1336,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1334,7 +1336,7 @@
              )
              method_slug = method.get("slug") or method.get("id")
              method_url = (
@@ -371,7 +415,7 @@ index 4380d38..11bf055 100644
              )
              label = (
                  f"[{_markdown_text(method_name)}]({method_url})"
-@@ -1351,7 +1353,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1351,7 +1353,7 @@
                  benchmark.get("name") or benchmark.get("slug") or benchmark.get("id")
              )
              benchmark_slug = benchmark.get("slug") or benchmark.get("id")
@@ -380,7 +424,7 @@ index 4380d38..11bf055 100644
              label = (
                  f"[{_markdown_text(benchmark_name)}]({benchmark_url})"
                  if markdown
-@@ -1389,7 +1391,7 @@ def task_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1389,7 +1391,7 @@
                  )
                  benchmark_slug = benchmark.get("slug") or benchmark.get("id")
                  benchmark_url = (
@@ -389,7 +433,7 @@ index 4380d38..11bf055 100644
                      f"{quote(str(benchmark_slug), safe='-')}"
                  )
                  label = (
-@@ -1490,11 +1492,11 @@ def method_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1490,11 +1492,11 @@
      source_url = method.get("source_url")
      if source_url:
          if str(source_url).startswith("/"):
@@ -403,7 +447,7 @@ index 4380d38..11bf055 100644
      print(f"\n{_entity_link('View method', url)}")
      return 0
  
-@@ -1574,7 +1576,7 @@ def conference_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1574,7 +1576,7 @@
      for label, field in (("Conference website", "url"), ("Hugging Face", "hf_url")):
          if conference.get(field):
              print(f"\n{_entity_link(label, str(conference[field]))}")
@@ -412,7 +456,7 @@ index 4380d38..11bf055 100644
      print(f"\n{_entity_link('View conference', url)}")
      return 0
  
-@@ -1645,13 +1647,16 @@ def organization_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1645,13 +1647,16 @@
      ):
          if organization.get(field):
              print(f"\n{_entity_link(label, str(organization[field]))}")
@@ -431,7 +475,7 @@ index 4380d38..11bf055 100644
  
      def render(items: list[dict[str, Any]]) -> None:
          _print_table(
-@@ -1731,10 +1736,10 @@ def framework_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -1731,10 +1736,10 @@
              print(f"\n{_entity_link(label, str(framework[field]))}")
      paper = framework.get("introducing_paper_arxiv_id")
      if paper:
@@ -444,7 +488,7 @@ index 4380d38..11bf055 100644
      print(f"\n{_entity_link('View framework', url)}")
      return 0
  
-@@ -2526,7 +2531,7 @@ def _paper_markdown(item: dict[str, Any]) -> str:
+@@ -2526,7 +2531,7 @@
      reference = item.get("paper_arxiv_id") or item.get("paper_id")
      if not reference:
          return title
@@ -453,7 +497,7 @@ index 4380d38..11bf055 100644
      return f"[{title}]({url})"
  
  
-@@ -2615,7 +2620,7 @@ def benchmark_detail(args: argparse.Namespace, client: Client) -> int:
+@@ -2615,7 +2620,7 @@
          )
          print(f"\n{description}")
      slug = benchmark.get("slug") or benchmark.get("id")
@@ -462,7 +506,7 @@ index 4380d38..11bf055 100644
      link = (
          f"View benchmark: {benchmark_url}"
          if interactive
-@@ -2945,6 +2950,7 @@ def build_parser(
+@@ -2945,6 +2950,7 @@
          action="store_true",
          help="return only curated featured organizations",
      )
@@ -471,10 +515,9 @@ index 4380d38..11bf055 100644
      organizations.set_defaults(handler=organization_list)
  
 diff --git a/standalone_cli/src/pwc_cli/transport.py b/standalone_cli/src/pwc_cli/transport.py
-index 9b6a172..96bd503 100644
 --- a/standalone_cli/src/pwc_cli/transport.py
 +++ b/standalone_cli/src/pwc_cli/transport.py
-@@ -12,6 +12,7 @@ from typing import Any
+@@ -12,6 +12,7 @@
  
  from pwc_cli import __version__
  

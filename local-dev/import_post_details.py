@@ -16,13 +16,9 @@ from pathlib import Path
 from sqlalchemy import text
 
 from backend.database.connection import db_manager
+from backend.models.catalog_posts import POST_TYPES
 
 TIERS = {"featured", "catalog"}
-POST_TYPES = {
-    "vulnerability-writeup", "exploit-walkthrough", "malware-or-threat-intel", "incident-postmortem",
-    "tool-or-release", "benchmark-or-evaluation", "engineering-practice", "detection-engineering",
-    "research-summary", "explainer-or-tutorial", "opinion-or-strategy", "other",
-}
 TIMELINESS = {"evergreen", "dated", "time_bound"}
 REVIEWERS = {"manual"}
 SCORES = ("technical_depth", "originality", "agent_relevance")

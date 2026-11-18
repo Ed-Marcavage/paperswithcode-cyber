@@ -151,3 +151,27 @@ def test_research_budget_is_a_soft_stop_before_the_hard_limit():
     assert research_budget_notice(19, limits, sent) is None
     # A batch that jumps past both thresholds gets only the stronger message.
     assert "Write your answer now" in research_budget_notice(19, limits, set())
+
+
+def test_developer_projection_keeps_agent_work_count():
+    from backend.services.assistant_tool_budget import compact_result
+    data = compact_result('list_developers', {'count': 1, 'results': [
+        {'github_id': 9, 'login': 'builder', 'agent_work_count': 7, 'repository_count': 10}]}, {})
+    assert data['results'][0]['agent_work_count'] == 7
+
+
+@pytest.mark.parametrize('extra', [{}, {'repositories_total': 40}])
+def test_paged_developer_repositories_keep_full_total(extra):
+    from backend.services.assistant_tool_budget import compact_result
+    raw = {'github_id': 9, 'total': 40, 'repositories': [
+        {'url': f'https://github.com/org/repo{i}'} for i in range(25)], **extra}
+    result = compact_result('get_developer', raw, {})
+    assert result['repositories_total'] == 40
+    assert len(result['repositories']) == 10
+
+
+def test_compact_nested_preserves_declared_collection_totals():
+    from backend.services.assistant_tool_budget import compact_nested
+    result = compact_nested({'repositories': [{}], 'repositories_total': 40,
+                             'papers': [{}], 'papers_total': 30})
+    assert result['repositories_total'] == 40 and result['papers_total'] == 30

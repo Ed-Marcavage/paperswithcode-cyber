@@ -1,14 +1,21 @@
+import time
+from datetime import date
+from functools import partial
 from typing import Literal
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import PlainTextResponse, Response
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from backend.database.catalog_reads import catalog_sessions
 from backend.database.connection import get_database_session
+from backend.models.catalog_posts import POST_TYPES
 from backend.models.database import Paper as DBPaper
 from backend.models.papers import Papers
 from backend.routers.paper_date_range import PaperDateRange, get_paper_date_range
-from backend.services import discovery_catalog, trending_posts
+from backend.services import catalog_posts, discovery_catalog, trending_posts
 from backend.services.paper_feed_executor import PaperFeedExecutor
 from backend.services.paper_service import PaperService
 
@@ -18,6 +25,52 @@ router = APIRouter(prefix="/catalog", tags=["Discovery catalog"])
 @router.get("/filters", summary="List catalog filter values")
 def filters(db: Session = Depends(get_database_session)):
     return discovery_catalog.terms(db)
+
+
+@router.get("/post-types", summary="List reviewed post types")
+def post_types():
+    return {"post_type": sorted(POST_TYPES)}
+
+
+@router.get("/posts", summary="Search reviewed industry posts")
+async def posts(query: str = Query("", max_length=200), topic: str = Query("", max_length=100),
+                subtopic: str = Query("", max_length=100), post_type: str = Query("", max_length=64),
+                tier: Literal["", "featured", "catalog"] = "", publisher: str = Query("", max_length=160),
+                min_agent_relevance: int | None = Query(None, ge=0, le=4),
+                harness_engineering: bool | None = None, published_after: date | None = None,
+                sort: Literal["score", "recent", "score_recent"] = "score",
+                limit: int = Query(10, ge=1, le=10), sessions=Depends(catalog_sessions)):
+    """Default relevance 3; only an omitted default may relax for sparse text searches.
+    All-word English search, then broader reporting, then ranked any-word search;
+    every relaxation is disclosed. No offset. At most 10 rows, within three seconds.
+    """
+    arguments = dict(query=query, topic=topic, subtopic=subtopic, post_type=post_type,
+                     tier=tier, publisher=publisher, harness_engineering=harness_engineering,
+                     published_after=published_after, sort=sort, limit=limit)
+    if min_agent_relevance is not None:
+        arguments["min_agent_relevance"] = min_agent_relevance
+    try:
+        with anyio.fail_after(catalog_posts.QUERY_SECONDS):
+            result = await anyio.to_thread.run_sync(partial(
+                catalog_posts.read_posts, arguments, sessions,
+                time.monotonic() + catalog_posts.QUERY_SECONDS, validate_filters=True), abandon_on_cancel=True)
+    except catalog_posts.InvalidPostFilter as error:
+        raise HTTPException(422, error.detail) from None
+    except (SQLAlchemyError, OSError, TimeoutError):
+        raise HTTPException(503, "Post search is temporarily unavailable; this is not a zero-match result.") from None
+    return {**result, "results": [{**row, "summary": row["tldr"]} for row in result["results"]]}
+
+
+@router.get("/metadata", summary="Compact metadata for up to 25 catalog works")
+async def metadata(references: str = Query(..., max_length=600,
+                   pattern=r"^(?:[1-9][0-9]{0,18}|[0-9]{4}\.[0-9]{4,5})(?:,(?:[1-9][0-9]{0,18}|[0-9]{4}\.[0-9]{4,5})){0,24}$"),
+                   sessions=Depends(catalog_sessions)):
+    try:
+        with anyio.fail_after(3):
+            return await anyio.to_thread.run_sync(discovery_catalog.compact_metadata,
+                                                 references.split(","), sessions, abandon_on_cancel=True)
+    except (SQLAlchemyError, OSError, TimeoutError):
+        raise HTTPException(503, "Catalog metadata is temporarily unavailable.") from None
 
 
 @router.get("/papers", summary="Browse papers by catalog filters")

@@ -18,7 +18,7 @@ def terms(db: Session) -> dict:
 
 SELECT_WORK = """
     SELECT p.id::text AS paper_id, coalesce(p.arxiv_id, p.id::text) AS reference,
-           p.title, w.facets, w.source_url, w.artifact_url, w.curated_pin,
+           p.title, p.date_published, w.facets, w.source_url, w.artifact_url, w.curated_pin,
            w.document_text IS NOT NULL AS has_text, w.post_details AS post,
            """ + PUBLISHER_ORGANIZATION_SQL.format(paper_id="p.id") + """ AS publisher_organization
       FROM discovery_works w JOIN papers p ON p.id = w.paper_id
@@ -32,6 +32,31 @@ def _with_publisher(row) -> dict:
     if "post" in (row.get("facets") or {}).get("kind", []):
         row["publisher"] = publisher_name(row["source_url"], organization=organization)
     return row
+
+
+def compact_metadata(references: list[str], sessions) -> dict:
+    """One bounded lookup for an MCP result page, including nested work references."""
+    with sessions() as db:
+        db.execute(text("SET TRANSACTION READ ONLY"))
+        db.execute(text("SELECT set_config('statement_timeout', :timeout, true)"), {"timeout": "1500"})
+        rows = db.execute(text(SELECT_WORK + """
+            WHERE p.id::text = ANY(CAST(:refs AS text[])) OR p.arxiv_id = ANY(CAST(:refs AS text[]))
+            ORDER BY p.is_latest_version DESC, p.id DESC LIMIT 25
+        """), {"refs": references[:25]}).mappings()
+        results = []
+        for row in rows:
+            item = _with_publisher(row)
+            post = item.pop("post", None)
+            if "post" in (item.get("facets") or {}).get("kind", []):
+                post = post or {}
+                # MCP metadata follows find_posts' curated-company-first rule.
+                # Existing site browse/detail routes retain their organization publisher.
+                item["publisher"] = publisher_name(item.get("source_url"), post.get("curated_company"), item.get("publisher"))
+                summary = post.get("tldr")
+                item.update(summary=summary[:600] + "…" if isinstance(summary, str) and len(summary) > 600 else summary,
+                            **{key: post.get(key) for key in ("agent_relevance", "post_type", "tier")})
+            results.append(item)
+    return {"results": results}
 
 
 def _facet_counts(db: Session, axes: list[str], params: dict, post_where: str) -> dict:

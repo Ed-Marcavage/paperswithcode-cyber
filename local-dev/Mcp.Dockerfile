@@ -5,7 +5,7 @@ WORKDIR /src
 COPY --from=pwc_cli standalone_cli standalone_cli
 COPY --from=pwc_cli mcp_server mcp_server
 COPY mcp.patch /tmp/mcp.patch
-COPY mcp_analytics.py mcp_server/src/pwc_mcp/mcp_analytics.py
+COPY mcp_analytics.py mcp_profile.py mcp_server/src/pwc_mcp/
 RUN patch -p1 < /tmp/mcp.patch && uv sync --project mcp_server --frozen --no-dev --no-editable
 ENV PWC_MCP_HOST=0.0.0.0 PORT=7860
 USER nobody

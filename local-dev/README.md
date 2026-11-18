@@ -108,21 +108,138 @@ page. A paper marked “Benchmark” can have no structured leaderboard results.
 ## How MCP works
 
 The frontend and MCP read the same FastAPI service. `GET /mcp` in a browser
-opens setup instructions; MCP clients send JSON-RPC to the same URL.
-`catalog_filters` and `browse_catalog` call `/api/v1/catalog/filters` and
-`/api/v1/catalog/papers`. `get_paper_info` adds curated metadata to the
-native paper response. `read_paper` uses the versioned
-`/api/v1/research/papers/{id}/read` endpoint. Postgres holds the text; no
-runtime OCR or model dispatch is involved. When no text is cached, the
-reader returns a source link. The project artifact may be a subdirectory;
-Trending credits stars to the enclosing GitHub repository. MCP adds no
-server-side chat agent; a client can use its own assistant.
+opens setup instructions; MCP clients send anonymous, read-only JSON-RPC to
+that URL. The public Cyber profile has 26 tools. Start with `find_posts` for
+industry engineering practice, agent harnesses, benchmark findings, defender
+reports and vulnerability triage; `browse_catalog`/`search_papers` for papers
+and repositories; developer tools for people; organization tools for publishers.
 
-The MCP image builds a pinned revision of [the CLI fork](https://github.com/Ed-Marcavage/pwc-cli-cyber) with
-the catalog changes in `mcp.patch`. A standalone CLI also needs
-`PWC_API_URL=http://localhost:8095/api/v1` to search this local catalog.
-API responses, schema discovery and
-client setup point at the review origin.
+The image builds the unchanged pinned CLI fork at
+`125ffe07aad3d268bc2e3ddd8d79f159b4bc2f2b`. That repository is the base server.
+This website repository owns `mcp_profile.py`, `mcp_analytics.py`, and the
+upstream hooks in `mcp.patch`; the Dockerfile copies both Python modules into
+`pwc_mcp`. Do not move the Cyber profile into the base repository.
+`PWC_API_URL` points to the backend `/api/v1`; `PWC_SITE_URL` supplies absolute
+catalog links. No new environment variables or runtime dependencies are needed.
+
+The server reads vocabulary at construction with two one-second attempts.
+Tool descriptions include topic/target/contribution/kind/year slugs; if the API
+is unavailable, they say to call `catalog_filters`, and filtered calls retry
+vocabulary discovery. One slug per filter, never an array. A single-element
+JSON array encoded as a string is normalized; multiple or invalid values yield
+an MCP error naming the parameter and its choices. `/catalog/filters` keeps its
+existing shape. Reviewed post types are also at `/catalog/post-types`.
+
+Each projected result sends one compact JSON document in text content, without
+duplicating it in `structuredContent`; the assistant parses this text. Work rows
+use `id` (pass to `get_paper_info`/`read_paper`), `published` (YYYY-MM-DD),
+`summary`, `source_url` and absolute `catalog_url`. Posts also include `publisher`,
+`agent_relevance`, `post_type` and `tier`. Nulls, duplicate identifiers/dates,
+raw review objects and site-internal fields are omitted from list rows. Long
+list text is capped at 600 characters plus an ellipsis. The assistant still adds
+its own `tldr` from the database.
+Native paper results use bounded `/catalog/metadata?references=...` batches
+(up to 25 numeric/arXiv references) for the same fields. `find_posts` already has
+complete rows and never reads metadata; browse uses its inline reviews. If
+metadata is unavailable, the tool returns its available data with top-level
+`metadata_status="unavailable"` and a `metadata_note` explaining that post fields
+may be missing. This read-only route
+uses the bounded public pool, a 1.5-second statement timeout and a 3-second
+request deadline; failures are generic 503s. Entity paths are `/paper/{id}`,
+`/orgs/{slug}`, `/developers/{github_id}` and `/repos/{owner}/{name}`.
+MCP post publishers consistently follow the search filter: curated company,
+then linked organization, then mapped/raw source host. The existing site browse
+and detail API publisher remains organization-first.
+
+`GET /api/v1/catalog/posts` searches reviewed posts with `query` (max 200),
+`topic`/`subtopic` (max 100), `post_type` (max 64), `tier=featured|catalog`,
+`publisher` (max 160), `min_agent_relevance` (0–4, omitted means 3), optional
+`harness_engineering`, exclusive `published_after=YYYY-MM-DD`,
+`sort=score|recent|score_recent` (default score), and `limit` (default/max 10).
+There is no offset. It returns `total`, compact `results`, effective `sort`,
+`match_mode`, `relaxations`, and `message`/`hint` for an empty search.
+Invalid values yield 422; unavailable/timeout yields a generic 503, never SQL
+or connection details. Every SQL value is bound. All attempts share a read-only
+transaction and three-second deadline, with statements capped at 1.5 seconds.
+A separate two-connection pool has one-second pool/connect timeouts.
+
+English all-word text search runs first. Below three matches, only an omitted
+relevance default may be dropped, then any-word matching ranks text relevance
+before score. Explicit relevance is retained. The response discloses each step.
+Relevance 3+ usually suits security-agent builders; use 0 for general malware,
+threat or vulnerability questions. Zero narrow matches do not prove missing
+coverage: follow the hint. Score is depth + originality + a harness bonus;
+score_recent applies the existing seven-day decay and catalog date anchor.
+The assistant still calls its local adapter, sharing only the SQL/search service;
+its model-visible post output and its enrichment/link adapter remain in place.
+
+Lists cap at 25 rows, except `find_posts` (10) and related papers (20).
+Organizations, conferences and frameworks now support limit/offset; developers
+and browse retain them. Grouped tasks and benchmarks use page/limit over the
+flattened rows, with totals; developer repositories and each lineage direction
+have limit/offset and totals. Whole-table organization/framework/conference
+fetches remain cached in the base client, but MCP responses are paged and compact.
+Paged feeds retain the API's total where provided; otherwise total counts the
+received collection. Nested lists are capped and disclose their original size.
+Organization list rows contain identifiers, links and counts; their top work
+contains only a title and catalog link. Use `get_organization` for details.
+The assistant preserves the full repository total when a developer page is
+truncated. Taxonomy, benchmark, conference and framework tools are inherited
+from the base server and sparse in this catalog.
+
+`get_paper_info` adds curated metadata; `read_paper` uses the versioned
+`/api/v1/research/papers/{id}/read` endpoint. Postgres holds the text; no runtime
+OCR or model calls are involved. Without cached text it returns a source link.
+Project artifacts may be subdirectories; stars belong to the enclosing repo.
+
+Run all profile/analytics tests plus the unchanged upstream suite from a local
+clone, without contacting deployed services or sending analytics:
+
+```sh
+SCRATCH=/path/to/writable/scratch bash local-dev/test-mcp.sh /path/to/pwc-cli-cyber
+```
+
+The script archives the pin into a fresh scratch tree, applies the patch, runs
+the Dockerfile's frozen non-editable runtime install, then installs only locked
+test dependencies. It prints the raw upstream result and fails on any failure
+outside the ten recorded baseline incompatibilities, any skips, or fewer than
+81 upstream passes. All analytics HTTP sends are stubbed.
+
+### Public MCP tool contract
+
+`null` means omitted. `limit=null` on tasks/benchmarks means 25; find_posts
+relevance omitted/null means an implicit 3. Strings without a stated bound
+retain the base CLI contract. Dates are YYYY-MM-DD; standard paper date bounds
+are inclusive. The tool schema at `/mcp/schema` is authoritative. Rows below follow `tools/list` order.
+
+| Tool | Parameters, defaults and bounds |
+| --- | --- |
+| `find_posts` | `query=""` (max chars 200); `topic=""` (max chars 100); `subtopic=""` (max chars 100); `post_type=""` (max chars 64); `tier=""`; `publisher=""` (max chars 160); `min_agent_relevance=3` (0..4); `harness_engineering=null`; `published_after=null` (max chars 10); `sort="score"` (score/recent/score_recent); `limit=10` (1..10) |
+| `browse_catalog` | `topic=""` (max chars 100); `target=""` (max chars 100); `contribution=""` (max chars 100); `year=""` (max chars 100); `kind=""` (max chars 100); `limit=10` (1..25); `offset=0` (0..2500); `include_facet_counts=false`; `min_agent_relevance=null` (0..4); `tier=""`; `post_type=""` (max chars 64) |
+| `search_papers` | `query=required` (min chars 1, max chars 500); `mode="keyword"` (keyword); `page=1` (1..100); `limit=10` (1..25); `published_after=null` (max chars 10); `published_before=null` (max chars 10); `has_official_implementation=false` |
+| `catalog_filters` | None |
+| `get_paper_info` | `paper=required` (min chars 1, max chars 500); `include_resources=false`; `repo_limit=5` (1..10); `include_evaluations=false` |
+| `read_paper` | `paper=required` (min chars 1, max chars 500); `cursor=null`; `offset=null` (0..9223372036854775807) |
+| `list_developers` | `q=""` (max chars 100); `topic=""` (max chars 100); `target=""` (max chars 100); `contribution=""` (max chars 100); `repository=""` (max chars 250); `sort="agent"` (agent/repos/stars); `include_facet_counts=false`; `limit=10` (1..25); `offset=0` (0..2500) |
+| `get_developer` | `github_id=required` (1..9223372036854775807); `limit=10` (1..25); `offset=0` (0..2500) |
+| `list_organizations` | `featured_only=false`; `sort=null` (trending/papers/stars/name); `limit=10` (1..25); `offset=0` (0..2500) |
+| `get_organization` | `organization=required` (min chars 1, max chars 500) |
+| `get_paper_evaluations` | `paper=required` (min chars 1, max chars 500); `page=1` (1..100); `limit=20` (1..25) |
+| `list_papers` | `search=null`; `task=null`; `method=null`; `conference=null`; `framework=null`; `organization=null`; `authors=null` (max items 10); `published_after=null` (max chars 10); `published_before=null` (max chars 10); `all_versions=false`; `order_by="trending"` (trending/date_published/citation_count); `order_direction="desc"` (asc/desc); `include_resources=false`; `has_official_implementation=false`; `page=1` (1..100); `limit=20` (1..25) |
+| `list_recent_papers` | `limit=10` (1..25) |
+| `list_trending_papers` | `limit=20` (1..25); `max_age_days=180` (1..365); `min_velocity=null` |
+| `get_related_papers` | `paper=required` (min chars 1, max chars 500); `limit=4` (1..20) |
+| `get_paper_lineage` | `paper=required` (min chars 1, max chars 500); `limit=10` (1..25); `offset=0` (0..2500) |
+| `get_task` | `task=required` (min chars 1, max chars 500); `benchmark_limit=10` (1..10) |
+| `list_tasks` | `search=null`; `area=null`; `level=null`; `visible_only=false`; `group_by_area=false`; `order_by="name"` (name/created_at/level/paper_count); `order_direction="asc"` (asc/desc); `page=1` (1..100); `limit=null` (1..25) |
+| `get_method` | `method=required` (min chars 1, max chars 500) |
+| `list_methods` | `search=null`; `area=null`; `introduced_year=null`; `order_by="name"` (name/full_name/introduced_year/created_at/paper_count); `order_direction="asc"` (asc/desc); `page=1` (1..100); `limit=25` (1..25) |
+| `get_conference` | `conference=required` (min chars 1, max chars 500) |
+| `get_framework` | `framework=required` (min chars 1, max chars 500) |
+| `get_benchmark` | `benchmark=required` (min chars 1, max chars 500); `page=1` (1..100); `limit=20` (1..25); `is_open=null`; `max_parameters=null` (max chars 32); `require_metrics=null` (min items 1); `minimum_metrics=null`; `maximum_metrics=null`; `sort_metric=null` (max chars 200); `pareto=null` (min items 2) |
+| `list_benchmarks` | `search=null`; `task=null`; `include_descendants=false`; `minimum_evaluations=null`; `is_open=null`; `group_by_area=false`; `area=null`; `benchmarks_per_task=3` (1..10); `order_by=null` (trending/name/full_name/created_at/paper_count); `order_direction="asc"` (asc/desc); `page=1` (1..100); `limit=null` (1..25) |
+| `list_conferences` | `year=null`; `limit=10` (1..25); `offset=0` (0..2500) |
+| `list_frameworks` | `domain=null`; `category=null`; `platform=null`; `limit=10` (1..25); `offset=0` (0..2500) |
 
 ## Rebuild, restore and promotion
 
@@ -181,6 +298,27 @@ configuration. The project token is the same public ingestion token. Enable **Pr
 the browser's CSP to permit connections to the selected ingest host if the
 site has a restrictive `connect-src`. Browser or network blocking can reduce
 these counts. Analytics outages and rate spikes do not block MCP requests.
+
+All three MCP events use `catalog-mcp-service`, disable person profiles and
+GeoIP, and carry `client_name`/`client_version` when the request supplies them,
+`user_agent_product`/`user_agent_version` from only the first product token,
+`client_source=request|none`, the existing bounded `mcp_protocol` label, and
+HTTP status. The 2026-07-28 protocol supplies clientInfo at
+`params._meta["io.modelcontextprotocol/clientInfo"]`; initialize supplies it at
+`params.clientInfo`. There is deliberately no recent-initialize association:
+public clients currently share one docker-proxy peer, making peer-based
+attribution unreliable. Legacy tool/list calls can therefore have no client name; their
+initialize event still records who connected.
+
+Labels accept only `[A-Za-z0-9._ -]`, with 64-character names and 32-character
+versions; invalid labels/IP literals become `other`, absent values stay absent.
+The trusted loopback `X-PwC-MCP-Client: assistant-…` path sets only
+`first_party_assistant=true`; neither its visitor hash nor any peer address/hash
+is retained or emitted. No full UA, arguments, results, ids or cursors are sent.
+Capture queues at most eight tasks, uses a three-second HTTP timeout, sends
+nothing without the configured token, and never waits in the request path.
+The existing `mcp_request` operational log is unchanged.
+
 
 #### Session replay
 
@@ -247,7 +385,9 @@ controls can reduce the measured visits.
 | `paper_link_clicked` | A visitor activated a public paper title or thumbnail. Includes the displayed paper title, ID, source surface and link part; captures keyboard, new-tab and middle-click activation, never hover or prefetch. |
 | `paper_opened` | The paper detail loaded successfully; includes its public catalog ID, title and facets. A thumbnail request or hover does not count. |
 | `paper_resource_clicked` | Intent to open a resource. Direct PDF links count as `pdf`; the reader, cached text, publisher landing pages and other artifacts have separate values. Recognized repository links count as `code`. It does not prove a download completed. |
-| `catalog_mcp_tool_called` | A named JSON-RPC `tools/call` request for a registered tool. Counts attempts, including errors and retries, by tool and HTTP status. A 200 is not proof of tool success. The single service ID is not a visitor; handshake, list, health and web page visits do not count. |
+| `catalog_mcp_tool_called` | A named `tools/call` for a registered tool. Counts attempts, errors and retries by tool, caller software and HTTP status; HTTP 200 is not proof of tool success. |
+| `catalog_mcp_client_initialized` | A JSON-RPC `initialize` attempt, with sanitized self-reported client software and HTTP status. |
+| `catalog_mcp_tools_listed` | A JSON-RPC `tools/list` attempt, including clients that never call a tool. |
 
 For a weekly review, filter to `catalog_environment=production`. Compare weekly
 unique pageview visitors with unique paper readers and PDF/code clickers. Over
